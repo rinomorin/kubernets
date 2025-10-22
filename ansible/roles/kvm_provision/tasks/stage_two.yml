@@ -1,0 +1,61 @@
+# roles/kvm_provision/tasks/start_vm.yml
+- name: Start VMs in dependency order
+  include_tasks: vm_boot_order.yml
+  vars:
+    ordered_groups: ['ca', 'dns']
+  when: vm_build_state != "running"  
+
+- name: Wait before after stating
+  wait_for:
+    timeout: 30
+  delegate_to: localhost
+  become: false
+  when: vm_build_state != "running"
+
+- name: vm_build_state status
+  debug:
+    msg: "vm_build_state is {{ vm_build_state }}"
+
+- name: Update vm_build_state to running (from polling)
+  set_fact:
+    vm_build_state: "running"
+    vm_build_stage: "booting"
+  when: (vm_state_check.stdout | default('')) == "running"
+
+- name: Update vm_build_state to running (already known)
+  set_fact:
+    vm_build_state: "running"
+    vm_build_stage: "booting"
+  when: vm_state_check is not defined and vm_build_state == "running"
+
+- name: Wait before SSH check
+  wait_for:
+    timeout: 30
+  delegate_to: localhost
+  become: false
+  when: vm_build_state == "running"
+
+- name: check vm_host
+  debug: msg="{{ vm_host}}"
+
+- name: Probe VM with echo until SSH is ready
+  become: false
+  shell: echo sshok
+  register: ssh_check
+  vars:
+    ansible_user: "{{ admin_id }}"
+    ansible_ssh_pass: "{{ admin_set }}"
+    ansible_host: "{{ vm_fqdn }}"
+  delegate_to: "{{ vm_host }}"
+  failed_when: false
+  changed_when: false
+  until: (ssh_check.stdout | default('')) == "sshok"
+  retries: 12         # 6 attempts
+  delay: 10          # 10 seconds between attempts
+
+- name: Mark VM as ready
+  set_fact:
+    vm_build_state: "sshok"
+    vm_build_stage: "booted"
+  when: (ssh_check.stdout | default('')).find('sshok') != -1
+

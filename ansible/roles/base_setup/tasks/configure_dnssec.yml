@@ -1,0 +1,5 @@
+- name: Enable DNSSEC signing
+  command: ipa dnszone-mod "{{ dns_zone }}" --dnssec=true
+
+- name: Trigger zone signing
+  command: ipa-dnskeysyncd --sync

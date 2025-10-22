@@ -1,0 +1,13 @@
+- name: Gather system info
+  setup:
+
+- name: Save gathered facts to JSON
+  copy:
+    content: "{{ ansible_facts | to_nice_json }}"
+    dest: "/tmp/secops_facts_{{ inventory_hostname }}.json"
+
+- name: Fetch system info
+  fetch:
+    src: "/tmp/secops_facts_{{ inventory_hostname }}.json"
+    dest: "secops_results/"
+    flat: yes

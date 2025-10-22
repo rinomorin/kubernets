@@ -1,0 +1,3 @@
+- name: Dispatch secops action
+  include_tasks: "{{ action }}.yml"
+  when: action is defined

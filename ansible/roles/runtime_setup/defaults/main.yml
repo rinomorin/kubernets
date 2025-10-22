@@ -1,0 +1,4 @@
+kubernetes_version_url: "https://dl.k8s.io/release/stable.txt"
+containerd_release_api: "https://api.github.com/repos/containerd/containerd/releases/latest"
+containerd_install_dir: "/usr/local/bin"
+containerd_temp_dir: "/tmp/containerd"

@@ -1,0 +1,12 @@
+- name: Fetch kubernetes version info
+  import_tasks: version.yml
+
+- name: Install kubernetes
+  import_tasks: install.yml
+
+- name: Configure
+  import_tasks: configure.yml
+- import_tasks: validate.yml
+
+- name: Validate Kubernetes runtime
+  import_tasks: validate.yml

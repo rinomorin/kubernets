@@ -1,0 +1,4 @@
+- name: Restart CRI-O
+  ansible.builtin.systemd:
+    name: "{{ crio_service_name }}"
+    state: restarted

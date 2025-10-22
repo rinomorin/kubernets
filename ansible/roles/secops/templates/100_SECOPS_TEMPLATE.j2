@@ -1,0 +1,5 @@
+# GLOBAL sudoers template for {{ account }}
+Cmnd_Alias {{ account }}_SECOPS = %secops
+Host_Alias {{ account }}_SECOPS_HOSTS = {{ ansible_hostname }}
+
+{{ account }}_SECOPS {{ account }}_SECOPS_HOSTS = (ALL) NOPASSWD:ALL

@@ -1,0 +1,11 @@
+- name: Create kubeadm config directory
+  file:
+    path: "{{ kubeadm_cluster_config_path | dirname }}"
+    state: directory
+    mode: '0755'
+
+- name: Generate kubeadm cluster config
+  template:
+    src: kubeadm-config.yaml.j2
+    dest: "{{ kubeadm_cluster_config_path }}"
+    mode: '0644'

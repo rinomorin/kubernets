@@ -1,0 +1,32 @@
+- name: Set system hostname
+  import_tasks: set_hostname.yml
+
+- name: Populate /etc/hosts with cluster entries
+  import_tasks: set_hosts.yml
+
+- name: Create DNS zone for api.morinsoft.ca
+  import_tasks: configure_dns_zone.yml
+
+- name: Add A records for infrastructure aliases
+  import_tasks: configure_dns_aliases.yml
+
+- name: Add PTR records for reverse DNS
+  import_tasks: configure_dns_ptr_records.yml
+
+- name: Add SRV records for FreeIPA service discovery
+  import_tasks: configure_dns_srv_records.yml
+  when: "'dns' in group_names" 
+
+- name: Enable DNSSEC signing for api.morinsoft.ca
+  import_tasks: configure_dnssec.yml
+
+- name: Delegate api.morinsoft.ca from morinsoft.ca (if applicable)
+  import_tasks: configure_zone_delegation.yml
+  when: "'dns' in group_names"
+
+- name: Configure FreeIPA CA and issue service certificates
+  import_tasks: configure_ca_services.yml
+  when: inventory_hostname == groups['dns'][0]
+
+- name: Validate DNS resolution from helper node
+  import_tasks: validate_dns_aliases.yml

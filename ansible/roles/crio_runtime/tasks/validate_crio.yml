@@ -1,0 +1,44 @@
+- name: Check if CRI-O binary is present
+  ansible.builtin.command: which crio
+  register: crio_bin_check
+  failed_when: crio_bin_check.rc != 0
+  changed_when: false
+
+- name: Check if crio-status binary is present
+  ansible.builtin.command: which crio-status
+  register: crio_status_check
+  failed_when: crio_status_check.rc != 0
+  changed_when: false
+
+- name: Check CRI-O systemd service status
+  ansible.builtin.systemd:
+    name: crio
+  register: crio_service_status
+
+- name: Assert CRI-O service is active
+  ansible.builtin.assert:
+    that:
+      - crio_service_status.status.ActiveState == "active"
+    fail_msg: "CRI-O service is not active"
+    success_msg: "CRI-O service is running"
+
+- name: Check CRI-O socket exists
+  ansible.builtin.stat:
+    path: /var/run/crio/crio.sock
+  register: crio_socket
+
+- name: Assert CRI-O socket is present
+  ansible.builtin.assert:
+    that:
+      - crio_socket.stat.exists
+    fail_msg: "CRI-O socket not found"
+    success_msg: "CRI-O socket is available"
+
+- name: Get CRI-O version
+  ansible.builtin.command: crio --version
+  register: crio_version
+  changed_when: false
+
+- name: Display CRI-O version
+  ansible.builtin.debug:
+    msg: "CRI-O version: {{ crio_version.stdout }}"

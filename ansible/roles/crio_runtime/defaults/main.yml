@@ -1,0 +1,6 @@
+crio_repo_url: "https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/RHEL_9/"
+crio_gpg_key_url: "https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/RHEL_9/repodata/repomd.xml.key"
+crio_packages:
+  - cri-o
+  - cri-o-runc
+crio_service_name: "crio"

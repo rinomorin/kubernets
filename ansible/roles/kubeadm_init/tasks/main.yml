@@ -1,0 +1,3 @@
+- import_tasks: generate_config.yml
+- import_tasks: init_cluster.yml
+- import_tasks: validate_cluster.yml

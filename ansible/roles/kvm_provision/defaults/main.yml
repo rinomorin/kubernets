@@ -1,0 +1,16 @@
+# default/main.yml
+# default stages
+existing_vms: false
+kvm_delegate: "{{ kvm_name | default((kvm | default(['kvmdc01.morinsoft.ca']))[0]) }}"
+vm_build_stage: "unknown"
+vm_build_state: "undefined"
+vm_timeout: 0
+# defauls system info
+vcpu: 2
+ram: 4096
+iso: "/var/lib/libvirt/images/Rocky-9.6-x86_64-boot.iso"
+default_network: "default"
+os_variant: "rocky9"
+shutdown_max_timeout: 1800
+default_ansible_id: "secops"
+default_ansible_pwd: "On32Secure4Sec0ps~"

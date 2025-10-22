@@ -1,0 +1,14 @@
+- name: Extract second-level domain
+  set_fact:
+    account_domain: "{{ ansible_domain.split('.')[-2:] | join('.') }}"
+
+- name: Add NS record in parent zone
+  command: >
+    ipa dnsrecord-add "{{ account_domain }}"
+    api --ns-rec={{ when: inventory_hostname == groups['dns'][0] }}.
+
+- name: Add glue A record for delegated NS
+  command: >
+    ipa dnsrecord-add {{ account_domain }}
+    {{ groups['dns'][0].split('.')[0] }}.api --a-rec={{ hostvars[groups['dns'][0]].ansible_host }}
+  when: inventory_hostname == groups['dns'][0]

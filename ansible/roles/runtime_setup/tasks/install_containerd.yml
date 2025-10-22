@@ -1,0 +1,25 @@
+- name: Download containerd archive
+  get_url:
+    url: "https://github.com/containerd/containerd/releases/download/v{{ containerd_version }}/containerd-{{ containerd_version }}-linux-amd64.tar.gz"
+    dest: "/tmp/containerd-{{ containerd_version }}.tar.gz"
+
+- name: Create extraction directory
+  file:
+    path: "{{ containerd_temp_dir }}-{{ containerd_version }}"
+    state: directory
+    mode: '0755'
+
+- name: Extract containerd archive
+  ansible.builtin.unarchive:
+    src: "/tmp/containerd-{{ containerd_version }}.tar.gz"
+    dest: "{{ containerd_temp_dir }}-{{ containerd_version }}"
+    remote_src: yes
+
+- name: Copy containerd binaries to install dir
+  copy:
+    src: "{{ containerd_temp_dir }}-{{ containerd_version }}/bin/"
+    dest: "{{ containerd_install_dir }}/"
+    mode: '0755'
+    owner: root
+    group: root
+    remote_src: yes

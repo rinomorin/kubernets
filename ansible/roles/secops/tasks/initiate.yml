@@ -1,0 +1,109 @@
+- name: Ensure secops user exists
+  user:
+    name: secops
+    shell: /bin/bash
+    groups: wheel
+    state: present
+    create_home: true
+
+- name: Set authorized SSH key for secops
+  authorized_key:
+    user: secops
+    key: "{{ lookup('file', ssh_pubkey_path | default('/home/secops/.ssh/id_rsa.pub')) }}"
+    state: present
+
+- name: Deploy sudoers file for secops group
+  template:
+    src: 100_SECOPS_TEMPLATE.j2
+    dest: "/etc/sudoers.d/100_{{ account }}_SECOPS_GLB
+    owner: root
+    group: root
+    mode: '0440'
+    validate: 'visudo -cf %s'
+  vars:
+    account: "{{ this_account }}"
+
+- name: Comment out any #includedir lines in /etc/sudoers
+  replace:
+    path: /etc/sudoers
+    regexp: '^#?includedir\s+.*'
+    replace: '# [REMOVED] \g<0>'
+  validate: 'visudo -cf %s'
+
+- name: Backup original /etc/sudoers
+  copy:
+    src: /etc/sudoers
+    dest: /etc/sudoers.bak
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0440'
+
+- name: Comment out any #includedir lines in /etc/sudoers
+  replace:
+    path: /etc/sudoers
+    regexp: '^#?includedir\s+.*'
+    replace: '# [REMOVED] \g<0>'
+    validate: 'visudo -cf %s'
+
+- name: Ensure direct include for secops sudoers file
+  lineinfile:
+    path: /etc/sudoers
+    line: "#include /etc/sudoers.d/100_{{ account }}_SECOPS_GLB"
+    state: present
+    insertafter: EOF
+    validate: 'visudo -cf %s'
+
+- name: Validate final sudoers file
+  command: visudo -cf /etc/sudoers
+  register: sudoers_check
+  ignore_errors: true
+
+- name: Restore original sudoers if validation failed
+  copy:
+    src: /etc/sudoers.bak
+    dest: /etc/sudoers
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0440'
+  when: sudoers_check.rc != 0
+
+- name: Fail if sudoers validation failed
+  fail:
+    msg: "Sudoers validation failed. Original file restored. Check for syntax errors."
+  when: sudoers_check.rc != 0
+
+- name: Remove sudoers backup if validation succeeded
+  file:
+    path: /etc/sudoers.bak
+    state: absent
+  when: sudoers_check.rc == 0
+
+- name: Test secops SSH and Ansible-style sudo from localhost
+  delegate_to: localhost
+  shell: |
+    ssh -i {{ ssh_privkey_path | default('/home/secops/.ssh/id_rsa') }} \
+        -o StrictHostKeyChecking=no \
+        -o UserKnownHostsFile=/dev/null \
+        secops@{{ hostvars[inventory_hostname].ansible_host }} \
+        "sudo /bin/sh -c 'whoami'"
+  register: ssh_sudo_test
+  ignore_errors: true
+
+- name: Assert secops can SSH and sudo like Ansible
+  assert:
+    that:
+      - ssh_sudo_test.stdout == "root"
+    fail_msg: "SSH or sudo failed for secops on {{ inventory_hostname }}. Check sudoers, SSH config, or shell restrictions."
+
+- name: Perform preliminary system check
+  shell: |
+    echo "Hostname: $(hostname)"
+    echo "Kernel: $(uname -r)"
+    echo "Uptime: $(uptime -p)"
+  register: prelim_check
+
+- name: Show preliminary check results
+  debug:
+    var: prelim_check.stdout_lines

@@ -1,0 +1,1 @@
+this_account: "{{ account_name| default(ansible_fqdn.split('.')[-2]) }}"

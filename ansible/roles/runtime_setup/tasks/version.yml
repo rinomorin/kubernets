@@ -1,0 +1,19 @@
+- name: Get latest Kubernetes version (major.minor)
+  delegate_to: localhost
+  run_once: true
+  shell: |
+    curl -sL {{ kubernetes_version_url }} | sed 's/\.[^.]*$//' | sed 's/^\\(.....\\).*/\\1/'
+  register: kubernetes_version_data
+
+- name: Set Kubernetes version fact
+  set_fact:
+    kubernetes_version: "{{ kubernetes_version_data.stdout }}"
+
+- name: Fetch latest containerd version tag
+  shell: |
+    curl -s {{ containerd_release_api }} | jq -r '.tag_name' | sed 's/[a-zA-Z]//g' | tr -d '\n'
+  register: containerd_version_raw
+
+- name: Set containerd version fact
+  set_fact:
+    containerd_version: "{{ containerd_version_raw.stdout }}"

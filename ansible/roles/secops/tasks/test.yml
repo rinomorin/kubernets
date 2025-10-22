@@ -1,0 +1,8 @@
+- name: Test secops SSH access
+  shell: whoami
+  become: false
+  register: whoami_result
+
+- name: Display SSH test result
+  debug:
+    msg: "SSH access confirmed as user: {{ whoami_result.stdout }}"

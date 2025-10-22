@@ -1,0 +1,209 @@
+- name: stage status
+  debug:
+    msg: "stage is {{ vm_build_stage }}"
+
+- name: Ensure Kickstart staging directory in user home
+  file:
+    path: "/home/kvm_admin/kickstarts"
+    state: directory
+    owner: kvm_admin
+    group: kvm_admin
+    mode: '0755'
+
+- name: show items
+  debug:
+    msg: "fqdn {{ vm_fqdn }}"
+
+- name: set ip_addr
+  set_fact:
+    ip_addr: "{{ ansible_host }}"
+  when: ansible_host
+
+- name: Validate required extra_vars
+  assert:
+    that:
+      - ip_addr is defined
+      - ip_mask is defined
+      - net_device is defined
+      - ip_gate is defined
+      - root_set is defined
+      - admin_set is defined
+    fail_msg: "Missing required extra_vars: ip_addr, ip_mask, net_device, ip_gate"
+
+- name: Set default DNS if not defined
+  set_fact:
+    ip_dns: "{{ ip_dns | default('192.168.100.1,8.8.8.8') }}"
+
+- name: Convert CIDR to subnet mask
+  vars:
+    cidr: 24
+  set_fact:
+    ip_mask: >-
+      {{
+        [ (['1'] * cidr + ['0'] * (32 - cidr))
+          | join('')
+          | regex_replace('(.{8})', '\\1 ')
+          | split()
+          | map('int', 2)
+          | join('.')
+      }}
+  when: ip_cid is defined
+
+- name: show ip_mask
+  debug:
+    var: ip_mask
+  when: ip_mask is defined
+
+- name: Calculate CIDR from subnet mask
+  set_fact:
+    ip_cid: >-
+      {{
+        ip_mask.split('.') |
+        map('int') |
+        map('regex_replace', '255', '8') |
+        map('regex_replace', '254', '7') |
+        map('regex_replace', '252', '6') |
+        map('regex_replace', '248', '5') |
+        map('regex_replace', '240', '4') |
+        map('regex_replace', '224', '3') |
+        map('regex_replace', '192', '2') |
+        map('regex_replace', '128', '1') |
+        map('regex_replace', '0', '0') |
+        map('int') |
+        sum
+      }}
+
+- name: Get VM status from virsh list
+  shell: |
+    if virsh list --all | sed 's/shut off/shutdown/' | grep -q '{{ vm_host }}'; then
+      virsh list --all | sed 's/shut off/shutdown/' | awk '/{{ vm_host }}/ { if ($NF != "-") print $NF; else print "undefined" }'
+    else
+      echo "undefined"
+    fi
+  register: vm_status
+  changed_when: false
+
+- name: show status
+  debug:
+    msg: "{{ vm_host }} state is {{ vm_status.stdout }} or {{ vm_status.stderr}}" 
+
+   
+- name: Set fact for existing VMs
+  set_fact:
+    existing_vms: true
+  when: "'undefined' not in (vm_status.stdout | trim)"
+
+- name: show existing_vms
+  debug:
+    msg: "existing_vms {{ existing_vms  }}"
+
+- name: Remove existing VMs if force_rebuild is true
+  when: 
+    - (force_rebuild | default(false)) | bool
+    - existing_vms
+    - vm_host != kvm_delegate
+  block:
+    - name: Get VM state from virsh list
+      shell: |
+        if virsh list --all | sed 's/shut off/shutdown/' | grep -q '{{ vm_host }}'; then
+          virsh list --all | sed 's/shut off/shutdown/' | awk '/{{ vm_host }}/ { if ($NF != "-") print $NF; else print "undefined" }'
+        else
+          echo "undefined"
+        fi
+      register: vm_state
+      changed_when: false
+      
+    - name: show stat
+      debug:
+        msg: "{{ vm_host }} state is {{ vm_state.stdout }} or {{ vm_state.stderr}}" 
+
+    - name: Destroy VM if running
+      command: "virsh destroy {{ vm_host }}"
+      when: 
+        - vm_state.stdout == "running"
+      
+    - name: Get VM disk path before undefine
+      command: "virsh domblklist {{ vm_host }} --details | awk '/disk/ { print $4 }'"
+      register: vm_disk_paths
+      changed_when: false
+      failed_when: false
+      
+    - name: Undefine VM
+      command: "virsh undefine {{ vm_host }}"
+      
+    - name: Remove VM disk(s) after undefine
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop: "{{ vm_disk_paths.stdout_lines }}"
+      when: 
+        - item != "" and item != "-"
+      
+    - name: Set fact for existing VMs
+      set_fact:
+        existing_vms: false
+
+# - name: break
+#   debug: "{{break_here}}"
+- name: Set kickstart template based on group
+  set_fact:
+    kickstart_template_set: >-
+      {% if inventory_hostname in groups['control_nodes'] %}
+        helper-node.ks.j2
+      {% elif inventory_hostname in groups['dns'] 
+            or inventory_hostname in groups['ldap'] 
+            or inventory_hostname in groups['ntp'] 
+            or inventory_hostname in groups['ca'] %}
+        ca_cis.base.ks.j2
+      {% else %}
+        default.ks.j2
+      {% endif %}
+  when: "'dns' in group_names"
+
+- name: clean variable
+  set_fact:
+     kickstart_template: "{{ kickstart_template_set | trim | replace('\n', '') | replace(' ', '') }}"
+  when: kickstart_template_set is defined
+
+- name: Show which kickstart file
+  debug:
+    msg: "ks = {{ kickstart_template }} to {{ existing_vms }}"
+  when: kickstart_template is defined
+
+- name: Generate Kickstart files for new or forced VMs
+  template:
+    src: "{{ kickstart_template }}"
+    dest: "/home/kvm_admin/kickstarts/{{ vm_host }}.ks"
+  when: not existing_vms and kickstart_template is defined
+  vars:
+    ip_address: "{{ ip_addr }}"
+    hostname: "{{ vm_fqdn }}"
+    gateway: "{{ ip_gate }}"
+    dns: "{{ ip_dns }}"
+    net_device: "{{ net_device }}"
+    ip_mask: "{{ ip_mask }}"
+    ip_cid: "{{ ip_cid }}"
+    root_pwd: "{{ root_set }}"
+    admin_pwd: "{{ admin_set }}"
+    install_disk: "sda"
+
+- name: Execute virt-install non-interactively and wait for completion
+  when: 
+    - not existing_vms
+    - kickstart_template is defined
+    - "'kvm' not in group_names"
+  command: >
+    virt-install
+      --name {{ vm_host }}
+      --ram {{ ram }}
+      --vcpus {{ vcpu }}
+      --initrd-inject="/home/kvm_admin/kickstarts/{{ vm_host }}.ks"
+      --extra-args="inst.ks=file:/{{ vm_host }}.ks console=ttyS0,115200n8"
+      --disk path=/var/lib/libvirt/images/{{ vm_host }}.qcow2,size=50,bus=sata
+      --os-variant {{ os_variant }}
+      --network network={{ default_network }}
+      --graphics none
+      --console pty,target_type=serial
+      --location {{ iso }}
+      --noautoconsole
+

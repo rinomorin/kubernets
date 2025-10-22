@@ -1,0 +1,57 @@
+all:
+  hosts:
+    helper_node:
+      ansible_host: 192.168.100.103
+      hostname: helper01.morinsoft.ca
+    master_node:
+      ansible_host: 192.168.100.104
+      hostname: master01.morinsoft.ca
+    worker_node1:
+      ansible_host: 192.168.100.105
+      hostname: worker01.morinsoft.ca
+    worker_node2:
+      ansible_host: 192.168.100.106
+      hostname: worker02.morinsoft.ca
+    kvmdc01:
+      ansible_host: 192.168.100.3
+      hostname: kvmdc01.morinsoft.ca
+    ipa01:
+      ansible_host: 192.168.100.10
+      hostname: ipa01.morinsoft.ca
+    ipa02:
+      ansible_host: 192.168.100.11
+      hostname: ipa02.morinsoft.ca
+
+  children:
+    control_nodes:
+      hosts:
+        helper_node:
+        master_node:
+    worker_nodes:
+      hosts:
+        worker_node1:
+        worker_node2:
+    infrastructure:
+      hosts:
+        kvmdc01:
+        ipa01:
+        ipa02:
+    dns:
+      hosts:
+        ipa01:
+        ipa02:
+    ldap:
+      hosts:
+        ipa01:
+        ipa02:  
+    ca:
+      hosts:
+        ipa01:
+        ipa02:
+    ntp:
+      hosts:
+        ipa01:
+        ipa02:
+    kvm:
+      hosts:
+        kvmdc01:

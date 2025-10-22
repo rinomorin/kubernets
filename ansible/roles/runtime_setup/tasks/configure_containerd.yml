@@ -1,0 +1,6 @@
+- name: Ensure containerd systemd unit exists
+  ansible.builtin.systemd:
+    name: containerd
+    enabled: yes
+    state: started
+  ignore_errors: yes  # In case unit file isn't present yet

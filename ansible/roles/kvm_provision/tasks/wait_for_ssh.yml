@@ -1,0 +1,14 @@
+- name: Wait for SSH on provisioned VMs
+  wait_for:
+    host: "{{ item }}"
+    port: 22
+    timeout: 300
+    state: started
+  loop: "{{ groups['infrastructure'] }}"
+  loop_control:
+    label: "{{ item }}"
+
+- name: Initialize VM state
+  set_fact:
+    vm_build_stage: "up"
+  when: sshok.stdout == "{{ vm_fqdn }}"

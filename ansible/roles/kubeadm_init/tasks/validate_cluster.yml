@@ -1,0 +1,28 @@
+- name: Ensure control plane endpoint resolves
+  command: "getent hosts {{ kubeadm_control_plane_endpoint.split(':')[0] }}"
+  register: dns_check
+  failed_when: dns_check.rc != 0
+  changed_when: false
+
+
+- name: Check if kube-apiserver is running
+  shell: "crictl ps | grep kube-apiserver"
+  register: apiserver_check
+  failed_when: apiserver_check.rc != 0
+  changed_when: false
+
+- name: Assert kube-apiserver is running
+  assert:
+    that:
+      - apiserver_check.stdout != ""
+    fail_msg: "kube-apiserver not running"
+    success_msg: "kube-apiserver is active"
+
+- name: Check kubectl cluster-info
+  command: kubectl cluster-info
+  register: cluster_info
+  changed_when: false
+
+- name: Show cluster-info
+  debug:
+    var: cluster_info.stdout_lines

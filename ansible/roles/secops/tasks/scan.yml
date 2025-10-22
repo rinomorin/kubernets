@@ -1,0 +1,19 @@
+- name: Run compliance scan (placeholder)
+  shell: |
+    oscap xccdf eval \
+      --profile xccdf_org.ssgproject.content_profile_cis \
+      --results-arf /tmp/secops_scan_{{ inventory_hostname }}.xml \
+      --report /tmp/secops_scan_{{ inventory_hostname }}.html \
+      /usr/share/xml/scap/ssg/content/ssg-*.xml
+  register: scan_output
+  failed_when: false
+
+- name: Convert scan result to JSON summary (placeholder)
+  shell: |
+    echo '{"host": "{{ inventory_hostname }}", "status": "scanned"}' > /tmp/secops_scan_{{ inventory_hostname }}.json
+
+- name: Fetch scan summary
+  fetch:
+    src: "/tmp/secops_scan_{{ inventory_hostname }}.json"
+    dest: "secops_results/"
+    flat: yes

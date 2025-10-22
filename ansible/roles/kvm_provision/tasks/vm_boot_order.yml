@@ -1,0 +1,52 @@
+- name: Compute final VM boot order
+  set_fact:
+    final_vm_order: >-
+      {{
+        ordered_groups
+        | map('extract', groups)
+        | flatten
+        | unique
+        | map('regex_search', '\\d+$')
+        | map('int')
+        | zip(ordered_groups | map('extract', groups) | flatten | unique)
+        | sort
+        | map('last')
+        | list
+      }}
+  run_once: true
+  delegate_to: kvmdc01
+
+- name: Share final_vm_order with all hosts
+  set_fact:
+    final_vm_order: "{{ hostvars['kvmdc01']['final_vm_order'] }}"
+  when: inventory_hostname != 'kvmdc01'
+
+- name: Conditionally start VM if defined and not running
+  shell: |
+    if virsh dominfo {{ vm_host2 }} >/dev/null 2>&1; then
+      state=$(virsh domstate {{ vm_host2 }} | tr -d '\r')
+      if [ "$state" != "running" ]; then
+        virsh start {{ vm_host2 }}
+      else
+        echo "{{ vm_host2 }} already running"
+      fi
+    else
+      echo "{{ vm_host2 }} not defined"
+    fi
+  register: vm_start
+  loop: "{{ final_vm_order }}"
+  loop_control:
+    loop_var: vm_host2
+    label: "{{ vm_host2 }}"
+  delegate_to: kvmdc01
+  become: true
+  changed_when: "'already running' not in vm_start.stdout and 'not defined' not in vm_start.stdout"
+  failed_when: false
+
+- name: Include shutdown check
+  include_tasks: check_vm_state.yml
+  
+- name: Show VM start result
+  debug:
+    msg: "{{ vm_build_state }}"
+  

@@ -1,0 +1,29 @@
+- name: Ensure Certmonger is enabled
+  systemd:
+    name: certmonger
+    enabled: true
+    state: started
+
+- name: Register service principal in FreeIPA
+  command: ipa service-add {{ item.principal }}
+  loop: "{{ ipa_services }}"
+  loop_control:
+    label: "{{ item.principal }}"
+
+- name: Request and track certificate via Certmonger
+  command: >
+    getcert request -f {{ item.cert_path }} -k {{ item.key_path }}
+    -N {{ item.principal }} -C "systemctl restart {{ item.principal.split('/')[0] | lower }}"
+  loop: "{{ ipa_services }}"
+  loop_control:
+    label: "{{ item.principal }}"
+
+- name: Wait for certificates to be issued
+  command: getcert list -f {{ item.cert_path }}
+  register: cert_status
+  until: "cert_status.stdout is search('status: MONITORING')"
+  retries: 10
+  delay: 15
+  loop: "{{ ipa_services }}"
+  loop_control:
+    label: "{{ item.cert_path }}"

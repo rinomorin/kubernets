@@ -1,0 +1,50 @@
+# stage one existence
+# ──────── STAGE: Check existence ─────────
+- name: startin vm build
+  debug: msg="checking if system exist"
+
+- name: Set fact for existing VMs
+  set_fact:
+    vm_host: "{{ inventory_hostname }}"
+    vm_fqdn: "{{ hostvars[inventory_hostname].ansible_fqdn | default(inventory_hostname + '.' + ansible_domain | default('morinsoft.ca')) }}"
+
+- name: Validate kvm_delegate is defined
+  assert:
+    that:
+      - kvm_delegate is defined
+      - kvm_delegate | length > 0
+    fail_msg: "kvm_delegate is not defined. Ensure 'kvm' or 'kvm_name' is set in inventory or vars."
+  run_once: yes
+
+- name: working on kvm
+  debug: 
+    msg: "delegated to {{ kvm_delegate }}" 
+
+- name: Check if VM exists
+  become: yes
+  delegate_to: "{{ kvm_delegate }}"
+  import_tasks: stage_one.yml
+  when: 
+   - "'kvm' not in group_names"
+
+- name: Start and get status
+  become: yes
+  delegate_to: "{{ kvm_delegate }}"
+  import_tasks: stage_two.yml
+  when: 
+   - "'kvm' not in group_names"
+
+- name: vm_build_state status
+  debug:
+    msg: "vm_build_state is {{ vm_build_state }}"
+  when: 
+   - "'kvm' not in group_names"
+   
+- name: Start and get status
+  become: yes
+  delegate_to: "{{ kvm_delegate }}"
+  import_tasks: stage_three.yml
+  when: 
+   - "'kvm' not in group_names"
+   - vm_build_state == "sshok"
+

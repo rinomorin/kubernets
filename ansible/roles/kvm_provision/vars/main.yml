@@ -1,0 +1,10 @@
+vm_definitions:
+  api01:
+    kickstart_template: ca_cis.base.ks.j2
+
+  api02:
+    kickstart_template: ca_cis.base.ks.j2
+
+  helper01:
+    kickstart_template: helper-node.ks.j2
+

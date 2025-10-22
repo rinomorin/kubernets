@@ -1,0 +1,17 @@
+- name: Validate required fix ID
+  assert:
+    that: fix_id is defined
+    fail_msg: "You must pass fix_id=<openscap_rule_id>"
+
+- name: Run fix script (dry-run or commit)
+  shell: |
+    echo "Fixing {{ fix_id }} on {{ inventory_hostname }} (dry_run={{ dry_run | default(true) }})"
+    if [ "{{ dry_run | default(true) }}" = "false" ]; then
+      # Actual remediation logic here
+      echo "Applying fix {{ fix_id }}"
+    fi
+  register: fix_result
+
+- name: Show fix result
+  debug:
+    var: fix_result.stdout_lines

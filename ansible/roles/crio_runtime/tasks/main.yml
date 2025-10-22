@@ -1,0 +1,11 @@
+- name: Fetch CRI-O version info
+  import_tasks: version.yml
+
+- name: Install CRI-O packages
+  import_tasks: install_crio.yml
+
+- name: Configure CRI-O service
+  import_tasks: configure_crio.yml
+
+- name: Validate CRI-O runtime
+  import_tasks: validate_crio.yml

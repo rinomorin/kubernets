@@ -1,0 +1,142 @@
+#version=RHEL9
+url --mirrorlist={{ kickstart_baseos_url | default('https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=BaseOS-9.6') }}
+repo --name=AppStream --mirrorlist={{ kickstart_appstream_url | default('https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=AppStream-9.6') }}
+
+lang {{ lang | default('en_CA.UTF-8') }}
+keyboard --vckeymap={{ keyboard_vckeymap | default('us') }} --xlayouts='{{ keyboard_xlayouts | default("us") }}'
+timezone {{ timezone_region | default('UTC') }},{{ time_zone | default('America/Toronto') }}
+
+network --bootproto=dhcp --device={{ net_device | default('enp1s0') }} --onboot=on --hostname={{ hostname | default(inventory_hostname) }}
+timesource --ntp-server={{ ntp_server | default('pool.ntp.org') }}
+
+selinux --enforcing
+firewall --enabled --service=ssh
+
+ignoredisk --only-use={{ install_disk | default('sda') }}
+clearpart --all --initlabel
+bootloader --location=mbr --boot-drive={{ install_disk | default('sda') }}
+
+part /boot --fstype="xfs" --ondisk={{ install_disk | default('sda') }} --size=1024
+part /boot/efi --fstype="efi" --ondisk={{ install_disk | default('sda') }} --size=600 --fsoptions="umask=0077,shortname=winnt"
+part pv.helper01 --fstype="lvmpv" --ondisk={{ install_disk | default('sda') }} --size=96000
+volgroup node00 pv.helper01
+
+{% set volumes = [
+  {'mount': '/tmp', 'name': 'tmplv', 'size': 2048, 'opts': 'nodev,nosuid,noexec'},
+  {'mount': '/var', 'name': 'varlv', 'size': 2048},
+  {'mount': '/var/log', 'name': 'varloglv', 'size': 2048},
+  {'mount': '/var/log/audit', 'name': 'auditlv', 'size': 2048},
+  {'mount': '/var/tmp', 'name': 'vartmplv', 'size': 1024, 'opts': 'nodev,nosuid,noexec'},
+  {'mount': '/dev/shm', 'name': 'shmlv', 'size': 512, 'opts': 'nodev,nosuid,noexec'},
+  {'mount': '/home', 'name': 'homelv', 'size': 1024},
+  {'mount': '/', 'name': 'rootlv', 'size': 4096},
+  {'mount': 'swap', 'name': 'swap', 'size': 2048, 'fstype': 'swap'}
+] %}
+{% for vol in volumes %}
+logvol {{ vol.mount }} --fstype="{{ vol.fstype | default('xfs') }}" --size={{ vol.size }} --name={{ vol.name }} --vgname=node00{% if vol.opts %} --fsoptions="{{ vol.opts }}"{% endif %}
+{% endfor %}
+
+rootpw --plaintext {{ root_pw }}
+
+{% if admin_id is defined and admin_pwd is defined %}
+user --groups=wheel,sysadmin(1000) --name={{ admin_id }} --password={{ admin_pwd }} --iscrypted --uid=1000 --gecos="System Admin" --gid=1000
+{% else %}
+user --groups=wheel --name=sysadmin --password=$y$j9T$mZyy4W7Kh9UgTWwsQFXDw4cG$DzOysH7CAit3HIv1/CmY2YaqrySI2/qb19E1s8OHzU6 --iscrypted --uid=1000 --gecos="System Admin" --gid=1000
+{% endif %}
+
+%packages
+@^minimal-environment
+@standard
+@headless-management
+podman
+buildah
+skopeo
+slirp4netns
+fuse-overlayfs
+shadow-utils
+iptables
+ebtables
+iproute
+ipset
+ansible-core
+python3-pyyaml
+jq
+git
+nmap-ncat
+strace
+lsof
+tcpdump
+gnupg2
+pinentry
+certmonger
+openssl
+openscap-scanner
+scap-security-guide
+aide
+audit
+policycoreutils
+policycoreutils-python-utils
+lvm2
+nfs-utils
+iscsi-initiator-utils
+%end
+
+%post --interpreter=/bin/bash
+echo "Starting post-install hardening..." >> /root/install.log
+
+groupadd sshaccess
+usermod -aG sshaccess {{ admin_id | default('admin') }}
+
+sed -i '/^#includedir \/etc\/sudoers.d/d' /etc/sudoers
+echo '#include /etc/sudoers.d/DFLT_HELPER_NODE' >> /etc/sudoers
+
+cat > /etc/sudoers.d/DFLT_HELPER_NODE <<EOF
+%wheel helper[0-9][0-9]*=(ALL) ALL
+EOF
+chmod 0440 /etc/sudoers.d/DFLT_HELPER_NODE
+
+nmcli con modify {{ net_device | default('enp1s0') }} ipv4.addresses {{ ip_addr }}/{{ ip_cid }}
+nmcli con modify {{ net_device | default('enp1s0') }} ipv4.gateway {{ ip_gate }}
+nmcli con modify {{ net_device | default('enp1s0') }} ipv4.dns {{ ip_dns | default('192.168.100.1,8.8.8.8') }}
+nmcli con modify {{ net_device | default('enp1s0') }} ipv4.method manual
+nmcli con modify {{ net_device | default('enp1s0') }} ipv6.method ignore
+nmcli con mod {{ net_device | default('enp1s0') }} connection.autoconnect yes
+nmcli con up {{ net_device | default('enp1s0') }}
+
+hostnamectl set-hostname {{ hostname | default(inventory_hostname) }}
+
+dnf update -y
+
+systemctl enable auditd
+systemctl start auditd
+
+aide --init && mv /var/lib/aide/aide.db.new.gz /var/lib/aide/aide.db.gz
+
+PROFILE="xccdf_org.ssgproject.content_profile_cis_level2_server"
+DATastream="/usr/share/xml/scap/ssg/content/ssg-rocky9-ds.xml"
+RESULTS="/root/oscap-results.xml"
+REPORT="/root/oscap-results.html"
+FIXLOG="/root/oscap-fix.log"
+
+echo "[+] Running initial oscap scan..." | tee -a "$FIXLOG"
+oscap xccdf eval \
+  --profile "$PROFILE" \
+  --results "$RESULTS" \
+  --report "$REPORT" \
+  "$DATastream" | tee -a "$FIXLOG"
+
+echo "[+] Applying remediations (excluding GRUB rules)..." | tee -a "$FIXLOG"
+oscap xccdf eval \
+  --profile "$PROFILE" \
+  --results "$RESULTS" \
+  --remediate \
+  --skip-rule xccdf_org.ssgproject.content_rule_grub2_password \
+  --skip-rule xccdf_org.ssgproject.content_rule_grub2_enable_password \
+  "$DATastream" | tee -a "$FIXLOG"
+
+echo "Helper node hardened. oscap report saved to /root/oscap-results.html" >> /root/install.log
+
+reboot
+%end
+
+reboot --eject

@@ -1,0 +1,17 @@
+- name: Add A records
+  vars:
+    alias_entries: >-
+      {{
+        infra_alias_map | dict2items |
+        map(attribute='value') | map('dict2items') | flatten
+      }}
+  loop: "{{ alias_entries }}"
+  loop_control:
+    label: "{{ item.key }}"
+  vars:
+    alias: "{{ item.key }}"
+    target_host: "{{ item.value }}"
+    target_ip: "{{ hostvars[target_host.split('.')[0]].ansible_host }}"
+  command: >
+    ipa dnsrecord-add {{ dns_zone }}
+    {{ alias }} --a-rec={{ target_ip }}

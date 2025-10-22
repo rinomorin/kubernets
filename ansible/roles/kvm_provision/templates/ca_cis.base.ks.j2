@@ -1,0 +1,107 @@
+#version=RHEL9
+url --mirrorlist={{ kickstart_baseos_url | default('https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=BaseOS-9.6') }}
+repo --name=AppStream --mirrorlist={{ kickstart_appstream_url | default('https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=AppStream-9.6') }}
+
+lang {{ lang | default('en_CA.UTF-8') }}
+keyboard --vckeymap={{ keyboard_vckeymap | default('us') }} --xlayouts='{{ keyboard_xlayouts | default("us") }}'
+timezone {{ timezone_region | default('UTC') }},{{ time_zone | default('UTC') }}
+
+network --bootproto=static --ip={{ ip_addr }} --netmask={{ ip_mask }} --gateway={{ ip_gate }} --nameserver={{ ip_dns }} --hostname={{ hostname | default(inventory_hostname) }}
+timesource --ntp-server={{ ntp_server | default('pool.ntp.org') }}
+
+selinux --enforcing
+firewall --enabled --service=ssh
+
+ignoredisk --only-use={{ install_disk | default('sda') }}
+clearpart --all --initlabel
+bootloader --location=mbr --boot-drive={{ install_disk | default('sda') }}
+
+part /boot --fstype="xfs" --ondisk={{ install_disk | default('sda') }} --size=1024
+part /boot/efi --fstype="efi" --ondisk={{ install_disk | default('sda') }} --size=300 --fsoptions="umask=0077,shortname=winnt"
+part pv.dns --fstype="lvmpv" --ondisk={{ install_disk | default('sda') }} --size=48128
+volgroup dnsvg pv.dns
+
+# update here
+
+{% set volumes = [
+  {'mount': '/tmp', 'name': 'tmplv', 'size': 1024, 'opts': 'nodev,nosuid,noexec'},
+  {'mount': '/var', 'name': 'varlv', 'size': 2048},
+  {'mount': '/var/log', 'name': 'varloglv', 'size': 2048},
+  {'mount': '/var/log/audit', 'name': 'auditlv', 'size': 2048},
+  {'mount': '/var/tmp', 'name': 'vartmplv', 'size': 1024, 'opts': 'nodev,nosuid,noexec'},
+  {'mount': '/dev/shm', 'name': 'shmlv', 'size': 1024, 'opts': 'nodev,nosuid,noexec'},
+  {'mount': '/home', 'name': 'homelv', 'size': 1024},
+  {'mount': '/', 'name': 'rootlv', 'size': 6144},
+  {'mount': 'swap', 'name': 'swap', 'size': 2048, 'fstype': 'swap'}
+] %}
+{% for vol in volumes %}
+{{ 'logvol %-20s --fstype="%s" --size=%-6s --name=%-10s --vgname=dnsvg%s' | format(
+    vol.mount,
+    vol.fstype | default('xfs'),
+    vol.size,
+    vol.name,
+    (' --fsoptions="%s"' | format(vol.opts)) if vol.get('opts') else ''
+) }}
+{% endfor %}
+
+# update end
+
+
+
+rootpw --plaintext {{ root_pwd }}
+user --name={{ admin_id }} --password={{ admin_pwd }} --gecos="System Admin" --groups=wheel
+
+%packages
+@^minimal-environment
+@standard
+@headless-management
+openscap-scanner
+scap-security-guide
+aide
+audit
+policycoreutils
+policycoreutils-python-utils
+gnupg2
+lvm2
+nfs-utils
+iscsi-initiator-utils
+ipa-server
+ipa-server-dns
+bind
+pki-server
+bind-dyndb-ldap
+chrony
+openssl
+sssd
+%end
+
+%post --interpreter=/bin/bash --log=/root/kickstart-post.log
+update-crypto-policies --set FIPS
+
+groupadd sshok
+usermod -aG sshok {{ admin_id }}
+
+cat > /etc/chrony.conf <<EOF
+server 0.ca.pool.ntp.org iburst
+server 1.ca.pool.ntp.org iburst
+server 2.ca.pool.ntp.org iburst
+server 3.ca.pool.ntp.org iburst
+allow {{ ip_gate.split('.')[:3] | join('.') }}.0/{{ ip_cid }}
+local stratum 10
+driftfile /var/lib/chrony/drift
+makestep 1.0 3
+rtcsync
+EOF
+systemctl enable chronyd
+systemctl restart chronyd
+
+echo "{{ ip_addr }} {{ hostname | default(inventory_hostname) }} {{ inventory_hostname_short }}" >> /etc/hosts
+
+systemctl enable named-pkcs11
+systemctl restart named-pkcs11
+
+update-crypto-policies --set FIPS
+sleep 2
+echo "Installation complete. System will power off."
+%end
+shutdown

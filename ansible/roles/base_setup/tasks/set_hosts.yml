@@ -1,0 +1,5 @@
+- name: Ensure consistent /etc/hosts entries
+  blockinfile:
+    path: /etc/hosts
+    block: "{{ base_hosts_entries }}"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK: cluster hosts"
