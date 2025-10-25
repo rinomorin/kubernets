@@ -1,59 +1,28 @@
-- name: Probe VM with key-based SSH
-  shell: |
-    ssh -o BatchMode=yes \
-        -o UserKnownHostsFile=/dev/null \
-        -o StrictHostKeyChecking=no \
-        -o ConnectTimeout=5 \
-        {{ admin_id }}@{{ vm_fqdn }} 'echo sshkey'
-  register: ssh_key_check
+- name: setup ssh keys for main id
+  import_tasks: add_keys.yml
+
+- name: Stage Three Provision Groups
+  import_tasks: create_groups.yml
+
+- name: Precompute members_map_items
   delegate_to: localhost
   become: false
-  failed_when: false
-  changed_when: false
+  set_fact:
+    members_map_items: "{{ members_map | dict2items }}"
 
-- name: Ensure SSH keypair exists on control node
-  openssh_keypair:
-    path: "{{ ssh_key_path | default('~/.ssh/id_rsa') }}"
-    type: rsa
-    size: 2048
-  delegate_to: localhost
-  become: false
-
-
-- name: Push public key using authorized_key
-  authorized_key:
-    user: "{{ admin_id }}"
-    state: present
-    key: "{{ lookup('file', ssh_key_path | default('~/.ssh/id_rsa') ~ '.pub') }}"
+- name: Create users and assign to groups
+  loop: "{{ members_map_items }}"
+  loop_control:
+    loop_var: group_entry
+    label: "{{ group_entry.key }} → {{ group_entry.value | join(', ') }}"
+  include_tasks: create_users.yml
   vars:
-    ansible_user: "{{ admin_id }}"
-    ansible_ssh_pass: "{{ admin_set }}"
-    ansible_host: "{{ vm_fqdn }}"
-  delegate_to: "{{ vm_host }}"
-  become: false
+    group_name: "{{ group_entry.key }}"
+    members: "{{ group_entry.value }}"
 
-- name: Push public key to VM from localhost
-  shell: |
-    ssh -o StrictHostKeyChecking=no \
-        -o UserKnownHostsFile=/dev/null \
-        -o ConnectTimeout=5 \
-        {{ admin_id }}@{{ vm_fqdn }} "mkdir -p ~/.ssh && chmod 700 ~/.ssh"
-    cat {{ ssh_key_path | default('~/.ssh/id_rsa') }}.pub | ssh \
-        -o StrictHostKeyChecking=no \
-        -o UserKnownHostsFile=/dev/null \
-        -o ConnectTimeout=5 \
-        {{ admin_id }}@{{ vm_fqdn }} "cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
-  delegate_to: localhost
-  become: false
-  register: ssh_key_push
-  failed_when: ssh_key_push.rc != 0
-  changed_when: "'Permission denied' not in ssh_key_push.stderr"
+- name: setup ssh keys for main id
+  import_tasks: add_keys.yml
 
-
-- name: Check if authorized_keys exists on VM
-  stat:
-    path: "/home/{{ admin_id }}/.ssh/authorized_keys"
-  register: auth_keys_stat
-  delegate_to: "{{ vm_host }}"
-  become: true
-  when: (ssh_key_check.stdout | default('')) != "sshkey"
+- name: Stage Three Provision Sudoers tmplates
+  import_tasks: render_sudoers_templates.yml
+  

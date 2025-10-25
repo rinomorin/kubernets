@@ -5,6 +5,11 @@
   failed_when: false
   changed_when: false
 
+- name: Initialize VM state
+  set_fact:
+    vm_build_state: "undefined"
+    vm_timeout: 0
+
 - name: Set stage
   set_fact:
     vm_build_stage: >-
@@ -55,41 +60,67 @@
   set_fact:
     vm_shutdown_start: "{{ global_epoch }}"
 
-- name: Initialize VM state
-  set_fact:
-    vm_build_state: "undefined"
-    vm_timeout: 0
+- name: stage status
+  debug:
+    msg: "stage is {{ vm_build_stage }}"
 
 - name: Trigger build if needed
   include_tasks: define_vms.yml
   when: vm_stage_map[vm_host] in ['build', 'building']
 
-
-- name: Include shutdown check
-  include_tasks: check_vm_state.yml
-  when: vm_build_state != "shutdown" and (vm_timeout | int) < shutdown_max_timeout
-
-- name: show status before next check
-  debug:
-    msg: "vm_build_state {{vm_build_state}}, vm_timeout {{vm_timeout}}"
+-  debug:
+    msg: "stage is {{ vm_build_stage }}"
 
 - name: vm_build_state status befor poll
   debug:
     msg: "vm_build_state is {{ vm_build_state }}"
 
-- name: Poll until VM is shut off or timeout
-  include_tasks: nested_loop.yml
+- name: vm_build_stage status befor poll
+  debug:
+    msg: "vm_build_stage_map is {{ vm_build_stage }}"
+ 
+- name: Calculate wait time in minutes
+  set_fact:
+    wait_time_to_shutdown_or_fail: "{{ ((build_loops | int) * 10 // 60) }}"
+
+- name: Display wait time
+  debug:
+    msg: "This will wait up to {{ wait_time_to_shutdown_or_fail }} minutes before resuming to next tasks"
+
+- debug:
+    msg: "vm_build_state is {{ vm_build_stage }} and {{vm_stage_map[vm_host]}}"
+
+- name: Probe VM with echo until vm shutdown
+  when: vm_stage_map[vm_host] in ['build', 'building'] and  vm_build_stage | trim != "present"
+  shell: |
+    virsh list --all | sed 's/shut off/shutdown/' | grep -i "^.*{{ vm_host }}.*" | awk '{print $NF}'
+  register: vm_state
+  vars:
+  delegate_to: "{{ kvm_delegate }}"
+  failed_when: false
+  changed_when: false
+  until: (vm_state.stdout | default('')) == "shutdown"
+  retries: "{{ build_loops|int }}"
+  delay: 10          # 10 seconds between attempts
+
+- name: update stage
+  set_fact:
+    vm_build_state: "booted"  
   when: 
-    - "'kvm' not in group_names"
-    - vm_build_state != "running"
+    - vm_stage_map[vm_host] in ['build', 'building']
+    - vm_build_stage | trim == "present"
+
+- name: Verify state
+  include_tasks: check_vm_state.yml
+
+- name: Fail if VM did not shut off after polling
+  fail:
+    msg: "VM {{ vm_host }} did not shut off after polling timeout."
+  when: vm_build_state != "shutdown" and (vm_timeout | int) > shutdown_max_timeout
 
 - name: vm_build_state status
   debug:
     msg: "vm_build_state is {{ vm_build_state }}"
 
 
-- name: Fail if VM did not shut off after polling
-  fail:
-    msg: "VM {{ vm_host }} did not shut off after polling timeout."
-  when: vm_build_state != "shutdown" and (vm_timeout | int) > shutdown_max_timeout
 

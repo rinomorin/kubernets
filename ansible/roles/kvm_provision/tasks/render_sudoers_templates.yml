@@ -1,0 +1,144 @@
+- name: Create local sudoers staging directory
+  become: false
+  file:
+    path: "/tmp/{{ vm_host }}/etc/sudoers.d"
+    state: directory
+    mode: '0755'
+    recurse: true
+  delegate_to: localhost
+
+- name: Render sudoers template {{ item.1 }} for group {{ item.0.key }}
+  template:
+    src: "{{ item.1 }}.j2"
+    dest: "/tmp/{{ vm_host }}/etc/sudoers.d/{{ item.1 }}"
+    mode: '0440'
+    force: true
+  vars:
+    this_group: "{{ item.0.key }}"
+  loop: "{{ template_map | dict2items | subelements('value') }}"
+  loop_control:
+    label: "{{ item.0.key }}/{{ item.1 }}"
+  when: item.0.key in default_groups
+  become: false
+  delegate_to: localhost
+
+
+- name: Validate sudoers template {{ item.1 }} with visudo
+  become: false
+  command: >
+    visudo -cf /tmp/{{ vm_host }}/etc/sudoers.d/{{ item.1 }}
+  loop: "{{ template_map | dict2items | subelements('value') }}"
+  loop_control:
+    label: "{{ item.1 }}"
+  delegate_to: localhost
+
+- name: Rename sudoers files with ACCOUNT in filename
+  find:
+    paths: "/tmp/{{ vm_host }}/etc/sudoers.d"
+    patterns: "*ACCOUNT*"
+    use_regex: false
+  register: account_files
+  delegate_to: localhost
+  become: false
+
+- debug: 
+    msg: "account is {{ ACCOUNT }}"
+
+- name: Rename each ACCOUNT file to uppercase ACCOUNT
+  command: >
+    mv "{{ item.path }}"
+       "{{ item.path | regex_replace('ACCOUNT', ACCOUNT | upper) }}"
+  loop: "{{ account_files.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  delegate_to: localhost
+  become: false
+
+- name: Render master sudoers template
+  template:
+    src: "sudoers.j2"
+    dest: "/tmp/{{ vm_host }}/etc/sudoers"
+    mode: '0440'
+    force: true
+  vars:
+    this_host: "{{ vm_host }}"
+    THiS_ACCOUNT: "{{ ACCOUNT | upper}}"
+    TMPPATH: "/tmp/{{ vm_host }}"
+  delegate_to: localhost
+  become: false
+
+- name: Validate sudoers with visudo
+  command: >
+    visudo -cf /tmp/{{ vm_host }}/etc/sudoers
+  delegate_to: localhost
+  become: false
+  register: visudo_check
+  failed_when: visudo_check.rc != 0
+
+- name: show results
+  debug:
+    msg: "check status:\n{{ visudo_check }}"
+
+- name: Copy validated sudoers files to clean staging path
+  copy:
+    src: "/tmp/{{ vm_host }}/etc/sudoers.d/"
+    dest: "/tmp/{{ vm_host }}/final/etc/sudoers.d/"
+    remote_src: false
+  delegate_to: localhost
+  become: false
+
+- name: Archive final sudoers bundle starting at etc/
+  archive:
+    path: "/tmp/{{ vm_host }}/final/etc"
+    dest: "/tmp/{{ vm_host }}/sudoers_bundle.zip"
+    format: zip
+  delegate_to: localhost
+  become: false
+
+- name: Copy sudoers tarball to guest
+  delegate_to: localhost
+  become: false
+  shell: |
+    scp -o BatchMode=yes \
+        -o UserKnownHostsFile=/dev/null \
+        -o StrictHostKeyChecking=no \
+        -o ConnectTimeout=5 \
+        /tmp/{{ vm_host }}/sudoers_bundle.zip \
+        {{ admin_id }}@{{ vm_fqdn }}:/tmp/
+
+- name: Extract sudoers bundle and fix ownership via SSH
+  delegate_to: localhost
+  become: false
+  shell: |
+    ssh -o BatchMode=yes \
+        -o UserKnownHostsFile=/dev/null \
+        -o StrictHostKeyChecking=no \
+        -o ConnectTimeout=5 \
+        {{ admin_id }}@{{ vm_fqdn }} <<'EOF'
+    sudo /bin/bash -c 'cd / && unzip -o /tmp/sudoers_bundle.zip -d / && \
+    chown -R root:root /etc/sudoers /etc/sudoers.d && \
+    chmod -R 0440 /etc/sudoers /etc/sudoers.d && \
+    visudo -cf /etc/sudoers && for f in /etc/sudoers.d/*; do visudo -cf "$f" || exit 1; done'
+    EOF
+
+- name: Verify sudo shell/su access via SSH
+  delegate_to: localhost
+  become: false
+  shell: |
+    ssh -o BatchMode=yes \
+        -o UserKnownHostsFile=/dev/null \
+        -o StrictHostKeyChecking=no \
+        -o ConnectTimeout=5 \
+        {{ admin_id }}@{{ vm_fqdn }} <<'EOF'
+    sudo -l | grep -E '(su|/bin/sh|/usr/bin/sh)' && echo "SUDO_SHELL_OK" || echo "SUDO_SHELL_FAIL"
+    EOF
+  register: sudo_shell_check
+  failed_when: "'SUDO_SHELL_OK' not in sudo_shell_check.stdout"
+
+
+- name: Remove temporary sudoers scaffolding
+  file:
+    path: "/tmp/{{ vm_host }}"
+    state: absent
+  delegate_to: localhost
+  become: false

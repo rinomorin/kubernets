@@ -1,0 +1,27 @@
+# Begin Global SA standard template Ver 2.0.0  Date 2015-04-01  * Master * Refer xxxxx Begin #
+#==============================================================================
+# User Aliases
+#==============================================================================
+# Replace sample group names with real group names for your account.
+# The User_Alias name must start with DFLT_UNIX_SA to identify the Alias
+#   as an SA alias
+#
+User_Alias      DFLT_SA_BAU = %{{ this_group }}
+#
+#==============================================================================
+# Host Aliases
+#==============================================================================
+Host_Alias      DFLT_SA_HOSTS = ALL # Use ALL or indicate
+#                                    indicate subsets as appropriate.
+#
+#==============================================================================
+# DFLT SA command Alias - sample
+#============================================================================== 
+#
+# NOTE This Cmnd_Alias can only be used if secondary logging are in place
+#   on the server.
+#
+DFLT_SA_BAU  DFLT_SA_HOSTS = ALL,!DFLT_NONE_SA,!DFLT_SHELLS_ALL,DFLT_UNIX_SA_CMDS, \
+     NOEXEC: DFLT_SHELLESCAPE_ALL,!DFLT_NONE_EDITOR
+#
+# End Global SA standard template Ver 2.0.0  Date 2015-04-01   * Master * Refer xxxxx End #

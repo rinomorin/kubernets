@@ -1,0 +1,68 @@
+- name: Render user creation script to file
+  delegate_to: localhost
+  become: false
+  template:
+    src: user_create_script.j2
+    dest: "/tmp/user_create_script_{{ group_name }}.sh"
+
+- name: Load rendered script into fact
+  delegate_to: localhost
+  become: false
+  slurp:
+    src: "/tmp/user_create_script_{{ group_name }}.sh"
+  register: script_content
+
+- name: Set user_create_script fact
+  set_fact:
+    user_create_script: "{{ script_content.content | b64decode }}"
+
+- name: Show rendered user creation script
+  delegate_to: localhost
+  become: false
+  debug:
+    var: user_create_script
+
+- name: Fail if user_create_script is empty
+  delegate_to: localhost
+  become: false
+  fail:
+    msg: "Rendered user_create_script is empty for group {{ group_name }}"
+  when: user_create_script | trim == ""
+
+- name: Execute user creation script on {{ vm_fqdn }}
+  delegate_to: localhost
+  become: false
+  shell: |
+    ssh -o BatchMode=yes \
+        -o UserKnownHostsFile=/dev/null \
+        -o StrictHostKeyChecking=no \
+        -o ConnectTimeout=5 \
+        {{ admin_id }}@{{ vm_fqdn }} <<'EOF'
+    {{ user_create_script }}
+    EOF
+
+- name: Push public key using authorized_key
+  delegate_to: localhost
+  become: false
+  shell: |
+    ssh -o BatchMode=yes \
+        -o UserKnownHostsFile=/dev/null \
+        -o StrictHostKeyChecking=no \
+        -o ConnectTimeout=5 \
+        {{ admin_id }}@{{ vm_fqdn }} <<'EOF'
+    {{ user_create_script }}
+    EOF
+  vars:
+    ansible_user: "{{ admin_id }}"
+    ansible_ssh_pass: "{{ admin_set }}"
+    ansible_host: "{{ vm_fqdn }}"
+  delegate_to: "{{ vm_host }}"
+  become: false
+
+
+- name: Remove user creation script for {{ group_name }}
+  file:
+    path: "/tmp/user_create_script_{{ group_name }}.sh"
+    state: absent
+  delegate_to: localhost
+  become: false

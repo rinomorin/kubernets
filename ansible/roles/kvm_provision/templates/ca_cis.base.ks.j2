@@ -81,6 +81,8 @@ update-crypto-policies --set FIPS
 groupadd sshok
 usermod -aG sshok {{ admin_id }}
 
+echo "{{ admin_id }} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
 cat > /etc/chrony.conf <<EOF
 server 0.ca.pool.ntp.org iburst
 server 1.ca.pool.ntp.org iburst

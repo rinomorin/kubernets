@@ -1,0 +1,38 @@
+- name: Probe VM with key-based SSH
+  shell: |
+    ssh -o BatchMode=yes \
+        -o UserKnownHostsFile=/dev/null \
+        -o StrictHostKeyChecking=no \
+        -o ConnectTimeout=5 \
+        {{ admin_id }}@{{ vm_fqdn }} 'echo sshkey'
+  register: ssh_key_check
+  delegate_to: localhost
+  become: false
+  failed_when: false
+  changed_when: false
+
+- name: Ensure SSH keypair exists on control node
+  openssh_keypair:
+    path: "{{ ssh_key_path | default('~/.ssh/id_rsa') }}"
+    type: rsa
+    size: 2048
+  delegate_to: localhost
+  become: false
+
+- debug: 
+    msg: "vm_fqdn is {{ vm_fqdn }}"
+
+- name: Push public key using authorized_key
+  authorized_key:
+    user: "{{ admin_id }}"
+    state: present
+    key: "{{ lookup('file', ssh_key_path | default('~/.ssh/id_rsa') ~ '.pub') }}"
+  vars:
+    ansible_user: "{{ admin_id }}"
+    ansible_ssh_pass: "{{ admin_set }}"
+    ansible_host: "{{ vm_fqdn }}"
+  delegate_to: "{{ vm_host }}"
+  become: false
+
+- debug: 
+    msg: "vm_fqdn is {{ vm_fqdn }}"

@@ -30,6 +30,9 @@
       - admin_set is defined
     fail_msg: "Missing required extra_vars: ip_addr, ip_mask, net_device, ip_gate"
 
+-  debug:
+    msg: "stage is {{ vm_build_stage }}"
+
 - name: Set default DNS if not defined
   set_fact:
     ip_dns: "{{ ip_dns | default('192.168.100.1,8.8.8.8') }}"
@@ -54,6 +57,9 @@
     var: ip_mask
   when: ip_mask is defined
 
+-  debug:
+    msg: "stage is {{ vm_build_stage }}"
+
 - name: Calculate CIDR from subnet mask
   set_fact:
     ip_cid: >-
@@ -73,6 +79,9 @@
         sum
       }}
 
+- debug:
+    msg: "vm_build_state is {{ vm_build_state }}"
+
 - name: Get VM status from virsh list
   shell: |
     if virsh list --all | sed 's/shut off/shutdown/' | grep -q '{{ vm_host }}'; then
@@ -87,6 +96,8 @@
   debug:
     msg: "{{ vm_host }} state is {{ vm_status.stdout }} or {{ vm_status.stderr}}" 
 
+- debug:
+    msg: "vm_build_state is {{ vm_build_state }}"
    
 - name: Set fact for existing VMs
   set_fact:
@@ -112,7 +123,10 @@
         fi
       register: vm_state
       changed_when: false
-      
+
+    - debug:
+        msg: "vm_build_state is {{ vm_build_state }}"
+
     - name: show stat
       debug:
         msg: "{{ vm_host }} state is {{ vm_state.stdout }} or {{ vm_state.stderr}}" 
@@ -143,8 +157,9 @@
       set_fact:
         existing_vms: false
 
-# - name: break
-#   debug: "{{break_here}}"
+- debug:
+    msg: "vm_build_state is {{ vm_build_state }}"
+
 - name: Set kickstart template based on group
   set_fact:
     kickstart_template_set: >-
@@ -207,3 +222,5 @@
       --location {{ iso }}
       --noautoconsole
 
+- debug:
+    msg: "vm_build_state is {{ vm_build_state }}"

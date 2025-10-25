@@ -1,0 +1,79 @@
+# Begin Global Negations standard template Ver 2.0.2  Date 2015-05-19  * Master * Refer xxxxx Begin #
+#==============================================================================
+# Standard negations
+#
+# Note:  For AIX, Solaris, HPUX, /bin is a symlink to /usr/bin.  sudo will apply
+# negations coded against /bin commands to /usr/bin in this case, and thus
+# the 'Linux location', when in /bin, can be used for all 4 OS's.
+#
+Cmnd_Alias   DFLT_CAT_NEG  = \
+    !/bin/cat /* *,!/bin/cat * /* *,!/bin/cat *..*,  !/bin/cat *./*
+Cmnd_Alias   DFLT_CHGRP_NEG = \
+    !/bin/chgrp * /* *,!/bin/chgrp *..*,!/bin/chgrp *./*
+Cmnd_Alias   DFLT_CHMOD_NEG = \
+     !/bin/chmod * /* *, !/bin/chmod *..*,!/bin/chmod *./*
+Cmnd_Alias   DFLT_CHOWN_NEG = \
+    !/bin/chown * /* *,!/bin/chown *..*, !/bin/chown *./*
+Cmnd_Alias   DFLT_COMPRESS_NEG = \
+    !/usr/bin/compress /* *,!/usr/bin/compress * /* *,!/usr/bin/compress *..*, !/usr/bin/compress *./*
+Cmnd_Alias   DFLT_CP_NEG = \
+    !/bin/cp /* /* *, !/bin/cp * /* /* *, !/bin/cp *..*, !/bin/cp *./*
+Cmnd_Alias   DFLT_DIFF_NEG = \
+    !/usr/bin/diff /* /* *,!/usr/bin/diff * /* /* *, !/usr/bin/diff *..*, !/usr/bin/diff *./*
+Cmnd_Alias   DFLT_FIND_NEG = \
+    !/usr/bin/find * -exec *, !/usr/bin/find * -ok *, !/usr/bin/find *..*, \
+    !/usr/bin/find * -execdir *, !/usr/bin/find * -okdir *
+Cmnd_Alias   DFLT_GUNZIP_NEG = \
+    !/usr/bin/gunzip /* *,!/usr/bin/gunzip -* /* *,!/usr/bin/gunzip *..*, !/usr/bin/gunzip *./*
+Cmnd_Alias   DFLT_GZIP_NEG = \
+    !/usr/bin/gzip /* *,!/usr/bin/gzip -* /* *,!/usr/bin/gzip *..*, !/usr/bin/gzip *./*
+Cmnd_Alias   DFLT_HEAD_NEG = \
+    !/usr/bin/head  /* *,!/usr/bin/head * /* *,!/usr/bin/head *..*, !/usr/bin/head *./*
+        # Authorization of head is discouraged.  Instead, authorize the
+        # the team to 'cat', team can then run 'sudo cat /tmp/specified file | head {any flags they need}'
+        # While discouraged, negation is effective when head is authorized
+Cmnd_Alias   DFLT_LN_NEG = \
+    !/bin/ln /* /* *, !/bin/ln -* /* /* *, !/bin/ln *..*, !/bin/ln *./*
+Cmnd_Alias   DFLT_LS_NEG = \
+            !/bin/ls /* *, !/bin/ls -* /* *, !/bin/ls *..*, !/bin/ls *./*
+Cmnd_Alias   DFLT_MKDIR_NEG = \
+    !/bin/mkdir /* *,!/bin/mkdir * /* *, !/bin/mkdir *..*, !/bin/mkdir *./*
+Cmnd_Alias   DFLT_MOUNT_NEG = \
+    !/bin/mount /* *,!/bin/mount * /* *,!/bin/mount *..*, !/bin/mount *./* , \
+    !/usr/sbin/mount /* *,!/usr/sbin/mount * /* *,!/usr/sbin/mount *..*, !/usr/sbin/mount *./*
+    # Caution:  we have only coded a negation for the 'single directory/device' version of the mount command;
+    #           if you need to 'permit' the 'two directory/device' version of the command, it will have to be
+    #           with a different negation, and if this negation is used, must be specified AFTER use of this
+    #           this negation or the use of DFLT_NEG_ALL as this negation will block the two * version.
+Cmnd_Alias   DFLT_MV_NEG = \
+    !/bin/mv /* /* *,!/bin/mv * /* /* *, !/bin/mv *..*, !/bin/mv *./*
+Cmnd_Alias   DFLT_RM_NEG = \
+    !/bin/rm /* *,!/bin/rm * /* *, !/bin/rm *..*, !/bin/rm *./*
+Cmnd_Alias   DFLT_RMDIR_NEG = \
+    !/bin/rmdir /* *,!/bin/rmdir * /* *,!/bin/rmdir *..*,!/bin/rmdir *./*
+Cmnd_Alias   DFLT_TAIL_NEG = \
+    !/usr/bin/tail /* *,!/usr/bin/tail -* /* *,!/usr/bin/tail *..*,  !/usr/bin/tail *./*
+        # authorization of tail 'except for' tail -f is discouraged.  Instead, authorize the
+        # the team to 'cat', team can then run 'sudo cat /tmp/specified file | tail {any flags they need}'
+        # While discouraged, negation is effective for when tail is authorized to be issued with no flags.
+Cmnd_Alias   DFLT_TAR_NEG = \
+    !/bin/tar /* /* *,!/bin/tar * /* /* *, !/bin/tar *..*, !/bin/tar *./*
+Cmnd_Alias   DFLT_TOUCH_NEG = \
+   !/bin/touch /* *, !/bin/touch * /* *, !/bin/touch *..*, !/bin/touch *./* # will block some complex parms such as "-r"
+        #Note: PO will need to create custom negation if flags such as -r must be 'allowed for'.
+Cmnd_Alias   DFLT_UMOUNT_NEG = \
+    !/bin/umount  /* *,!/bin/umount * /* *,!/bin/umount *..*, !/bin/umount *./*,\
+    !/usr/sbin/umount /* *, !/usr/sbin/umount * /* *,!/usr/sbin/umount *..*, !/usr/sbin/umount *./*
+Cmnd_Alias   DFLT_UNCOMPRESS_NEG = \
+    !/usr/bin/uncompress /* *,!/usr/bin/uncompress * /* *,!/usr/bin/uncompress *..*, !/usr/bin/uncompress *./*
+Cmnd_Alias   DFLT_ZCAT_NEG = \
+    !/bin/zcat /* *, !/bin/zcat *..*, !/bin/zcat *./*
+Cmnd_Alias   DFLT_ALL_NEG = \
+    DFLT_CAT_NEG, DFLT_CHGRP_NEG, DFLT_CHMOD_NEG, DFLT_CHOWN_NEG, \
+    DFLT_COMPRESS_NEG, DFLT_CP_NEG, DFLT_DIFF_NEG, DFLT_FIND_NEG, \
+    DFLT_GUNZIP_NEG, DFLT_GZIP_NEG, DFLT_HEAD_NEG, \
+    DFLT_LS_NEG, DFLT_LN_NEG, DFLT_MKDIR_NEG, \
+    DFLT_MOUNT_NEG, DFLT_MV_NEG, DFLT_RM_NEG, DFLT_RMDIR_NEG, DFLT_TAIL_NEG, \
+    DFLT_TAR_NEG, DFLT_TOUCH_NEG, DFLT_UMOUNT_NEG, DFLT_UNCOMPRESS_NEG,DFLT_ZCAT_NEG
+#
+# End Global Negations standard template Ver 2.0.2  Date 2015-05-19  * Master * Refer xxxxx End #

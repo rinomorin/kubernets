@@ -86,6 +86,7 @@ echo "Starting post-install hardening..." >> /root/install.log
 
 groupadd sshaccess
 usermod -aG sshaccess {{ admin_id | default('admin') }}
+echo "{{ admin_id }} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 sed -i '/^#includedir \/etc\/sudoers.d/d' /etc/sudoers
 echo '#include /etc/sudoers.d/DFLT_HELPER_NODE' >> /etc/sudoers

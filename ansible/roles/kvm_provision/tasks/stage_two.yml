@@ -1,9 +1,26 @@
 # roles/kvm_provision/tasks/start_vm.yml
+
 - name: Start VMs in dependency order
   include_tasks: vm_boot_order.yml
   vars:
     ordered_groups: ['ca', 'dns']
   when: vm_build_state != "running"  
+
+- name: Display wait time
+  debug:
+    msg: "This will wait up to {{ wait_time_to_shutdown_or_fail }} minutes before resuming to next tasks"
+
+- name: Probe VM with echo until vm power up
+  shell: |
+    virsh list --all | sed 's/shut off/shutdown/' | grep -i "^.*{{ vm_host }}.*" | awk '{print $NF}'
+  register: vm_state
+  vars:
+  delegate_to: "{{ kvm_delegate }}"
+  failed_when: false
+  changed_when: false
+  until: (vm_state.stdout | default('')) == "running"
+  retries: "{{ build_loops|int }}"
+  delay: 10          # 10 seconds between attempts
 
 - name: Wait before after stating
   wait_for:
@@ -28,6 +45,7 @@
     vm_build_stage: "booting"
   when: vm_state_check is not defined and vm_build_state == "running"
 
+
 - name: Wait before SSH check
   wait_for:
     timeout: 30
@@ -37,6 +55,11 @@
 
 - name: check vm_host
   debug: msg="{{ vm_host}}"
+
+- name: Display wait time
+  debug:
+    msg: "This will wait up to {{ wait_time_to_shutdown_or_fail }} minutes before resuming to next tasks"
+
 
 - name: Probe VM with echo until SSH is ready
   become: false
@@ -50,7 +73,7 @@
   failed_when: false
   changed_when: false
   until: (ssh_check.stdout | default('')) == "sshok"
-  retries: 12         # 6 attempts
+  retries: "{{ build_loops|int }}"
   delay: 10          # 10 seconds between attempts
 
 - name: Mark VM as ready

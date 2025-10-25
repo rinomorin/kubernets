@@ -1,16 +1,83 @@
-# default/main.yml
 # default stages
+build_loops: "{{ bl|default(120)}}"
 existing_vms: false
 kvm_delegate: "{{ kvm_name | default((kvm | default(['kvmdc01.morinsoft.ca']))[0]) }}"
 vm_build_stage: "unknown"
 vm_build_state: "undefined"
 vm_timeout: 0
-# defauls system info
+
+# default system info
 vcpu: 2
 ram: 4096
 iso: "/var/lib/libvirt/images/Rocky-9.6-x86_64-boot.iso"
 default_network: "default"
 os_variant: "rocky9"
 shutdown_max_timeout: 1800
+
+# default IDs
+default_secops_id: "secops"
+default_secops_pwd: "On32Secure4Sec0ps~"
 default_ansible_id: "secops"
-default_ansible_pwd: "On32Secure4Sec0ps~"
+default_ansible_pwd: "On32Ansible4Auto~"
+admin_id: "{{ admin_id | default('sysadmin') }}"
+admin_set: "{{ admin_set | default('On32Build4SysAdmin') }}"
+default_user_passwords: >-
+  {{
+    {
+      (default_secops_id | default('secops')): default_secops_pwd,
+      (default_ansible_id | default('awx_automate')): default_ansible_pwd,
+      (admin_id | default('sysadmin')): admin_set
+    }
+  }}
+
+
+# groups
+sa_group: "sysadmin"
+secure_group: "{{ default_secops_id| default('secops') }}"
+awx_group: "awx_automate"
+sa_group_members: "{{ [admin_id | default('sysadmin')] }}"
+secure_group_members: "{{ [secure_group | default('secops')] }}"
+awx_group_members: ["secops"]
+
+
+members_map: >-
+  {{
+    {
+      sa_group: sa_group_members,
+      secure_group: secure_group_members,
+      awx_group: awx_group_members
+    }
+  }}
+  
+
+
+account_name2: "{{ account_name | default('MorinSoft')}}"
+ACCOUNT: "{{ account_name2 }}"
+
+sa_templates:
+  - "010_STD_ALIAS_DFLT"
+  - "010_STD_NEG_DFLT"
+  - "010_STD_SA_DFLT"
+
+secure_templates:
+  - "123_AE_ACCOUNT_DFLT"
+
+awx_templates:
+  - "124_AWX_ACCOUNT_DFLT"
+
+
+# group list for validation
+default_groups: [ "{{ sa_group }}", "{{ secure_group }}", "{{ awx_group }}" ]
+resolved_sa_group: "{{ sa_group | default('sysadmin') }}"
+resolved_secure_group: "{{ secure_group | default(default_secops_id) }}"
+resolved_awx_group: "{{ awx_group | default(default_ansible_id) }}"
+
+template_map: >-
+  {{
+    {
+      resolved_sa_group: sa_templates,
+      resolved_secure_group: secure_templates,
+      resolved_awx_group: awx_templates
+    }
+  }}
+

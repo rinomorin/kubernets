@@ -1,5 +1,8 @@
 ipa_domain: morinsoft.ca
 dns_zone: api.morinsoft.ca
+account_name: "MorinSoft"
+admin_id: "sysadmin"
+admin_set: "On32Build4SysAdmin"
 
 infra_alias_map:
   dns:
