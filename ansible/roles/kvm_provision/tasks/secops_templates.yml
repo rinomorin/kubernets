@@ -1,0 +1,78 @@
+- name: Set password for {{ secops_id }} via SSH from localhost
+  delegate_to: localhost
+  become: false
+  shell: |
+    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 {{ admin_id }}@{{ vm_host }} \
+    "echo '{{ secops_id }}:{{ secops_pwd }}' | sudo chpasswd"
+  register: password_set_result
+  changed_when: password_set_result.rc == 0
+
+- name: Wait for SSH to be available on {{ vm_host }}
+  delegate_to: localhost
+  become: false
+  wait_for:
+    host: "{{ vm_host }}"
+    port: 22
+    timeout: 15
+
+- name: Test password-based SSH login from localhost to {{ vm_host }}
+  delegate_to: localhost
+  become: false
+  shell: |
+    sshpass -p '{{ secops_pwd }}' ssh -o BatchMode=no \
+      -o StrictHostKeyChecking=no \
+      -o ConnectTimeout=5 \
+      {{ secops_id }}@{{ vm_host }} 'echo "✅ Password login successful"'
+  register: ssh_password_test
+  failed_when: "'Permission denied' in ssh_password_test.stderr"
+  changed_when: false
+
+- name: Push public key using ssh-copy-id from localhost
+  delegate_to: localhost
+  become: false
+  shell: |
+    sshpass -p '{{ secops_pwd }}' ssh-copy-id \
+      -o StrictHostKeyChecking=no \
+      -o ConnectTimeout=5 \
+      {{ secops_id }}@{{ vm_host }}
+  register: ssh_copy_result
+  changed_when: "'Number of key(s) added' in ssh_copy_result.stdout"
+
+- name: Set remote login user to {{ secops_id }} for remaining tasks
+  set_fact:
+    ansible_user: "{{ secops_id }}"
+    ansible_ssh_pass: null  # Now using key-based auth
+    ansible_become: true
+
+- name: Confirm key-based login works from localhost
+  delegate_to: localhost
+  become: false
+  shell: |
+    ssh -o BatchMode=yes \
+        -o StrictHostKeyChecking=no \
+        -o ConnectTimeout=5 \
+        {{ secops_id }}@{{ vm_host }} 'echo "✅ Key-based login successful"'
+  register: ssh_key_test
+  failed_when: "'Permission denied' in ssh_key_test.stderr"
+  changed_when: false
+
+- name: Check for OpenSCAP or CIS scan artifacts on {{ vm_host }}
+  become: true
+  vars:
+    remote_user: "{{ secops_id }}"
+    remote_pass: "{{ secops_pwd }}"
+  shell: |
+    if find /var/tmp /var/log /var/lib /root /etc /tmp -type f \( -name "*oscap*" -o -name "*scap*" -o -name "*cis*" \) 2>/dev/null | grep -q .; then
+      echo "scanned"
+    else
+      echo "built"
+    fi
+  register: cis_check
+  changed_when: false
+
+- name: Set CIS readiness flag
+  set_fact:
+    vm_build_state: "{{ cis_check.stdout }}"
+
+- name: stage is at
+  debug: msg=" system is {{ cis_check }}"

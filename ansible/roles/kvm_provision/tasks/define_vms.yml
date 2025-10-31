@@ -185,6 +185,10 @@
     msg: "ks = {{ kickstart_template }} to {{ existing_vms }}"
   when: kickstart_template is defined
 
+- name: Show secops
+  debug: msg="secops_id {{ secops_id}}, secops_pwd {{ secops_pwd }}"
+
+
 - name: Generate Kickstart files for new or forced VMs
   template:
     src: "{{ kickstart_template }}"

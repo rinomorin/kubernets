@@ -3,10 +3,16 @@
 - name: startin vm build
   debug: msg="checking if system exist"
 
+- name: Show secops
+  debug: msg="secops_id {{ secops_id}}, secops_pwd {{ secops_pwd }}"
+
+
 - name: Set fact for existing VMs
   set_fact:
     vm_host: "{{ inventory_hostname }}"
-    vm_fqdn: "{{ hostvars[inventory_hostname].ansible_fqdn | default(inventory_hostname + '.' + ansible_domain | default('morinsoft.ca')) }}"
+    vm_fqdn: >-
+      {{ hostvars[inventory_hostname].ansible_fqdn
+         | default(inventory_hostname + '.' + (ansible_domain | default(lookup('env', 'ipa_domain'))) ) }}
 
 - name: Validate kvm_delegate is defined
   assert:
@@ -16,6 +22,14 @@
     fail_msg: "kvm_delegate is not defined. Ensure 'kvm' or 'kvm_name' is set in inventory or vars."
   run_once: yes
 
+- name: Debug resolved group variables
+  debug:
+    msg:
+      - "secops_id: {{ secops_id | default('undefined') }}"
+      - "default_secops_id: {{ default_secops_id }}"
+      - "secure_group: {{ secure_group }}"
+      - "resolved_secure_group: {{ resolved_secure_group }}"
+
 - name: working on kvm
   debug: 
     msg: "delegated to {{ kvm_delegate }}" 
@@ -23,6 +37,9 @@
 - name: Check if VM exists
   become: yes
   delegate_to: "{{ kvm_delegate }}"
+  vars:
+    remote_user: "{{secops secops_id}}"
+    # remote_pass: "{{On32Secure4Sec0ps}}"
   import_tasks: stage_one.yml
   when: 
    - "'kvm' not in group_names"
@@ -39,7 +56,7 @@
     msg: "vm_build_state is {{ vm_build_state }}"
   when: 
    - "'kvm' not in group_names"
-   
+
 - name: Start and get status
   become: yes
   delegate_to: "{{ kvm_delegate }}"
@@ -47,4 +64,3 @@
   when: 
    - "'kvm' not in group_names"
    - vm_build_state == "sshok"
-

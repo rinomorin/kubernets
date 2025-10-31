@@ -41,28 +41,38 @@
     {{ user_create_script }}
     EOF
 
-- name: Push public key using authorized_key
+- name: Variables
+  delegate_to: localhost
+  debug:
+    msg: "{{ group_name}}\n\n{{ members }}"
+
+- name: Set admin ssh keys
   delegate_to: localhost
   become: false
   shell: |
-    ssh -o BatchMode=yes \
-        -o UserKnownHostsFile=/dev/null \
-        -o StrictHostKeyChecking=no \
-        -o ConnectTimeout=5 \
-        {{ admin_id }}@{{ vm_fqdn }} <<'EOF'
-    {{ user_create_script }}
-    EOF
+    sshpass -p '{{ admin_pwd }}' \
+    ssh-copy-id -o UserKnownHostsFile=/dev/null \
+                -o StrictHostKeyChecking=no \
+                -o ConnectTimeout=5 \
+                {{ admin_id }}@{{ vm_fqdn }}
   vars:
     ansible_user: "{{ admin_id }}"
     ansible_ssh_pass: "{{ admin_set }}"
     ansible_host: "{{ vm_fqdn }}"
-  delegate_to: "{{ vm_host }}"
-  become: false
+## this is a key id ensure it present
 
 
-- name: Remove user creation script for {{ group_name }}
-  file:
-    path: "/tmp/user_create_script_{{ group_name }}.sh"
-    state: absent
+- name: Set secops ssh keys
   delegate_to: localhost
   become: false
+  shell: |
+    sshpass -p '{{ secops_pwd }}' \
+    ssh-copy-id -o UserKnownHostsFile=/dev/null \
+                -o StrictHostKeyChecking=no \
+                -o ConnectTimeout=5 \
+                {{ secops_id }}@{{ vm_fqdn }}
+  vars:
+    ansible_user: "{{ admin_id }}"
+    ansible_ssh_pass: "{{ admin_set }}"
+    ansible_host: "{{ vm_fqdn }}"
+

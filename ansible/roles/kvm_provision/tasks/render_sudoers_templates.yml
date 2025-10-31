@@ -22,6 +22,19 @@
   become: false
   delegate_to: localhost
 
+- name: Rendermain  sudoers template
+  become: false
+  vars:
+    this_host: "{{ vm_host }}"
+    THiS_ACCOUNT: "{{ ACCOUNT | upper}}"
+    TMPPATH: "/tmp/{{ vm_host }}"
+  template:
+    src: "sudoers.j2"
+    dest: "/tmp/{{ vm_host }}/etc/sudoers"
+    mode: '0440'
+    force: true
+  delegate_to: localhost
+
 
 - name: Validate sudoers template {{ item.1 }} with visudo
   become: false
@@ -54,19 +67,6 @@
   delegate_to: localhost
   become: false
 
-- name: Render master sudoers template
-  template:
-    src: "sudoers.j2"
-    dest: "/tmp/{{ vm_host }}/etc/sudoers"
-    mode: '0440'
-    force: true
-  vars:
-    this_host: "{{ vm_host }}"
-    THiS_ACCOUNT: "{{ ACCOUNT | upper}}"
-    TMPPATH: "/tmp/{{ vm_host }}"
-  delegate_to: localhost
-  become: false
-
 - name: Validate sudoers with visudo
   command: >
     visudo -cf /tmp/{{ vm_host }}/etc/sudoers
@@ -83,6 +83,27 @@
   copy:
     src: "/tmp/{{ vm_host }}/etc/sudoers.d/"
     dest: "/tmp/{{ vm_host }}/final/etc/sudoers.d/"
+    remote_src: false
+  delegate_to: localhost
+  become: false
+
+- name: Remove /tmp/{{ vm_host }} from sudoers file
+  ansible.builtin.replace:
+    path: "/tmp/{{ vm_host }}/etc/sudoers"
+    regexp: "/tmp/{{ vm_host }}"
+    replace: ""
+  delegate_to: localhost
+  become: false
+  register: clean_sudo
+
+- name: Show result
+  debug:
+    var: clean_sudo
+
+- name: Copy validated main sudoers files to clean staging path
+  copy:
+    src: "/tmp/{{ vm_host }}/etc/sudoers"
+    dest: "/tmp/{{ vm_host }}/final/etc/sudoers"
     remote_src: false
   delegate_to: localhost
   become: false

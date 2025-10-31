@@ -1,4 +1,15 @@
 # ──────── STAGE: Check existence ─────────
+- name: Check if host acess
+  shell: hoostname
+  register: vm_host_ck
+  failed_when: false
+  changed_when: false
+
+
+- name: check access debug
+  debug:
+    msg: "id {{ vm_host_ck }}"
+
 - name: Check if VM exists
   shell: virsh dominfo {{ vm_host }}
   register: vm_check

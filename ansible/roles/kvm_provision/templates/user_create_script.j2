@@ -1,26 +1,36 @@
+#!/bin/bash
+
+# Ensure group exists
+if ! getent group "{{ group_name }}" >/dev/null 2>&1; then
+  sudo groupadd "{{ group_name }}"
+fi
+
 {% for user in members %}
 {% set pwd = default_user_passwords[user] | default("On32Default4User") %}
 
-# Create user {{ user }} in group {{ group_name }}
+echo "Provisioning user: {{ user }}"
+
+# Create user if missing
 if ! id -u {{ user }} >/dev/null 2>&1; then
   {% if user == group_name %}
-  sudo useradd -m -s /bin/bash -g {{ group_name }} -G {{ group_name }},sshok {{ user }} &&
+  # If user == group, assign as primary group
+  sudo useradd -m -s /bin/bash -g "{{ group_name }}" -G "{{ group_name }},sshok" "{{ user }}"
   {% else %}
-  sudo useradd -m -s /bin/bash -G {{ group_name }},sshok {{ user }} &&
+  # If group exists, assign it as primary with -g
+  if getent group "{{ group_name }}" >/dev/null 2>&1; then
+    sudo useradd -m -s /bin/bash -g "{{ group_name }}" -G sshok "{{ user }}"
+  else
+    sudo useradd -m -s /bin/bash -G "{{ group_name }},sshok" "{{ user }}"
+  fi
   {% endif %}
-  echo '{{ user }}:{{ pwd }}' | sudo chpasswd;
+  echo '{{ user }}:{{ pwd }}' | sudo chpasswd
+else
+  echo "User {{ user }} already exists"
 fi
 
-# Ensure {{ user }} is listed in {{ group_name }} group entry
-{% if user == group_name %}
-if [ "{{ user }}" = "{{ group_name }}" ] && \
-   ! grep "^{{ group_name }}:" /etc/group | awk -F: '{print $NF}' | grep -qw "{{ user }}"; then
+# Ensure user is in group
+if ! id -nG "{{ user }}" | grep -qw "{{ group_name }}"; then
   sudo usermod -aG "{{ group_name }}" "{{ user }}"
 fi
-{% else %}
-if ! getent group "{{ group_name }}" | grep -qw "{{ user }}"; then
-  sudo usermod -aG "{{ group_name }}" "{{ user }}"
-fi
-{% endif %}
 
 {% endfor %}

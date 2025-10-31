@@ -1,24 +1,29 @@
-ipa_domain: morinsoft.ca
-dns_zone: api.morinsoft.ca
-account_name: "MorinSoft"
-admin_id: "sysadmin"
-admin_set: "On32Build4SysAdmin"
+ipa_domain: "{{ lookup('env', 'ipa_domin`') }}"
+dns_zone: "{{ lookup('env', 'dns_zone') }}"
+account_name: "{{ lookup('env', 'ACCOUNT') }}"
+admin_id: "{{ lookup('env', 'admin_id') }}"
+admin_set: "{{ lookup('env', 'admin_set') }}"
+# default IDs
+secops_id: "secops"
+# secops_pw
+secops_pw: "{{ lookup('env', 'secops_pwd') }}"
 
-infra_alias_map:
-  dns:
-    dns01: api01.api.morinsoft.ca
-    dns02: api02.api.morinsoft.ca
-  ca:
-    ca: api01.api.morinsoft.ca
-    ca-intermidiant: api02.api.morinsoft.ca
-  ldap:
-    ldap01: api01.api.morinsoft.ca
-  kvm:
-    kvm01: kvmdc01.morinsoft.ca
-  ad:
-    ad01: api01.api.morinsoft.ca
-    ad02: api01.api.morinsoft.ca
-  api:
-    api: [api01.api.morinsoft.ca, api02.api.morinsoft.ca]
-  router:
-    rout01: rout01.morinsoft.ca
+
+# infra_alias_map:
+#   dns:
+#     dns01: api01.api.morinsoft.ca
+#     dns02: api02.api.morinsoft.ca
+#   ca:
+#     ca: api01.api.morinsoft.ca
+#     ca-intermidiant: api02.api.morinsoft.ca
+#   ldap:
+#     ldap01: api01.api.morinsoft.ca
+#   kvm:
+#     kvm01: kvmdc01.morinsoft.ca
+#   ad:
+#     ad01: api01.api.morinsoft.ca
+#     ad02: api01.api.morinsoft.ca
+#   api:
+#     api: [api01.api.morinsoft.ca, api02.api.morinsoft.ca]
+#   router:
+#     rout01: rout01.morinsoft.ca

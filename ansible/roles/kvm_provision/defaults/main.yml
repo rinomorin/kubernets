@@ -15,12 +15,14 @@ os_variant: "rocky9"
 shutdown_max_timeout: 1800
 
 # default IDs
-default_secops_id: "secops"
-default_secops_pwd: "On32Secure4Sec0ps~"
+default_secops_id: "{{ lookup('vars', 'secops_id') | default('secops', true) }}"
+default_secops_pwd: "{{ secops_pwd }}"
 default_ansible_id: "secops"
-default_ansible_pwd: "On32Ansible4Auto~"
-admin_id: "{{ admin_id | default('sysadmin') }}"
-admin_set: "{{ admin_set | default('On32Build4SysAdmin') }}"
+default_ansible_pwd: "{{ lookup('env', 'secops_pwd') }}"
+secops_id: "{{ default_secops_id }}"
+secops_pwd: "{{ secops_pwd }}"
+admin_id: "{{ lookup('env', 'admin_id') }}"
+admin_set: "{{ lookup('env', 'admin_set') }}"
 default_user_passwords: >-
   {{
     {
@@ -31,13 +33,13 @@ default_user_passwords: >-
   }}
 
 
-# groups
+# groups we put sysadmin in temporory for setup
 sa_group: "sysadmin"
 secure_group: "{{ default_secops_id| default('secops') }}"
 awx_group: "awx_automate"
 sa_group_members: "{{ [admin_id | default('sysadmin')] }}"
 secure_group_members: "{{ [secure_group | default('secops')] }}"
-awx_group_members: ["secops"]
+awx_group_members: ["secops","sysadmin"]
 
 
 members_map: >-

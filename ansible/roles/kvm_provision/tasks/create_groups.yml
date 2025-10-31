@@ -1,3 +1,4 @@
+
 - name: show groups list
   debug: msg="groups - {{ default_groups }}"
 
@@ -16,24 +17,3 @@
           getent group "$grp" || sudo groupadd "$grp"
         done
         '
-
-
-# - name: Ensure required groups exist on VM
-#   shell: |
-#     for grp in {{ default_groups | join(' ') }}; do
-#       getent group "$grp" || sudo groupadd "$grp"
-#     done
-#   vars:
-#     ansible_user: "{{ admin_id }}"
-#     ansible_ssh_pass: "{{ admin_set }}"
-#     ansible_host: "{{ vm_fqdn }}"
-#   delegate_to: "{{ vm_host }}"
-#   become: false
-
-# - name: Debug group_members_map
-#   debug:
-#     var: group_members_map
-
-# - name: Debug vm_fqdn
-#   debug:
-#     var: vm_fqdn

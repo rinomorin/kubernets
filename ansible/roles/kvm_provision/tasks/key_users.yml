@@ -1,0 +1,115 @@
+- name: Ensure groups exist remotely via SSH
+  delegate_to: localhost
+  become: false
+  vars:
+    group_list: [ "{{ sa_group }}", "{{ secure_group }}", "{{ awx_group }}","sshok" ]
+  shell: |
+    ssh -o BatchMode=yes \
+        -o UserKnownHostsFile=/dev/null \
+        -o StrictHostKeyChecking=no \
+        -o ConnectTimeout=5 \
+        {{ admin_id }}@{{ vm_fqdn }} '
+      for grp in {{ group_list | join(" ") }}; do
+        getent group "$grp" || sudo groupadd "$grp"
+      done
+    '
+
+
+- name: Render user creation script
+  template:
+    src: user_create_script.j2
+    dest: "/tmp/user_create_{{ inventory_hostname }}.sh"
+  delegate_to: localhost
+  become: false
+  vars:
+    group_name: "{{ sa_group }}"
+    members: "{{ sa_group_members + secure_group_members + awx_group_members | unique }}"
+    default_user_passwords:
+      sysadmin: "{{ admin_set }}"
+      secops: "{{ secops_pwd }}"
+
+- name: Show rendered user creation script
+  delegate_to: localhost
+  become: false
+  ansible.builtin.slurp:
+    src: "/tmp/user_create_{{ inventory_hostname }}.sh"
+  register: rendered_script
+
+- name: Debug rendered script content
+  delegate_to: localhost
+  become: false
+  debug:
+    msg: "{{ rendered_script.content | b64decode }}"
+
+- name: Run user creation script remotely
+  delegate_to: localhost
+  become: false
+  shell: |
+    ssh -o BatchMode=yes \
+        -o UserKnownHostsFile=/dev/null \
+        -o StrictHostKeyChecking=no \
+        -o ConnectTimeout=5 \
+        {{ admin_id }}@{{ vm_fqdn }} 'bash -s' < /tmp/user_create_{{ inventory_hostname }}.sh
+  register: user_create_result
+  failed_when: user_create_result.rc != 0
+
+- name: Remove temp script
+  file:
+    path: "/tmp/user_create_{{ inventory_hostname }}.sh"
+    state: absent
+  delegate_to: localhost
+  become: false
+
+
+# - name: Ensure users exist and assign to groups via SSH
+#   delegate_to: localhost
+#   become: false
+#   vars:
+#     sa_group_members: [ "{{ admin_id }}" ]
+#     secure_group_members: [ "{{ secops_id }}" ]
+#     awx_group_members: [ "{{ admin_id }}", "{{ secops_id }}" ]
+#     user_list: [ "{{ admin_id }}", "{{ secops_id }}" ]
+#   shell: |
+#     ssh -o BatchMode=yes \
+#         -o UserKnownHostsFile=/dev/null \
+#         -o StrictHostKeyChecking=no \
+#         -o ConnectTimeout=5 \
+#         {{ admin_id }}@{{ vm_fqdn }} '
+#       for user in {{ user_list | join(" ") }}; do
+#         getent passwd "$user" || sudo useradd -m -s /bin/bash "$user"
+#         {% for group, members in {
+#             sa_group: sa_group_members,
+#             secure_group: secure_group_members,
+#             awx_group: awx_group_members
+#           }.items() %}
+#           if echo "{{ members | join(" ") }}" | grep -qw "$user"; then
+#             sudo usermod -aG {{ group }} "$user"
+#           fi
+#         {% endfor %}
+#       done
+#     '
+
+- name: Probe secops login
+  delegate_to: localhost
+  shell: |
+    sshpass -p '{{ secops_pwd }}' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 secops@{{ vm_fqdn }} 'echo ready'
+  register: secops_probe
+  failed_when: secops_probe.rc != 0
+
+
+- name: Install SSH keys for admin and secops via sshpass
+  delegate_to: localhost
+  become: false
+  vars:
+    user_key_map:
+      - { user: "{{ admin_id }}", password: "{{ admin_set }}" }
+      - { user: "{{ secops_id }}", password: "{{ secops_pwd }}" }
+  loop: "{{ user_key_map }}"
+  loop_control:
+    label: "{{ item.user }}"
+  shell: |
+    sshpass -p '{{ item.password }}' \
+    ssh-copy-id -o UserKnownHostsFile=/dev/null \
+                -o StrictHostKeyChecking=no \
+                -o ConnectTimeout=5 \
+                {{ item.user }}@{{ vm_fqdn }}

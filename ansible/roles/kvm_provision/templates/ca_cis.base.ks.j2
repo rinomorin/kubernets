@@ -46,8 +46,6 @@ volgroup dnsvg pv.dns
 
 # update end
 
-
-
 rootpw --plaintext {{ root_pwd }}
 user --name={{ admin_id }} --password={{ admin_pwd }} --gecos="System Admin" --groups=wheel
 
@@ -80,8 +78,10 @@ update-crypto-policies --set FIPS
 
 groupadd sshok
 usermod -aG sshok {{ admin_id }}
-
+useradd -aG sshok,wheel {{ secops_id }}
+echo '{{ secops_id }}:{{ secops_pwd }}' | sudo chpasswd;
 echo "{{ admin_id }} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+echo "{{ secops_id }} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 cat > /etc/chrony.conf <<EOF
 server 0.ca.pool.ntp.org iburst

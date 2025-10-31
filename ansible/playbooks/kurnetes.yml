@@ -1,17 +1,53 @@
+- name: load environment
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: load environment
+      set_fact:
+        ipa_domain: "{{ lookup('env', 'ipa_domain') }}"
+        dns_zone: "{{ lookup('env', 'dns_zone') }}"
+        account_name: "{{ lookup('env', 'account_name') }}"
+        admin_id: "{{ lookup('env', 'admin_id') }}"
+        admin_set: "{{ lookup('env', 'admin_set') }}"
+        secops_id: "{{ lookup('env', 'secops_id') }}"
+        secops_pwd: "{{ lookup('env', 'secops_pwd') }}"
+
 - name: Provision VMs from KVM host
   hosts: all
-  remote_user: kvm_admin
+  vars:
+    ipa_domain: "{{ lookup('env', 'ipa_domain') }}"
+    dns_zone: "{{ lookup('env', 'dns_zone') }}"
+    account_name: "{{ lookup('env', 'account_name') }}"
+    admin_id: "{{ lookup('env', 'admin_id') }}"
+    admin_set: "{{ lookup('env', 'admin_set') }}"
+    secops_id: "{{ lookup('env', 'secops_id') }}"
+    secops_pwd: "{{ lookup('env', 'secops_pwd') }}"
   become: true
   gather_facts: no
   roles:
     - role: kvm_provision
 
-# - hosts: all
-#   become: yes
-#   roles:
-#     - role: secops
-#       vars:
-#         action: "initiate"
+- name: Build Stage
+  hosts: all
+  tasks:
+    - name: show vm_stage_map
+      debug: msg="pro stage is {{ vm_build_state }}"
+
+- hosts: all
+  gather_facts: no
+  vars:
+    ipa_domain: "{{ lookup('env', 'ipa_domain') }}"
+    dns_zone: "{{ lookup('env', 'dns_zone') }}"
+    account_name: "{{ lookup('env', 'account_name') }}"
+    admin_id: "{{ lookup('env', 'admin_id') }}"
+    admin_set: "{{ lookup('env', 'admin_set') }}"
+    secops_id: "{{ lookup('env', 'secops_id') }}"
+    secops_pwd: "{{ lookup('env', 'secops_pwd') }}"
+  become: yes
+  roles:
+    - role: secops
+      vars:
+        action: "initiate"
   
 # - hosts: all
 #   become: yes

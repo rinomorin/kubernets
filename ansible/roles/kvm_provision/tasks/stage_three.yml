@@ -10,6 +10,9 @@
   set_fact:
     members_map_items: "{{ members_map | dict2items }}"
 
+- name: set up key ids and groups
+  import_tasks: key_users.yml
+
 - name: Create users and assign to groups
   loop: "{{ members_map_items }}"
   loop_control:
@@ -20,9 +23,26 @@
     group_name: "{{ group_entry.key }}"
     members: "{{ group_entry.value }}"
 
-- name: setup ssh keys for main id
-  import_tasks: add_keys.yml
+- name: Find user creation scripts
+  find:
+    paths: /tmp
+    patterns: "user_create_script_*.sh"
+    file_type: file
+  delegate_to: localhost
+  become: false
+  register: user_scripts
+
+- name: Remove user creation scripts
+  file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ user_scripts.files }}"
+  delegate_to: localhost
+  become: false
 
 - name: Stage Three Provision Sudoers tmplates
   import_tasks: render_sudoers_templates.yml
-  
+
+- name: Stage four set secure id and is compliance 
+  import_tasks: secops_templates.yml
+
