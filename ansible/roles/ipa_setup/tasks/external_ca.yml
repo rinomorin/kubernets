@@ -1,0 +1,26 @@
+# role/ipa_setup/tasks/external_ca.yml
+- name: Generate CSR for external CA
+  command: >
+    ipa-server-install
+    --external-ca
+    --domain={{ ipa_domain }}
+    --realm={{ ipa_realm }}
+    --hostname={{ ipa_hostname }}
+    --setup-dns
+    --no-forwarders
+    --no-ntp
+    --mkhomedir
+  args:
+    creates: /root/ipa.csr
+
+- name: Wait for signed CA to be placed
+  wait_for:
+    path: /root/ipa.crt
+    timeout: 3600
+    state: present
+
+- name: Complete external CA install
+  command: >
+    ipa-server-install
+    --external-cert-file=/root/ipa.crt
+    --external-cert-file=/root/ipa_chain.crt

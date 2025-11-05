@@ -1,0 +1,49 @@
+- import_tasks: load_env.yml
+- import_tasks: tag_node_role.yml
+- import_tasks: emit_node_summary.yml
+
+- import_tasks: bootstrap_master.yml
+  when:
+    - kube_role == "master"
+    - kube_ready_for_bootstrap
+
+- import_tasks: emit_join_token.yml
+  when:
+    - kube_role == "master"
+    - kube_ready_for_bootstrap
+
+- import_tasks: join_worker.yml
+  when:
+    - kube_role == "worker"
+    - kube_ready_for_bootstrap
+
+- name: Gather all node dispatcher matrix files
+  find:
+    paths: "/var/log/kube_dispatcher_matrix"
+    patterns: "*.json"
+  delegate_to: localhost
+  register: dispatcher_matrix_files
+
+- name: Read each dispatcher matrix file
+  slurp:
+    src: "{{ item.path }}"
+  loop: "{{ dispatcher_matrix_files.files }}"
+  delegate_to: localhost
+  register: raw_dispatcher_data
+
+- name: Aggregate dispatcher matrix
+  set_fact:
+    kube_dispatcher_summary: >-
+      {{
+        raw_dispatcher_data.results
+        | map(attribute='content')
+        | map('b64decode')
+        | map('from_json')
+        | list
+      }}
+
+- name: Emit dispatcher-wide summary
+  copy:
+    dest: "/var/log/kube_dispatcher_summary.json"
+    content: "{{ kube_dispatcher_summary | to_nice_json }}"
+  delegate_to: localhost

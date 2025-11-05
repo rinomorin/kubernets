@@ -1,0 +1,7 @@
+- name: Tag Kubernetes node role
+  set_fact:
+    kube_role: >-
+      {% if inventory_hostname == "helper01.morinsoft.ca" %} helper
+      {% elif inventory_hostname == "master01.morinsoft.ca" %} master
+      {% elif inventory_hostname in ["worker01.morinsoft.ca", "worker02.morinsoft.ca"] %} worker
+      {% else %} unknown {% endif %}

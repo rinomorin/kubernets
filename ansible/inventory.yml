@@ -48,6 +48,10 @@ all:
       hosts:
         ipa01:
         ipa02:
+    ipa_servers:
+      hosts:
+        ipa01:
+        ipa02:
     ntp:
       hosts:
         ipa01:

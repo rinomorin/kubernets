@@ -1,0 +1,30 @@
+- name: Gather all node env status files
+  find:
+    paths: "/var/log/kube_env_matrix"
+    patterns: "*.json"
+  delegate_to: localhost
+  register: env_matrix_files
+
+- name: Read each env status file
+  slurp:
+    src: "{{ item.path }}"
+  loop: "{{ env_matrix_files.files }}"
+  delegate_to: localhost
+  register: raw_env_data
+
+- name: Parse and aggregate env status
+  set_fact:
+    kube_env_summary: >-
+      {{
+        raw_env_data.results
+        | map(attribute='content')
+        | map('b64decode')
+        | map('from_json')
+        | list
+      }}
+
+- name: Emit dispatcher summary matrix
+  copy:
+    dest: "/var/log/kube_env_dispatcher_summary.json"
+    content: "{{ kube_env_summary | to_nice_json }}"
+  delegate_to: localhost

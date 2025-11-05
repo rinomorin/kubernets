@@ -61,34 +61,6 @@
   become: false
 
 
-# - name: Ensure users exist and assign to groups via SSH
-#   delegate_to: localhost
-#   become: false
-#   vars:
-#     sa_group_members: [ "{{ admin_id }}" ]
-#     secure_group_members: [ "{{ secops_id }}" ]
-#     awx_group_members: [ "{{ admin_id }}", "{{ secops_id }}" ]
-#     user_list: [ "{{ admin_id }}", "{{ secops_id }}" ]
-#   shell: |
-#     ssh -o BatchMode=yes \
-#         -o UserKnownHostsFile=/dev/null \
-#         -o StrictHostKeyChecking=no \
-#         -o ConnectTimeout=5 \
-#         {{ admin_id }}@{{ vm_fqdn }} '
-#       for user in {{ user_list | join(" ") }}; do
-#         getent passwd "$user" || sudo useradd -m -s /bin/bash "$user"
-#         {% for group, members in {
-#             sa_group: sa_group_members,
-#             secure_group: secure_group_members,
-#             awx_group: awx_group_members
-#           }.items() %}
-#           if echo "{{ members | join(" ") }}" | grep -qw "$user"; then
-#             sudo usermod -aG {{ group }} "$user"
-#           fi
-#         {% endfor %}
-#       done
-#     '
-
 - name: Probe secops login
   delegate_to: localhost
   shell: |

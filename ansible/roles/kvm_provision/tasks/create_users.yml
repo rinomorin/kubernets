@@ -50,29 +50,31 @@
   delegate_to: localhost
   become: false
   shell: |
-    sshpass -p '{{ admin_pwd }}' \
-    ssh-copy-id -o UserKnownHostsFile=/dev/null \
+    sshpass -p '{{ admin_set }}' \
+    ssh-copy-id -f \
+                -o UserKnownHostsFile=/dev/null \
                 -o StrictHostKeyChecking=no \
                 -o ConnectTimeout=5 \
+                -i {{ playbook_dir }}/../roles/kvm_provision/files/admin_id_rsa.pub \
                 {{ admin_id }}@{{ vm_fqdn }}
   vars:
     ansible_user: "{{ admin_id }}"
     ansible_ssh_pass: "{{ admin_set }}"
     ansible_host: "{{ vm_fqdn }}"
-## this is a key id ensure it present
-
-
+  
 - name: Set secops ssh keys
   delegate_to: localhost
   become: false
   shell: |
     sshpass -p '{{ secops_pwd }}' \
-    ssh-copy-id -o UserKnownHostsFile=/dev/null \
+    ssh-copy-id -f \ 
+                -o UserKnownHostsFile=/dev/null \
                 -o StrictHostKeyChecking=no \
                 -o ConnectTimeout=5 \
+                -i {{ playbook_dir }}/../roles/kvm_provision/files/secops_id_rsa.pub \
                 {{ secops_id }}@{{ vm_fqdn }}
   vars:
-    ansible_user: "{{ admin_id }}"
-    ansible_ssh_pass: "{{ admin_set }}"
+    ansible_user: "{{ secops_id }}"
+    ansible_ssh_pass: "{{ secops_pwd }}"
     ansible_host: "{{ vm_fqdn }}"
 

@@ -1,0 +1,20 @@
+- name: Promote node if IPA is compliant and role is master
+  debug:
+    msg: "Promoting {{ inventory_hostname }} to next stage (e.g., cluster prep)"
+  when:
+    - ipa_compliance_status
+    - ipa_role == "master"
+
+- import_tasks: roles/ipa_dispatcher_summary/tasks/main.yml
+  when: ipa_dispatcher_enable_summary
+
+- import_tasks: roles/ipa_promotion_gate/tasks/main.yml
+  when: ipa_dispatcher_enable_promotion
+
+- name: Trigger cluster prep if all conditions are met
+  include_tasks: prepare_kubernetes.yml
+  when:
+    - ipa_compliance_status
+    - ipa_role == "master"
+    - ipa_replication_ok
+    - ipa_dns_zone_count > 0

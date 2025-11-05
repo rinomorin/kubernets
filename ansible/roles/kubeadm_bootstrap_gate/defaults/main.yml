@@ -1,0 +1,5 @@
+kube_ready_for_bootstrap: false
+kubeadm_cluster_name: morinsoft
+kubeadm_pod_network_cidr: "10.244.0.0/16"
+kubeadm_crio_version: "1.34"
+kubeadm_k8s_repo_url: "https://pkgs.k8s.io/core:/stable:/v1.34/rpm/"

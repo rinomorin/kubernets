@@ -1,0 +1,65 @@
+- name: Check if node is ready for bootstrap
+  debug:
+    msg: "Node {{ inventory_hostname }} is ready for Kubernetes bootstrap"
+  when: kube_ready_for_bootstrap
+
+- name: Enable CRI-O 1.34 repository
+  yum_repository:
+    name: cri-o
+    description: CRI-O Stable 1.34
+    baseurl: "https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/{{ kubeadm_crio_version }}/CentOS_9_Stream/"
+    gpgcheck: yes
+    enabled: yes
+    gpgkey: "https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/{{ kubeadm_crio_version }}/CentOS_9_Stream/repodata/repomd.xml.key"
+  when: kube_ready_for_bootstrap
+
+- name: Install CRI-O
+  package:
+    name:
+      - cri-o
+      - cri-tools
+    state: present
+  when: kube_ready_for_bootstrap
+
+- name: Enable and start CRI-O
+  systemd:
+    name: crio
+    enabled: true
+    state: started
+  when: kube_ready_for_bootstrap
+
+- name: Enable Kubernetes 1.34 repository
+  yum_repository:
+    name: kubernetes
+    description: Kubernetes Stable 1.34
+    baseurl: "{{ kubeadm_k8s_repo_url }}"
+    gpgcheck: yes
+    enabled: yes
+    gpgkey: "{{ kubeadm_k8s_repo_url }}/repodata/repomd.xml.key"
+  when: kube_ready_for_bootstrap
+
+- name: Install Kubernetes components
+  package:
+    name:
+      - kubelet
+      - kubeadm
+      - kubectl
+    state: present
+  when: kube_ready_for_bootstrap
+
+- name: Enable kubelet
+  systemd:
+    name: kubelet
+    enabled: true
+    state: started
+  when: kube_ready_for_bootstrap
+
+- name: Generate kubeadm config
+  template:
+    src: kubeadm_config.yaml.j2
+    dest: /etc/kubernetes/kubeadm_config.yaml
+  when: kube_ready_for_bootstrap
+
+- name: Initialize Kubernetes master
+  command: kubeadm init --config /etc/kubernetes/kubeadm_config.yaml
+  when: kube_ready_for_bootstrap

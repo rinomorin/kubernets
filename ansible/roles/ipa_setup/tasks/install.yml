@@ -1,0 +1,23 @@
+- name: Install IPA packages
+  package:
+    name:
+      - ipa-server
+      - ipa-server-dns
+      - bind-dyndb-ldap
+    state: present
+
+- name: Ensure IPA install audit directory exists
+  file:
+    path: /var/log/ipa_install_status
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  when: "{{ ipa_role == 'master' }}"
+
+- name: Ensure IPA install audit directory exists
+  file:
+    path: /var/log/ipa_version
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  when: "{{ ipa_role == 'master' }}"

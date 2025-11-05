@@ -1,0 +1,11 @@
+{
+  "host": "{{ inventory_hostname }}",
+  "compliant": {{ ipa_compliance_status | to_json }},
+  "details": {
+    "verified": {{ ipa_compliance_reason.verified | to_json }},
+    "replication_ok": {{ ipa_compliance_reason.replication | to_json }},
+    "dns_zone_count": {{ ipa_compliance_reason.dns_zones }},
+    "kerberos_ticket_valid": {{ ipa_compliance_reason.kerberos | to_json }}
+  },
+  "timestamp": "{{ ansible_date_time.iso8601 }}"
+}

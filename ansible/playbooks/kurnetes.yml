@@ -1,3 +1,4 @@
+
 - name: load environment
   hosts: all
   gather_facts: false
@@ -31,10 +32,17 @@
   hosts: all
   tasks:
     - name: show vm_stage_map
-      debug: msg="pro stage is {{ vm_build_state }}"
-
+      debug: msg="{{ inventory_hostname }} is in {{ global_vm_build_state }} state"
+      when: 
+        - "'kvm' not in group_names"
+    
+    - name: set global state
+      set_fact: 
+         vm_build_state: '{{ global_vm_build_state | default("skipped") }}'
+      
 - hosts: all
   gather_facts: no
+  become: yes
   vars:
     ipa_domain: "{{ lookup('env', 'ipa_domain') }}"
     dns_zone: "{{ lookup('env', 'dns_zone') }}"
@@ -43,11 +51,69 @@
     admin_set: "{{ lookup('env', 'admin_set') }}"
     secops_id: "{{ lookup('env', 'secops_id') }}"
     secops_pwd: "{{ lookup('env', 'secops_pwd') }}"
-  become: yes
-  roles:
-    - role: secops
+
+  tasks:
+    - name: show vm_stage_map
+      debug: msg=" starting {{ vm_build_state }} on {{ inventory_hostname }}"
+      when: 
+        - "'kvm' not in group_names"
+
+    - name: Include secops role for scanned systems
+      import_role:
+        name: secops
+      vars:
+        action: "scan"
+      when:
+        - vm_build_state == "scanned"
+        - "'kvm' not in group_names"
+
+    - name: Include secops role for built systems
+      import_role:
+        name: secops
       vars:
         action: "initiate"
+      when:
+        - vm_build_state == "built"
+        - "'kvm' not in group_names"
+
+    - name: Show final vm_build_state
+      debug:
+        var: vm_build_state
+
+- hosts: ipa_servers
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Include ipa_dispatcher
+      import_role:
+        name: ipa_dispatcher
+      when: vm_build_state == "scanned"
+
+    - name: Include ipa_setup
+      import_role:
+        name: ipa_setup
+      when: vm_build_state == "scanned"
+
+- hosts: ipa_servers
+  become: true
+  roles:
+    - ipa_verify
+
+- hosts: ipa_servers
+  become: true
+  roles:
+    - ipa_verify
+  tasks:
+    - import_tasks: roles/ipa_verify/tasks/set_dispatcher_facts.yml
+    - import_tasks: roles/ipa_verify/tasks/schema_validate.yml
+    - import_tasks: roles/ipa_verify/tasks/emit_metrics.yml
+
+- hosts: ipa_servers
+  become: true
+  roles:
+    - ipa_verify
+    - ipa_compliance_hook
+
   
 # - hosts: all
 #   become: yes

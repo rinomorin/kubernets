@@ -1,0 +1,11 @@
+# IPA service status
+ipa_service_up{host="{{ inventory_hostname }}"} 1
+
+# Replication agreements
+ipa_replication_agreements{host="{{ inventory_hostname }}"} {{ replica_partners | length }}
+
+# DNS zones
+ipa_dns_zone_count{host="{{ inventory_hostname }}"} {{ dns_zones | length }}
+
+# Kerberos ticket presence
+ipa_kerberos_ticket_valid{host="{{ inventory_hostname }}"} {{ 1 if kerberos_ticket else 0 }}

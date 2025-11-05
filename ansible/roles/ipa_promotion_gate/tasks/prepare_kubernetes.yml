@@ -1,0 +1,45 @@
+- name: Set Kubernetes node role
+  set_fact:
+    kube_role: >-
+      {% if inventory_hostname == "helper" %} helper
+      {% elif inventory_hostname in ["master01", "master02", "master03"] %} master
+      {% else %} unknown {% endif %}
+
+- name: Emit Kubernetes node readiness
+  copy:
+    dest: "/var/log/kube_node_ready/{{ inventory_hostname }}.json"
+    content: |
+      {
+        "host": "{{ inventory_hostname }}",
+        "kube_role": "{{ kube_role }}",
+        "ipa_compliant": {{ ipa_compliance_status | default(false) }},
+        "dns_zone_count": {{ ipa_dns_zone_count | default(0) }},
+        "replication_ok": {{ ipa_replication_ok | default(false) }},
+        "kerberos_ticket_valid": {{ ipa_kerberos_ticket_valid | default(false) }},
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  delegate_to: localhost
+
+- name: Prepare DNS entry for cloud.morinsoft.ca
+  command: >
+    ipa dnsrecord-add morinsoft.ca cloud --a-ip-address=192.168.100.20
+  when: inventory_hostname == "helper"
+
+- name: Scaffold Squid proxy placeholder
+  debug:
+    msg: "Squid proxy not yet built — placeholder for future cloud-side deployment"
+  when: inventory_hostname == "helper"
+
+- name: Scaffold VPN access control
+  debug:
+    msg: "VPN access enforcement will be added once cloud.morinsoft.ca is reachable"
+  when: inventory_hostname == "helper"
+
+- name: Set dispatcher fact for cluster prep
+  set_fact:
+    kube_ready_for_bootstrap: true
+  when:
+    - ipa_compliance_status
+    - ipa_role == "master"
+    - ipa_replication_ok
+    - ipa_dns_zone_count > 0

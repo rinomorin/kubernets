@@ -2,7 +2,7 @@
   delegate_to: localhost
   become: false
   shell: |
-    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 {{ admin_id }}@{{ vm_host }} \
+    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 {{ secops_id }}@{{ vm_host }} \
     "echo '{{ secops_id }}:{{ secops_pwd }}' | sudo chpasswd"
   register: password_set_result
   changed_when: password_set_result.rc == 0
@@ -56,13 +56,11 @@
   failed_when: "'Permission denied' in ssh_key_test.stderr"
   changed_when: false
 
-- name: Check for OpenSCAP or CIS scan artifacts on {{ vm_host }}
-  become: true
-  vars:
-    remote_user: "{{ secops_id }}"
-    remote_pass: "{{ secops_pwd }}"
+- name: Check CIS scan state
   shell: |
-    if find /var/tmp /var/log /var/lib /root /etc /tmp -type f \( -name "*oscap*" -o -name "*scap*" -o -name "*cis*" \) 2>/dev/null | grep -q .; then
+    if sudo /bin/sh -c 'find /var/tmp /var/log /var/lib /root /etc /tmp \
+      -type f \( -name "*oscap*" -o -name "*scap*" -o -name "*cis*" \) \
+      ! -path "/etc/bash_completion.d/oscap" 2>/dev/null' | grep -q .; then
       echo "scanned"
     else
       echo "built"
@@ -73,6 +71,14 @@
 - name: Set CIS readiness flag
   set_fact:
     vm_build_state: "{{ cis_check.stdout }}"
+    cacheable: true
+  delegate_facts: true
 
-- name: stage is at
-  debug: msg=" system is {{ cis_check }}"
+- name: Set global build state
+  set_fact:
+    global_vm_build_state: "{{ cis_check.stdout }}"
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Show build stage
+  debug:
+    msg: "System is in stage:  {{ global_vm_build_state }}"

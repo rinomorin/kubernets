@@ -1,0 +1,32 @@
+- name: Check if kubelet is active
+  shell: systemctl is-active kubelet
+  register: kubelet_status
+  changed_when: false
+  failed_when: false
+
+- name: Check if CRI-O is active
+  shell: systemctl is-active crio
+  register: crio_status
+  changed_when: false
+  failed_when: false
+
+- name: Check if node_exporter is active
+  shell: systemctl is-active node_exporter
+  register: exporter_status
+  changed_when: false
+  failed_when: false
+
+- name: Emit service health summary
+  copy:
+    dest: "/var/log/kube_service_health/{{ inventory_hostname }}.json"
+    content: |
+      {
+        "host": "{{ inventory_hostname }}",
+        "services": {
+          "kubelet": "{{ kubelet_status.stdout }}",
+          "crio": "{{ crio_status.stdout }}",
+          "node_exporter": "{{ exporter_status.stdout }}"
+        },
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  delegate_to: localhost

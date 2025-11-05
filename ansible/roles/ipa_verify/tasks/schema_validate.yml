@@ -1,0 +1,21 @@
+- name: Validate IPA verification summary against schema
+  delegate_to: localhost
+  run_once: true
+  vars:
+    schema_path: "{{ playbook_dir }}/roles/ipa_verify/files/ipa_verification_schema.json"
+    summary_path: "{{ ipa_verify_summary_path }}/{{ inventory_hostname }}.json"
+  block:
+    - name: Load verification summary
+      slurp:
+        src: "{{ summary_path }}"
+      register: summary_raw
+
+    - name: Load schema
+      slurp:
+        src: "{{ schema_path }}"
+      register: schema_raw
+
+    - name: Validate summary JSON
+      community.general.jsonschema:
+        data: "{{ summary_raw.content | b64decode | from_json }}"
+        schema: "{{ schema_raw.content | b64decode | from_json }}"

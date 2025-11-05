@@ -1,4 +1,5 @@
 #version=RHEL9
+#url --url=file:///run/install/repo
 url --mirrorlist={{ kickstart_baseos_url | default('https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=BaseOS-9.6') }}
 repo --name=AppStream --mirrorlist={{ kickstart_appstream_url | default('https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=AppStream-9.6') }}
 
@@ -22,6 +23,18 @@ part pv.dns --fstype="lvmpv" --ondisk={{ install_disk | default('sda') }} --size
 volgroup dnsvg pv.dns
 
 # update here
+
+%addon com_redhat_kdump --enable --reserve-mb='auto'
+
+%end
+
+%addon com_redhat_oscap
+    content-type = scap-security-guide
+    datastream-id = scap_org.open-scap_datastream_from_xccdf_ssg-rhel9-xccdf.xml
+    xccdf-id = scap_org.open-scap_cref_ssg-rhel9-xccdf.xml
+    profile = xccdf_org.ssgproject.content_profile_cis
+%end
+
 
 {% set volumes = [
   {'mount': '/tmp', 'name': 'tmplv', 'size': 1024, 'opts': 'nodev,nosuid,noexec'},
@@ -48,8 +61,10 @@ volgroup dnsvg pv.dns
 
 rootpw --plaintext {{ root_pwd }}
 user --name={{ admin_id }} --password={{ admin_pwd }} --gecos="System Admin" --groups=wheel
+user --name={{ secops_id }} --password={{ secops_pwd }} --gecos="automation id" --groups=wheel
 
 %packages
+--ignoremissing
 @^minimal-environment
 @standard
 @headless-management
@@ -57,20 +72,18 @@ openscap-scanner
 scap-security-guide
 aide
 audit
+libpwquality
 policycoreutils
 policycoreutils-python-utils
 gnupg2
 lvm2
-nfs-utils
 iscsi-initiator-utils
-ipa-server
-ipa-server-dns
-bind
-pki-server
-bind-dyndb-ldap
 chrony
 openssl
 sssd
+rsyslog
+logrotate
+gnutls-utils
 %end
 
 %post --interpreter=/bin/bash --log=/root/kickstart-post.log
@@ -78,8 +91,7 @@ update-crypto-policies --set FIPS
 
 groupadd sshok
 usermod -aG sshok {{ admin_id }}
-useradd -aG sshok,wheel {{ secops_id }}
-echo '{{ secops_id }}:{{ secops_pwd }}' | sudo chpasswd;
+usermod -aG sshok {{ secops_id }}
 echo "{{ admin_id }} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 echo "{{ secops_id }} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
@@ -103,6 +115,10 @@ systemctl enable named-pkcs11
 systemctl restart named-pkcs11
 
 update-crypto-policies --set FIPS
+
+echo "{{ admin_id }}:{{ admin_set }}" | chpasswd
+echo "{{ secops_id }}:{{ secops_pwd }}" | chpasswd
+
 sleep 2
 echo "Installation complete. System will power off."
 %end

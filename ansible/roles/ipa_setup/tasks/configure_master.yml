@@ -1,0 +1,34 @@
+# role/ipa_setup/tasks/configure_master.yml
+- name: Configure IPA master
+  command: >
+    umask 022 &&    
+    ipa-server-install
+    --hostname={{ ipa_hostname }}
+    --domain={{ ipa_domain }}
+    --realm={{ ipa_realm }}
+    {% if ipa_setup_dns %} --setup-dns --auto-reverse {% endif %}
+    {% if ipa_no_forwarders %} --no-forwarders {% endif %}
+    {% if ipa_no_ntp %} --no-ntp {% endif %}
+    {% if ipa_no_hbac_allow %} --no-hbac-allow {% endif %}
+    {% if ipa_mkhomedir %} --mkhomedir {% endif %}
+    --ds-password={{ ipa_dm_password }}
+    --admin-password={{ ipa_admin_password }}
+    --unattended
+  args:
+    creates: /etc/ipa/default.conf
+
+- name: Emit IPA version
+  command: ipa-server-install --version
+  register: ipa_version
+  changed_when: false
+  failed_when: false
+
+- name: Log IPA version
+  copy:
+    dest: "/var/log/ipa_version/{{ inventory_hostname }}.json"
+    content: |
+      {
+        "ipa_version": "{{ ipa_version.stdout }}",
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  delegate_to: localhost

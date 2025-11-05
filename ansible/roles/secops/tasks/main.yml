@@ -1,5 +1,21 @@
 - name: Dispatch secops action
+  include_tasks: read_rule_db.yml
+
+- name: Dispatch secops action
   include_tasks: "{{ action }}.yml"
   when: 
    - "'kvm' not in group_names"
    - action is defined
+
+- name: Show final vm_build_state
+  debug:
+    var: vm_build_state
+
+- name: Show rule_fail_list
+  debug:
+    var: "{{ rule_fail_list }}"
+
+- name: Exit if OSCAP failed
+  fail:
+    msg: "Skipping {{ inventory_hostname }} due to OSCAP failure"
+  when: vm_build_state == "oscap_failed"

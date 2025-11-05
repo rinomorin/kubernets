@@ -1,0 +1,7 @@
+# role/ipa_distpatcher/defaults/main.yml
+ipa_dns_zones:
+  - name: "{{ lookup('env', 'ipa_domain') | lower }}"
+    allow_transfer: "{{ groups['ipa_servers'] | map('extract', hostvars, ['ansible_host']) | list }}"
+    allow_query:
+      - "any"
+    allow_update: "{{ groups['ipa_servers'] | map('extract', hostvars, ['ansible_host']) | list }}"

@@ -1,11 +1,31 @@
+
+- name: "starting initial {{ vm_build_state}} scan"
+  debug: msg="running scan on {{ inventory_hostname }}"
+
 - name: Ensure OpenSCAP and SCAP content are installed
   become: yes
-  vars:
-    remote_user: "{{ secops_id }}"
-    remote_pass: "{{ secops_pwd }}"
   ansible.builtin.package:
     name:
       - openscap-scanner
       - scap-security-guide
     state: latest
   tags: [secops, install]
+
+
+- name: run initial scan
+  register: init_scan
+  shell: "{{ oscan_scanner.scan_command }}"
+
+- name: run initial scan
+  register: init_fix
+  import_tasks: dispatch_failed.yml
+
+- name: Set vm_build_state to scanned if scan passed
+  set_fact:
+    vm_build_state: "scanned"
+  when: rule_is | selectattr('status', 'equalto', 'fail') | list | length == 0
+
+- name: Set vm_build_state to oscap_failed if scan has failures
+  set_fact:
+    vm_build_state: "oscap_failed"
+  when: rule_is | selectattr('status', 'equalto', 'fail') | list | length > 0

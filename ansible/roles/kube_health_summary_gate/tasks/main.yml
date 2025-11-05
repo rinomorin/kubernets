@@ -1,0 +1,56 @@
+- name: Gather all service health files
+  find:
+    paths: "/var/log/kube_service_health"
+    patterns: "*.json"
+  delegate_to: localhost
+  register: health_files
+
+- name: Read each health file
+  slurp:
+    src: "{{ item.path }}"
+  loop: "{{ health_files.files }}"
+  delegate_to: localhost
+  register: raw_health_data
+
+- name: Parse and aggregate health data
+  set_fact:
+    kube_health_matrix: >-
+      {{
+        raw_health_data.results
+        | map(attribute='content')
+        | map('b64decode')
+        | map('from_json')
+        | list
+      }}
+
+- name: Filter unhealthy nodes
+  set_fact:
+    kube_unhealthy_nodes: >-
+      {{
+        kube_health_matrix
+        | selectattr('services.kubelet', 'ne', 'active')
+        | union(kube_health_matrix | selectattr('services.crio', 'ne', 'active'))
+        | union(kube_health_matrix | selectattr('services.node_exporter', 'ne', 'active'))
+        | map(attribute='host')
+        | unique
+        | list
+      }}
+
+- name: Emit health summary matrix
+  copy:
+    dest: "/var/log/kube_health_summary.json"
+    content: |
+      {
+        "timestamp": "{{ ansible_date_time.iso8601 }}",
+        "unhealthy_nodes": {{ kube_unhealthy_nodes | to_json }},
+        "total_unhealthy": {{ kube_unhealthy_nodes | length }},
+        "health_checked_nodes": {{ kube_health_matrix | map(attribute='host') | list | to_json }}
+      }
+  delegate_to: localhost
+
+- name: Block promotion if unhealthy nodes exist
+  fail:
+    msg: >
+      Promotion blocked due to unhealthy nodes:
+      {{ kube_unhealthy_nodes | join(', ') }}
+  when: kube_unhealthy_nodes | length > 0

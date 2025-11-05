@@ -1,0 +1,19 @@
+# role/ipa_setup/tasks/delegate_dns.yml
+- name: Create delegated DNS zones
+  ipa_dnszone:
+    name: "{{ item.name }}"
+    allow_transfer: "{{ item.allow_transfer }}"
+    allow_query: "{{ item.allow_query }}"
+    allow_update: "{{ item.allow_update }}"
+    state: present
+  loop: "{{ ipa_dns_zones }}"
+  when: ipa_delegate_dns
+
+- name: Cache IPA facts
+  set_fact:
+    ipa_cached_facts:
+      role: "{{ ipa_role }}"
+      external_ca: "{{ ipa_use_external_ca }}"
+      dns_delegate: "{{ ipa_delegate_dns }}"
+      promote_ca: "{{ ipa_promote_ca }}"
+  cacheable: true

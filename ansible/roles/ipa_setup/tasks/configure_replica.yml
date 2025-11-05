@@ -1,0 +1,17 @@
+# role/ipa_setup/tasks/configure_replica.yml
+- name: Configure IPA replica
+  command: >
+    umask 022 &&
+    ipa-replica-install
+    --hostname={{ ipa_hostname }}
+    --domain={{ ipa_domain }}
+    --realm={{ ipa_realm }}
+    {% if ipa_setup_dns %} --setup-dns --auto-reverse {% endif %}
+    {% if ipa_no_forwarders %} --no-forwarders {% endif %}
+    {% if ipa_no_ntp %} --no-ntp {% endif %}
+    {% if ipa_mkhomedir %} --mkhomedir {% endif %}
+    --ds-password={{ ipa_dm_password }}
+    --admin-password={{ ipa_admin_password }}
+    --unattended
+  args:
+    creates: /etc/ipa/default.conf

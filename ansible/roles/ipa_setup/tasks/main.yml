@@ -1,0 +1,71 @@
+# role/ipa_setup/tasks/main.yml
+- include_tasks: install.yml
+
+- name: current IPA 
+  debug: msg="{{ inventory_hostname }} ipa_role is {{ ipa_role }}"
+
+- name: Check if IPA is already installed
+  stat:
+    path: /etc/ipa/default.conf
+  register: ipa_installed
+
+- name: Log IPA install status
+  debug:
+    msg: "IPA already installed on {{ inventory_hostname }}, skipping install"
+  when: ipa_installed.stat.exists
+
+- name: Show ipa_role from hostvars
+  debug:
+    msg: "hostvars role for {{ inventory_hostname }} is {{ hostvars[inventory_hostname].ipa_role }}"
+
+- name: Skip IPA master install if already configured
+  debug:
+    msg: |
+      IPA master already installed on {{ inventory_hostname }}, skipping configure_master.yml
+      ipa_role={{ hostvars[inventory_hostname].ipa_role }}
+      status={{ ipa_installed.stat.exists }}
+  when:
+    - hostvars[inventory_hostname].ipa_role == "master"
+    - ipa_installed.stat.exists
+
+- name: Include configure_master.yml
+  include_tasks: configure_master.yml
+  when:
+    - hostvars[inventory_hostname].ipa_role == "master"
+    - not ipa_installed.stat.exists
+
+- name: Skip IPA replica install if already configured
+  debug:
+    msg: "IPA replica already installed on {{ inventory_hostname }}, skipping configure_replica.yml"
+  when:
+    - hostvars[inventory_hostname].ipa_role == "replica"
+    - ipa_installed.stat.exists
+
+- name: Include configure_replica.yml
+  include_tasks: configure_replica.yml
+  when:
+    - hostvars[inventory_hostname].ipa_role == "replica"
+    - not ipa_installed.stat.exists
+
+- name: Emit IPA install status
+  copy:
+    dest: "/var/log/ipa_install_status/{{ inventory_hostname }}.json"
+    content: |
+      {
+        "role": "{{ ipa_role }}",
+        "installed": {{ ipa_installed.stat.exists }},
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  delegate_to: localhost
+
+- name: Configure IPA master
+  include_tasks: configure_master.yml
+  when: hostvars[inventory_hostname].ipa_role | trim == "master"
+
+  # when: ipa_role == "master"
+
+- name: Configure IPA replica
+  include_tasks: configure_replica.yml
+  when: hostvars[inventory_hostname].ipa_role | trim == "replica"
+
+  # when: ipa_role == "replica"

@@ -64,3 +64,16 @@
   when: 
    - "'kvm' not in group_names"
    - vm_build_state == "sshok"
+
+- name: Show build stage main
+  debug:
+    msg: "System is in stage:  {{ global_vm_build_state }}"
+  when: 
+   - "'kvm' not in group_names"
+
+- name: exit by set the build to global for next module
+  set_fact:
+    vm_build_stage: "{{ global_vm_build_state }}"
+  when: 
+   - "'kvm' not in group_names"
+   - global_vm_build_state is defined

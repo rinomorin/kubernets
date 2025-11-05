@@ -1,0 +1,15 @@
+- name: Emit worker node promotion flag
+  copy:
+    dest: "/var/log/kube_worker_promoted/{{ inventory_hostname }}.json"
+    content: |
+      {
+        "host": "{{ inventory_hostname }}",
+        "role": "worker",
+        "promoted": true,
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  delegate_to: localhost
+
+- name: Trigger worker service deployment
+  debug:
+    msg: "Worker services triggered for {{ inventory_hostname }}"

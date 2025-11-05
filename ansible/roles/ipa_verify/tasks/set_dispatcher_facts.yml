@@ -1,0 +1,6 @@
+- name: Set dispatcher facts from verification
+  set_fact:
+    ipa_verified: true
+    ipa_replication_ok: "{{ replica_partners | length > 0 }}"
+    ipa_dns_zone_count: "{{ dns_zones | length }}"
+    ipa_kerberos_ticket_valid: "{{ kerberos_ticket | length > 0 }}"

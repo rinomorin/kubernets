@@ -1,3 +1,6 @@
+build_loops: "{{ bl|default(120)}}"
+
 secops_profile: xccdf_org.ssgproject.content_profile_cis
-secops_scan_path: /usr/share/xml/scap/ssg/content/ssg-{{ ansible_distribution | lower }}-ds.xml
+# secops_scan_path: /usr/share/xml/scap/ssg/content/ssg-{{ ansible_distribution | lower }}-ds.xml
+secops_scan_path: /usr/share/xml/scap/ssg/content/ssg-rhel9-ds.xml
 secops_graphql_endpoint: https://secops-api.local/graphql

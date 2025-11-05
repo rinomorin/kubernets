@@ -1,0 +1,9 @@
+{
+  "host": "{{ inventory_hostname }}",
+  "ipactl_status": {{ ipactl_status.stdout | to_json }},
+  "replica_partners": {{ replica_list.stdout_lines | to_json }},
+  "replica_verbose": {{ replica_verbose.stdout_lines | to_json }},
+  "dns_zones": {{ dns_zones.stdout_lines | to_json }},
+  "kerberos_ticket": {{ klist_result.stdout_lines | default([]) | to_json }},
+  "timestamp": "{{ ansible_date_time.iso8601 }}"
+}

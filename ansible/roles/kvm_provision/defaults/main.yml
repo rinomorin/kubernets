@@ -10,6 +10,7 @@ vm_timeout: 0
 vcpu: 2
 ram: 4096
 iso: "/var/lib/libvirt/images/Rocky-9.6-x86_64-boot.iso"
+# iso: "/var/lib/libvirt/images/Rocky-9.6-x86_64-dvd.iso"
 default_network: "default"
 os_variant: "rocky9"
 shutdown_max_timeout: 1800

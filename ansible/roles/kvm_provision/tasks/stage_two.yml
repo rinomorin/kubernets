@@ -1,4 +1,4 @@
-# roles/kvm_provision/tasks/start_vm.yml
+  # roles/kvm_provision/tasks/start_vm.yml
 
 - name: Start VMs in dependency order
   include_tasks: vm_boot_order.yml
@@ -54,11 +54,57 @@
   when: vm_build_state == "running"
 
 - name: check vm_host
-  debug: msg="{{ vm_host}}"
+  debug: 
+    msg: |
+      vm_host {{ vm_host}}
+      admin_id {{ admin_id}} 
+      admin_set {{ admin_set }}
 
 - name: Display wait time
   debug:
     msg: "This will wait up to {{ wait_time_to_shutdown_or_fail }} minutes before resuming to next tasks"
+
+# - name: Set temporary password for sysadmin
+#   ansible.builtin.user:
+#     name: sysadmin
+#     password: "{{ temp_pwd | password_hash('sha512') }}"
+
+# - name: Change expired password for sysadmin
+#   ansible.builtin.expect:
+#     command: "ssh -o StrictHostKeyChecking=no sysadmin@{{ vm_fqdn }}"
+#     responses:
+#       "Current password:": "{{ admin_set }}"
+#       "New password:": "{{ temp_pw }}"
+#       "Retype new password:": "{{ temp_pw }}"
+#     timeout: 30
+#   vars:
+#     ansible_user: "{{ admin_id }}"
+#     ansible_ssh_pass: "{{ admin_set }}"
+#     ansible_host: "{{ vm_fqdn }}"
+#   become: false
+#   delegate_to: "{{ vm_host }}"
+#   register: password_change
+#   ignore_errors: true
+
+# - name: Reset sysadmin password back to original using chpasswd
+#   ansible.builtin.shell: |
+#     echo "{{ admin_id }}:{{ admin_set }}" | chpasswd
+#   vars:
+#     ansible_user: "sysadmin"
+#     ansible_ssh_pass: "{{ temp_pw }}"
+#     ansible_host: "{{ vm_fqdn }}"
+#   become: true
+#   delegate_to: "{{ vm_host }}"
+
+# - name: Reset secops password back to original using chpasswd
+#   ansible.builtin.shell: |
+#     echo "{{ secops_id }}:{{ secops_pwd }}" | chpasswd
+#   vars:
+#     ansible_user: "sysadmin"
+#     ansible_ssh_pass: "{{ admin_set }}"
+#     ansible_host: "{{ vm_fqdn }}"
+#   become: true
+#   delegate_to: "{{ vm_host }}"
 
 
 - name: Probe VM with echo until SSH is ready

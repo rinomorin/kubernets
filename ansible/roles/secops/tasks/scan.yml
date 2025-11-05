@@ -17,3 +17,5 @@
     src: "/tmp/secops_scan_{{ inventory_hostname }}.json"
     dest: "secops_results/"
     flat: yes
+
+- debug: msg="{{ break }}"
