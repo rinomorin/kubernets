@@ -1,0 +1,25 @@
+- name: Gather failure diagnostics
+  slurp:
+    src: "/var/log/kube_promotion_failures/{{ inventory_hostname }}.json"
+  delegate_to: localhost
+  register: failure_diag_raw
+
+- name: Parse failure diagnostics
+  set_fact:
+    failure_diag: "{{ failure_diag_raw.content | b64decode | from_json }}"
+
+- name: Trigger env remediation
+  include_tasks: fix_env.yml
+  when: failure_diag.failure_reasons.missing_env | length > 0
+
+- name: Trigger compliance remediation
+  include_tasks: fix_compliance.yml
+  when: failure_diag.failure_reasons.compliance | length > 0
+
+- name: Trigger bootstrap remediation
+  include_tasks: fix_bootstrap.yml
+  when: failure_diag.failure_reasons.bootstrap | length > 0
+
+- name: Trigger service health remediation
+  include_tasks: fix_service_health.yml
+  when: failure_diag.failure_reasons.service_health | length > 0

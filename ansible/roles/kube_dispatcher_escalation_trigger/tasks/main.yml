@@ -1,0 +1,43 @@
+- name: Load final retry report
+  slurp:
+    src: "/var/log/kube_dispatcher_final_retry_report.json"
+  delegate_to: localhost
+  register: final_retry_raw
+
+- name: Parse escalation nodes
+  set_fact:
+    escalation_nodes: >-
+      {{
+        final_retry_raw.content
+        | b64decode
+        | from_json
+        | default({})
+        | dict2items
+        | selectattr('key', 'equalto', 'nodes')
+        | map(attribute='value')
+        | first
+        | selectattr('escalation.triggered', 'equalto', true)
+        | list
+      }}
+
+- name: Emit escalation alert per node
+  copy:
+    dest: "/var/log/kube_escalation_alerts/{{ item.host }}.json"
+    content: |
+      {
+        "host": "{{ item.host }}",
+        "retry_count": {{ item.retry_count }},
+        "failure_reasons": {{ item.failure_reasons | to_nice_json }},
+        "escalation_triggered": true,
+        "timestamp": "{{ ansible_date_time.iso8601 }}",
+        "action_required": "Manual review or override required"
+      }
+  loop: "{{ escalation_nodes }}"
+  delegate_to: localhost
+
+- name: Notify dispatcher of escalation
+  debug:
+    msg: >
+      Escalation triggered for nodes: {{ escalation_nodes | map(attribute='host') | join(', ') }}.
+      Manual intervention required. See /var/log/kube_escalation_alerts/ for details.
+  when: escalation_nodes | length > 0

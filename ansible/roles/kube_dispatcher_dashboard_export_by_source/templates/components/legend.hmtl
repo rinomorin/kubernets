@@ -1,0 +1,10 @@
+<section class="legend">
+  <h2>🔎 Sort Legend</h2>
+  <ul>
+    <li><strong>↑</strong> Sorted ascending (A → Z, 0 → 9)</li>
+    <li><strong>↓</strong> Sorted descending (Z → A, 9 → 0)</li>
+    <li><strong>Alt+N</strong> Sort column N ascending</li>
+    <li><strong>Shift+Alt+N</strong> Sort column N descending</li>
+    <li><strong>Ctrl+Alt+N</strong> Add column N to sort stack</li>
+  </ul>
+</section>

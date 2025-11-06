@@ -1,0 +1,4 @@
+- name: Re-source env.sh and re-emit dispatcher matrix
+  import_role:
+    name: kubeadm_bootstrap_gate
+    tasks_from: load_env.yml

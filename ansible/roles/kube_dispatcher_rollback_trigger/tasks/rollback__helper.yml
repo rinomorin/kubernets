@@ -1,0 +1,5 @@
+- name: Remove VPN prep flag
+  file:
+    path: "/var/log/vpn_ready/{{ inventory_hostname }}.json"
+    state: absent
+  delegate_to: localhost

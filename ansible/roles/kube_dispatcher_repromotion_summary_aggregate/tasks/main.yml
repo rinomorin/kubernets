@@ -1,0 +1,35 @@
+- name: Gather all re-promotion flags
+  find:
+    paths: "/var/log/kube_repromotion_flags"
+    patterns: "*.json"
+  delegate_to: localhost
+  register: repromotion_files
+
+- name: Read each re-promotion flag
+  slurp:
+    src: "{{ item.path }}"
+  loop: "{{ repromotion_files.files }}"
+  delegate_to: localhost
+  register: raw_repromotion_data
+
+- name: Parse and aggregate re-promotion data
+  set_fact:
+    repromotion_matrix: >-
+      {{
+        raw_repromotion_data.results
+        | map(attribute='content')
+        | map('b64decode')
+        | map('from_json')
+        | list
+      }}
+
+- name: Emit dispatcher-wide re-promotion summary
+  copy:
+    dest: "/var/log/kube_dispatcher_repromotion_summary.json"
+    content: |
+      {
+        "timestamp": "{{ ansible_date_time.iso8601 }}",
+        "re_promoted_nodes": {{ repromotion_matrix | map(attribute='host') | list | to_json }},
+        "details": {{ repromotion_matrix | to_nice_json }}
+      }
+  delegate_to: localhost

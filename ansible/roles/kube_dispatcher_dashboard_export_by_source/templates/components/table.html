@@ -1,0 +1,22 @@
+<table id="dashboardTable">
+  <thead>
+    <tr>
+      {% for col in columns %}
+        <th onclick="sortTable({{ loop.index0 }})" data-index="{{ loop.index0 }}">
+          {{ col.name }}
+          <span class="sort-icon" tabindex="0" title="" role="img" aria-label="Sort direction"></span>
+          <span class="shortcut-hint">Alt+{{ loop.index }} / Shift+Alt+{{ loop.index }} / Ctrl+Alt+{{ loop.index }}</span>
+        </th>
+      {% endfor %}
+    </tr>
+  </thead>
+    <tbody>
+    {% for row in rows %}
+        <tr>
+        {% for col in columns %}
+            <td data-key="{{ col.key }}">{{ row[col.key] }}</td>
+        {% endfor %}
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>

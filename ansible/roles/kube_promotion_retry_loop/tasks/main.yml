@@ -1,0 +1,53 @@
+- name: Set retry loop parameters
+  set_fact:
+    retry_attempts: 0
+    max_retries: 3
+    retry_complete: false
+
+- name: Retry remediation loop
+  block:
+    - name: Load remediation summary
+      slurp:
+        src: "/var/log/kube_dispatcher_remediation_summary.json"
+      delegate_to: localhost
+      register: remediation_summary_raw
+
+    - name: Parse unresolved nodes
+      set_fact:
+        unresolved_nodes: >-
+          {{
+            remediation_summary_raw.content
+            | b64decode
+            | from_json
+            | default({})
+            | dict2items
+            | selectattr('key', 'equalto', 'unresolved_nodes')
+            | map(attribute='value')
+            | first
+            | default([])
+          }}
+
+    - name: Retry remediation for unresolved nodes
+      include_role:
+        name: kube_promotion_remediation
+      when: inventory_hostname in unresolved_nodes
+
+    - name: Re-run unified promotion gate
+      include_role:
+        name: kube_unified_promotion_gate
+
+    - name: Check if retry is complete
+      set_fact:
+        retry_complete: "{{ kube_promotable_nodes | length > 0 }}"
+        retry_attempts: "{{ retry_attempts + 1 }}"
+
+  rescue:
+    - name: Fail if max retries exceeded
+      fail:
+        msg: >
+          Promotion retry loop failed after {{ retry_attempts }} attempts.
+          See /var/log/kube_dispatcher_remediation_summary.json for unresolved nodes.
+
+  until: retry_complete or retry_attempts >= max_retries
+  retries: "{{ max_retries }}"
+  delay: 10

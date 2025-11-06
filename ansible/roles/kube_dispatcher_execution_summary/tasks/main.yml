@@ -1,0 +1,49 @@
+- name: Load final promotion summary
+  slurp:
+    src: "/var/log/kube_final_promotion_summary.json"
+  delegate_to: localhost
+  register: final_promotion_raw
+
+- name: Parse final promotable nodes
+  set_fact:
+    final_promotable_nodes: >-
+      {{
+        final_promotion_raw.content
+        | b64decode
+        | from_json
+        | default({})
+        | dict2items
+        | selectattr('key', 'equalto', 'promotable_nodes')
+        | map(attribute='value')
+        | first
+        | default([])
+      }}
+
+- name: Load node matrix
+  slurp:
+    src: "/var/log/kube_dispatcher_matrix/{{ inventory_hostname }}.json"
+  delegate_to: localhost
+  register: node_matrix_raw
+
+- name: Parse node matrix
+  set_fact:
+    node_matrix: "{{ node_matrix_raw.content | b64decode | from_json }}"
+
+- name: Emit execution summary per node
+  copy:
+    dest: "/var/log/kube_execution_summary/{{ inventory_hostname }}.json"
+    content: |
+      {
+        "host": "{{ inventory_hostname }}",
+        "role": "{{ node_matrix.kube_role }}",
+        "promoted": {{ inventory_hostname in final_promotable_nodes }},
+        "promotion_source": "{{ 'override' if inventory_hostname in final_promotion_raw.content | b64decode | from_json | default({})['from_override'] else 'unified' }}",
+        "triggered_roles": {{ (
+          ['vpn_access_prep'] if node_matrix.kube_role == 'helper' else []
+        ) + (
+          ['kube_service_deploy', 'monitoring_agent_deploy'] if node_matrix.kube_role in ['master', 'worker'] else []
+        ) | to_json }},
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  when: inventory_hostname in final_promotable_nodes
+  delegate_to: localhost

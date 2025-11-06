@@ -1,0 +1,84 @@
+- name: Gather all failure diagnostics
+  find:
+    paths: "/var/log/kube_promotion_failures"
+    patterns: "*.json"
+  delegate_to: localhost
+  register: failure_files
+
+- name: Read each failure file
+  slurp:
+    src: "{{ item.path }}"
+  loop: "{{ failure_files.files }}"
+  delegate_to: localhost
+  register: raw_failure_data
+
+- name: Parse failure diagnostics
+  set_fact:
+    failure_matrix: >-
+      {{
+        raw_failure_data.results
+        | map(attribute='content')
+        | map('b64decode')
+        | map('from_json')
+        | list
+      }}
+
+- name: Gather retry counters
+  find:
+    paths: "/var/log/kube_retry_counters"
+    patterns: "*.json"
+  delegate_to: localhost
+  register: retry_files
+
+- name: Read each retry counter file
+  slurp:
+    src: "{{ item.path }}"
+  loop: "{{ retry_files.files }}"
+  delegate_to: localhost
+  register: raw_retry_data
+
+- name: Parse retry counters
+  set_fact:
+    retry_matrix: >-
+      {{
+        raw_retry_data.results
+        | map(attribute='content')
+        | map('b64decode')
+        | map('from_json')
+        | list
+      }}
+
+- name: Merge failure and retry data
+  set_fact:
+    final_retry_report: >-
+      {{
+        failure_matrix
+        | map('combine', retry_matrix | items2dict(key_name='host'))
+        | map('combine', {
+            'escalation': {
+              'triggered': (item.retry_count | default(0)) >= 3
+            }
+          })
+        | list
+      }}
+
+- name: Emit final dispatcher-wide retry report
+  copy:
+    dest: "/var/log/kube_dispatcher_final_retry_report.json"
+    content: |
+      {
+        "timestamp": "{{ ansible_date_time.iso8601 }}",
+        "nodes": {{ final_retry_report | to_nice_json }}
+      }
+  delegate_to: localhost
+
+- name: Emit retry counter
+  copy:
+    dest: "/var/log/kube_retry_counters/{{ inventory_hostname }}.json"
+    content: |
+      {
+        "host": "{{ inventory_hostname }}",
+        "retry_count": {{ retry_attempts }},
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  delegate_to: localhost

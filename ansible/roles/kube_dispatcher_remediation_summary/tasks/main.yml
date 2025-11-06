@@ -1,0 +1,35 @@
+- name: Gather all remediation diagnostics
+  find:
+    paths: "/var/log/kube_promotion_failures"
+    patterns: "*.json"
+  delegate_to: localhost
+  register: failure_files
+
+- name: Read each failure file
+  slurp:
+    src: "{{ item.path }}"
+  loop: "{{ failure_files.files }}"
+  delegate_to: localhost
+  register: raw_failure_data
+
+- name: Parse and aggregate failure data
+  set_fact:
+    kube_remediation_matrix: >-
+      {{
+        raw_failure_data.results
+        | map(attribute='content')
+        | map('b64decode')
+        | map('from_json')
+        | list
+      }}
+
+- name: Emit dispatcher-wide remediation summary
+  copy:
+    dest: "/var/log/kube_dispatcher_remediation_summary.json"
+    content: |
+      {
+        "timestamp": "{{ ansible_date_time.iso8601 }}",
+        "unresolved_nodes": {{ kube_remediation_matrix | map(attribute='host') | list | to_json }},
+        "failure_details": {{ kube_remediation_matrix | to_nice_json }}
+      }
+  delegate_to: localhost

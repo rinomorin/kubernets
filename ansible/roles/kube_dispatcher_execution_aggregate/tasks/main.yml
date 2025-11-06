@@ -1,0 +1,35 @@
+- name: Gather all per-node execution summaries
+  find:
+    paths: "/var/log/kube_execution_summary"
+    patterns: "*.json"
+  delegate_to: localhost
+  register: execution_files
+
+- name: Read each execution summary
+  slurp:
+    src: "{{ item.path }}"
+  loop: "{{ execution_files.files }}"
+  delegate_to: localhost
+  register: raw_execution_data
+
+- name: Parse and aggregate execution data
+  set_fact:
+    kube_execution_matrix: >-
+      {{
+        raw_execution_data.results
+        | map(attribute='content')
+        | map('b64decode')
+        | map('from_json')
+        | list
+      }}
+
+- name: Emit dispatcher-wide execution summary
+  copy:
+    dest: "/var/log/kube_dispatcher_execution_summary.json"
+    content: |
+      {
+        "timestamp": "{{ ansible_date_time.iso8601 }}",
+        "executed_nodes": {{ kube_execution_matrix | map(attribute='host') | list | to_json }},
+        "execution_details": {{ kube_execution_matrix | to_nice_json }}
+      }
+  delegate_to: localhost

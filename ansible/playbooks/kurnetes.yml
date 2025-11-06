@@ -104,9 +104,10 @@
   roles:
     - ipa_verify
   tasks:
-    - import_tasks: roles/ipa_verify/tasks/set_dispatcher_facts.yml
-    - import_tasks: roles/ipa_verify/tasks/schema_validate.yml
-    - import_tasks: roles/ipa_verify/tasks/emit_metrics.yml
+    # - import_tasks: roles/ipa_verify/tasks/set_dispatcher_facts.yml
+    - include_tasks: "{{ playbook_dir }}/../roles/ipa_verify/tasks/set_dispatcher_facts.yml"
+    - include_tasks: "{{ playbook_dir }}/../roles/ipa_verify/tasks/schema_validate.yml"
+    - include_tasks: "{{ playbook_dir }}/../roles/ipa_verify/tasks/emit_metrics.yml"
 
 - hosts: ipa_servers
   become: true
@@ -114,23 +115,27 @@
     - ipa_verify
     - ipa_compliance_hook
 
-  
-# - hosts: all
-#   become: yes
-#   roles:
-#     - base_setup
+- name: Deploy Kubernetes Cluster
+  hosts: kube_helpers:kube_masters:kube_workers
+  become: true
+  gather_facts: false
+  roles:
+    - role: kubeadm_bootstrap_gate
+    - role: kubeadm_init
 
-# - hosts: all
-#   become: yes
-#   roles:
-#     - role: runtime_setup
+- name: Render Dispatcher Dashboard
+  hosts: kube_masters
+  become: true
+  gather_facts: false
+  roles:
+    - role: kube_dispatcher_dashboard_render
+      vars:
+        dashboard_output_path: /var/www/dispatcher-dashboard
 
-# - hosts: helper_nodes
-#   become: yes
-#   roles:
-#     - role: crio_runtime
-
-# - hosts: helper_nodes
-#   become: yes
-#   roles:
-#     - role: kubeadm_init
+- name: Deploy Dispatcher Dashboard to Kubernetes
+  hosts: kube_masters
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Build and deploy dashboard
+      include_tasks: "{{ playbook_dir }}/../roles/kube_dispatcher_dashboard_export_by_source/tasks/Deploy_Kube_Dashboard.yml"

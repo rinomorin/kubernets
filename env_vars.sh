@@ -20,10 +20,10 @@ export temp_pwd="IJustW@nt1nToo~"
 export ipa_dm_password="On32dr1v3H0me~"
 export ipa_admin_password="On32L00kUpToo~"
 
-export ipa_dispatcher_enable_summary: true
-export ipa_dispatcher_enable_promotion: true
+export ipa_dispatcher_enable_summary=true
+export ipa_dispatcher_enable_promotion=true
 
-export kubeadm_cluster_name="morinsoft"`
+export kubeadm_cluster_name="morinsoft"
 export kubeadm_pod_network_cidr="10.244.0.0/16"
 export kubeadm_crio_version="1.34"
 

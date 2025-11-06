@@ -1,0 +1,11 @@
+- name: Emit kubeadm join token and CA cert hash
+  shell: |
+    kubeadm token create --print-join-command
+  register: join_command
+  changed_when: false
+
+- name: Save join command for dispatcher
+  copy:
+    dest: "/var/log/kube_join_command.txt"
+    content: "{{ join_command.stdout }}"
+  delegate_to: localhost
