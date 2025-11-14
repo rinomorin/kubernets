@@ -1,0 +1,12 @@
+---
+- name: Install KVM and libvirt packages
+  ansible.builtin.package:
+    name: "{{ virt_packages }}"
+    state: present
+
+- name: Enable and start libvirtd
+  ansible.builtin.service:
+    name: libvirtd
+    state: started
+    enabled: true
+
