@@ -1,4 +1,4 @@
-name: Validate Repo Hygiene
+name: Repo Hygiene & Validation
 
 on:
   push:
@@ -22,6 +22,16 @@ jobs:
             echo "✅ Repo hygiene check passed: env_build.sh not tracked."
           fi
 
-      - name: Run validator on sample file
+      - name: Validate sample environment file
         run: |
+          echo "🔍 Validating env_build.sh.sample..."
           ./ansible/roles/kvm_vm_deploy/scripts/validate_env_build.sh ./ansible/roles/kvm_vm_deploy/files/env_build.sh.sample
+
+      - name: Validate any staged env_build.sh (if present locally in PR)
+        run: |
+          if [ -f ansible/roles/kvm_vm_deploy/files/env_build.sh ]; then
+            echo "🔍 Validating local env_build.sh (not tracked)..."
+            ./ansible/roles/kvm_vm_deploy/scripts/validate_env_build.sh ansible/roles/kvm_vm_deploy/files/env_build.sh || true
+          else
+            echo "ℹ️ No local env_build.sh found, skipping."
+          fi
