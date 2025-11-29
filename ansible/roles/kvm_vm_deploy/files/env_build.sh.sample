@@ -3,7 +3,6 @@
 # Copy the sample file before running automation:
 # cp ansible/roles/kvm_vm_deploy/files/env_build.sh.sample \
 #    ansible/roles/kvm_vm_deploy/files/env_build.sh
-
 # Edit `env_build.sh` with your real settings.  
 # **Do not commit this file — it is ignored by Git.**
 
