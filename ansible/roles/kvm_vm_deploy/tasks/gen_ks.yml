@@ -1,0 +1,5 @@
+- name: Generate IPA kickstart
+  template:
+    src: ipa.ks.j2
+    dest: /home/kvm_admin/kickstarts/ipa01.ks
+  when: "'ipa' in vm_purpose"

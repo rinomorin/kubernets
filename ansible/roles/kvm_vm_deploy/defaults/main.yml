@@ -1,0 +1,21 @@
+# roles/vm/defaults/main.yml
+vm_host: "{{ lookup('env','VM_HOST') | default(omit, true) }}" # required
+vm_virt_options: "{{ lookup('env','VM_VIRT_OPTIONS') | default({'name': inventory_hostname.split('.')[0], 'graphics':'none','disk_type':'sata','console':'noautoconsole'}, true) }}"
+vm_type: "{{ lookup('env','VM_TYPE') | default('vms', true) }}"
+vm_iso: "{{ lookup('env','VM_ISO') | default(omit, true) }}"   # required
+vm_osvariant: "{{ lookup('env','VM_OSVARIANT') | default('rock9', true) }}"
+vm_platform: "{{ lookup('env','VM_PLATFORM') | default('linux', true) }}"
+vm_purpose: "{{ lookup('env','VM_PURPOSE') | default('server', true) }}"
+vm_mem: "{{ lookup('env','VM_MEM') | default(4086, true) }}"
+vm_cpu: "{{ lookup('env','VM_CPU') | default(2, true) }}"
+vm_disk_count: "{{ lookup('env','VM_DISK_COUNT') | default(1, true) }}"
+vm_disk_size: "{{ lookup('env','VM_DISK_SIZE') | default(50, true) }}"
+vm_network: "{{ lookup('env','VM_NETWORK') | default(['default'], true) }}"
+vm_ip: "{{ lookup('env','VM_IP') | default(['dhcp'], true) }}"
+vm_mask: "{{ lookup('env','VM_MASK') | default([''], true) }}"
+vm_gate: "{{ lookup('env','VM_GATE') | default([''], true) }}"
+vm_domain: "{{ lookup('env','VM_DOMAIN') | default(['example.com'], true) }}"
+vm_segment: "{{ lookup('env','VM_SEGMENT') | default([''], true) }}"
+os_user: "{{ lookup('env','OS_USER') | default(['sysadmin','secops'], true) }}"
+os_passwd: "{{ lookup('env','OS_PASSWD') | default(['randomg','ramdom'], true) }}"
+os_secure: "{{ lookup('env','OS_SECURE') | default(['default'], true) }}"

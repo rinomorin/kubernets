@@ -1,0 +1,27 @@
+---
+# tasks/main.yml for kvm_vm_deploy
+# Acts as the director, importing sub-task files
+---
+# tasks/main.yml for kvm_vm_deploy
+
+- name: Stage Zero - Pre-flight environment setup
+  import_tasks: stage_zero.yml
+  delegate_to: "{{ kvm_delegate }}"
+  run_once: true
+
+- name: Stage One - Check existence
+  import_tasks: stage_one.yml
+  delegate_to: "{{ kvm_delegate }}"
+  when: "'kvm' not in group_names"
+
+# - name: Stage Two - Provision/start VM
+#   import_tasks: stage_two.yml
+#   delegate_to: "{{ kvm_delegate }}"
+#   when: "'kvm' not in group_names"
+
+# - name: Stage Three - Guest configuration
+#   import_tasks: stage_three.yml
+#   delegate_to: "{{ kvm_delegate }}"
+#   when:
+#     - "'kvm' not in group_names"
+#     - vm_build_state == "sshok"

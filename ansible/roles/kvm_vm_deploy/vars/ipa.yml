@@ -1,0 +1,17 @@
+# ipa.yml - ACME dummy values for IPA Kickstart template
+
+ip_addr: "192.168.100.10"
+ip_mask: "255.255.255.0"
+ip_gate: "192.168.100.1"
+dns_01: "192.168.100.1"
+dns_02: "8.8.8.8"
+ipa_host: "ipa01.acme.com"
+
+vg_name: "dnsvg"
+vg_short: "dns"
+
+# Plaintext password for sysadmin/secops
+pwd_var: "On32Build4Cl0udT3st01"
+
+# Pre-hashed password (generate with: openssl passwd -6 On32Build4Cl0udT3st01)
+pwd_hash: "$6$acmehash$abcdefghijklmnopqrstuvwxzy0123456789abcdefghijklmnopqrstuvwxzy"

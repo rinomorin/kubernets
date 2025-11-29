@@ -1,0 +1,142 @@
+# ──────── STAGE: Check existence ─────────
+- name: Check if host acess
+  shell: hostname
+  register: vm_host_ck
+  failed_when: false
+  changed_when: false
+
+- name: check access debug
+  debug:
+    msg: "id {{ vm_host_ck }}"
+
+- name: Check if VM exists
+  shell: virsh dominfo {{ vm_host }}
+  register: vm_check
+  failed_when: false
+  changed_when: false
+
+- name: Initialize VM state
+  set_fact:
+    vm_build_state: "undefined"
+    vm_timeout: 0
+
+- name: Set stage
+  set_fact:
+    vm_build_stage: >-
+      {% if vm_check.rc != 0 %}
+        build
+      {% elif force_rebuild | default(false) %}
+        building
+      {% else %}
+        present
+      {% endif %}
+
+- name: update existing_vms
+  set_fact:
+    existing_vms: True
+  when: vm_build_stage in ['present']
+
+- name: stage status
+  debug:
+    msg: "stage is {{ vm_build_stage }}"
+
+- name: stage status
+  debug:
+    msg: "delegate id {{ kvm_delegate }}"
+
+- name: Initialize VM stage map
+  set_fact:
+    vm_stage_map: "{{ vm_stage_map | default({}) | combine({ vm_host: 'unknown' }) }}"
+
+- name: Update VM stage map to building
+  set_fact:
+    vm_stage_map: "{{ vm_stage_map | combine({ vm_host: vm_build_stage }) }}"
+
+- name: Set stage to building
+  set_fact:
+    vm_stage_map: "{{ vm_stage_map | combine({ vm_host: 'building' }) }}"
+
+# ──────── STAGE: Build if needed ─────────
+- name: Get current epoch time from localhost
+  become: false
+  shell: date +%s
+  register: epoch_result
+  delegate_to: localhost
+  # run_once: true
+  changed_when: false
+
+- name: Set global epoch fact
+  set_fact:
+    global_epoch: "{{ epoch_result.stdout | int }}"
+  # run_once: true
+
+- name: Set VM shutdown poll start time
+  set_fact:
+    vm_shutdown_start: "{{ global_epoch }}"
+
+- name: stage status
+  debug:
+    msg: "stage is {{ vm_build_stage }}"
+
+- name: Trigger build if needed
+  include_tasks: define_vms.yml
+  when: vm_stage_map[vm_host] in ['build', 'building']
+
+-  debug:
+    msg: "stage is {{ vm_build_stage }}"
+
+- name: vm_build_state status befor poll
+  debug:
+    msg: "vm_build_state is {{ vm_build_state }}"
+
+- name: vm_build_stage status befor poll
+  debug:
+    msg: "vm_build_stage_map is {{ vm_build_stage }}"
+ 
+- name: Calculate wait time in minutes
+  set_fact:
+    wait_time_to_shutdown_or_fail: "{{ ((build_loops | int) * 10 // 60) }}"
+
+- name: Display wait time
+  debug:
+    msg: "This will wait up to {{ wait_time_to_shutdown_or_fail }} minutes before resuming to next tasks"
+
+- debug:
+    msg: "vm_build_state is {{ vm_build_stage }} and {{vm_stage_map[vm_host]}}"
+
+- name: Probe VM with echo until vm shutdown
+  when: vm_stage_map[vm_host] in ['build', 'building'] and  vm_build_stage | trim != "present"
+  shell: |
+    virsh list --all | sed 's/shut off/shutdown/' | grep -i "^.*{{ vm_host }}.*" | awk '{print $NF}'
+  register: vm_state
+  vars:
+  delegate_to: "{{ kvm_delegate }}"
+  failed_when: false
+  changed_when: false
+  until: (vm_state.stdout | default('')) == "shutdown"
+  retries: "{{ build_loops|int }}"
+  delay: 10          # 10 seconds between attempts
+
+- name: update stage
+  set_fact:
+    vm_build_state: "booted"  
+  when: 
+    - vm_stage_map[vm_host] in ['build', 'building']
+    - vm_build_stage | trim == "present"
+
+- name: Verify state
+  include_tasks: check_vm_state.yml
+
+- name: Fail if VM did not shut off after polling
+  fail:
+    msg: "VM {{ vm_host }} did not shut off after {{ wait_time_to_shutdown_or_fail }} minutes."
+  when:
+    - vm_build_state != "shutdown"
+    - (vm_timeout | int) > shutdown_max_timeout
+    
+- name: vm_build_state status
+  debug:
+    msg: "vm_build_state is {{ vm_build_state }}"
+
+
+

@@ -1,0 +1,48 @@
+---
+# ──────── STAGE ZERO: Pre-flight ─────────
+# Load env_build.sh and validate required variables
+
+- name: Source env_build.sh and export variables
+  shell: |
+    set -a
+    . {{ playbook_dir }}/env_build.sh
+    env
+  register: env_output
+  delegate_to: "{{ kvm_delegate }}"
+  run_once: true
+
+- name: Convert environment output to dictionary
+  set_fact:
+    global_env: "{{ dict(env_output.stdout_lines | map('split', '=', 1) | list) }}"
+
+- name: Register key VM parameters from environment
+  set_fact:
+    vm_host: "{{ global_env.VM_HOST }}"
+    vm_iso: "{{ global_env.VM_ISO }}"
+    vg_name: "{{ global_env.VG_NAME | default('dnsvg') }}"
+    vg_short: "{{ global_env.VG_SHORT | default('dns') }}"
+    pwd_var: "{{ global_env.PWD_VAR | default('On32Build4Cl0udT3st01') }}"
+    build_loops: "{{ global_env.BUILD_LOOPS | default(30) }}"
+    shutdown_max_timeout: "{{ global_env.SHUTDOWN_MAX_TIMEOUT | default(600) }}"
+
+- name: Verify required parameters are defined
+  assert:
+    that:
+      - vm_host is defined
+      - vm_iso is defined
+      - vg_name is defined
+      - vg_short is defined
+      - pwd_var is defined
+    fail_msg: "Stage Zero failed: required parameters missing in env_build.sh"
+  run_once: true
+
+- name: Debug environment summary
+  debug:
+    msg:
+      - "VM Host: {{ vm_host }}"
+      - "VM ISO: {{ vm_iso }}"
+      - "VG Name: {{ vg_name }}"
+      - "VG Short: {{ vg_short }}"
+      - "Password Var: {{ pwd_var }}"
+      - "Build Loops: {{ build_loops }}"
+      - "Shutdown Timeout: {{ shutdown_max_timeout }}"
