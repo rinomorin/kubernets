@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Environment Setup
+# Copy the sample file before running automation:
+# cp ansible/roles/kvm_vm_deploy/files/env_build.sh.sample \
+#    ansible/roles/kvm_vm_deploy/files/env_build.sh
+# Edit `env_build.sh` with your real settings.  
+# **Do not commit this file — it is ignored by Git.**
+
+# env_build.sh - Static variable definitions for VM role
+# Edit this file to update values. Source it before running automation:
+#   source ./env_build.sh
+
+# Required variables
+VM_HOST="ipa01.acme.com"
+VM_ISO="</path/rocky96.iso>"
+VG_NAME="ipavg"
+VG_SHORT="ipa"
+PWD_VAR="<replaceme>"
+
+# Optional variables
+VM_MEM=4096
+VM_CPU=2
+VM_DISK_COUNT=1
+VM_DISK_SIZE=20
+VM_NETWORK="default"
+
+# --- Optional parameters with ACME defaults ---
+VM_VIRT_OPTIONS='{"name":"ipa01","graphics":"none","disk_type":"sata","console":"noautoconsole"}'
+VM_TYPE="vms"
+VM_OSVARIANT="rock9"
+VM_PLATFORM="linux"
+VM_PURPOSE="server"
+VM_DISK_COUNT="1"
+VM_DISK_SIZE="50"
+VM_NETWORK="['default']"
+VM_IP="['dhcp']"
+VM_MASK="['']"
+VM_GATE="['']"
+VM_DOMAIN="['acme.com']"
+VM_SEGMENT="['seg01']"
+
+# --- OS user and security defaults ---
+OS_USER="['sysadmin','secops']"
+OS_PASSWD="['changeme','changeme2']"
+OS_SECURE="['default']"
+
+# --- Echo summary for quick validation ---
+echo "Loaded env_build.sh with ACME defaults:"
+echo "  VM_HOST        = $VM_HOST"
+echo "  VM_ISO         = $VM_ISO"
+echo "  VM_VIRT_OPTIONS= $VM_VIRT_OPTIONS"
+echo "  VM_TYPE        = $VM_TYPE"
+echo "  VM_OSVARIANT   = $VM_OSVARIANT"
+echo "  VM_PLATFORM    = $VM_PLATFORM"
+echo "  VM_PURPOSE     = $VM_PURPOSE"
+echo "  VM_MEM         = $VM_MEM"
+echo "  VM_CPU         = $VM_CPU"
+echo "  VM_DISK_COUNT  = $VM_DISK_COUNT"
+echo "  VM_DISK_SIZE   = $VM_DISK_SIZE"
+echo "  VM_NETWORK     = $VM_NETWORK"
+echo "  VM_IP          = $VM_IP"
+echo "  VM_MASK        = $VM_MASK"
+echo "  VM_GATE        = $VM_GATE"
+echo "  VM_DOMAIN      = $VM_DOMAIN"
+echo "  VM_SEGMENT     = $VM_SEGMENT"
+echo "  OS_USER        = $OS_USER"
+echo "  OS_PASSWD      = $OS_PASSWD"
+echo "  OS_SECURE      = $OS_SECURE"

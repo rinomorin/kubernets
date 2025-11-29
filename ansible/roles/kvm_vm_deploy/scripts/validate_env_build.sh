@@ -2,7 +2,6 @@
 # validate_env_build.sh - Pre-flight validator for env_build.sh
 # Usage: ./validate_env_build.sh [path-to-env_build.sh]
 
-
 set -euo pipefail
 
 ENV_FILE="${1:-./env_build.sh}"
