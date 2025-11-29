@@ -1,0 +1,27 @@
+name: Validate Repo Hygiene
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Fail if env_build.sh is present
+        run: |
+          if git ls-files | grep -q "ansible/roles/kvm_vm_deploy/files/env_build.sh"; then
+            echo "❌ ERROR: env_build.sh must not be committed. Use env_build.sh.sample instead."
+            exit 1
+          else
+            echo "✅ Repo hygiene check passed: env_build.sh not tracked."
+          fi
+
+      - name: Run validator on sample file
+        run: |
+          ./ansible/roles/kvm_vm_deploy/scripts/validate_env_build.sh ./ansible/roles/kvm_vm_deploy/files/env_build.sh.sample
