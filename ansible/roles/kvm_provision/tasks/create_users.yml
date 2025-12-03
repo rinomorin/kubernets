@@ -4,7 +4,7 @@
   template:
     src: user_create_script.j2
     dest: "/tmp/user_create_script_{{ group_name }}.sh"
-
+  
 - name: Load rendered script into fact
   delegate_to: localhost
   become: false
@@ -29,52 +29,33 @@
     msg: "Rendered user_create_script is empty for group {{ group_name }}"
   when: user_create_script | trim == ""
 
-- name: Execute user creation script on {{ vm_fqdn }}
-  delegate_to: localhost
-  become: false
-  shell: |
-    ssh -o BatchMode=yes \
-        -o UserKnownHostsFile=/dev/null \
-        -o StrictHostKeyChecking=no \
-        -o ConnectTimeout=5 \
-        {{ admin_id }}@{{ vm_fqdn }} <<'EOF'
-    {{ user_create_script }}
-    EOF
+- name: Copy user creation script to remote
+  copy:
+    content: "{{ user_create_script }}"
+    dest: /tmp/user_create_script.sh
+    mode: '0755'
 
-- name: Variables
-  delegate_to: localhost
-  debug:
-    msg: "{{ group_name}}\n\n{{ members }}"
+- name: Execute user creation script
+  become: true
+  shell: /tmp/user_create_script.sh
+  # vars:
+  #   ansible_user: "{{ admin_id }}"
+  #   ansible_ssh_pass: "{{ admin_set }}"
+  #   ansible_host: "{{ vm_fqdn }}"
 
-- name: Set admin ssh keys
-  delegate_to: localhost
-  become: false
-  shell: |
-    sshpass -p '{{ admin_set }}' \
-    ssh-copy-id -f \
-                -o UserKnownHostsFile=/dev/null \
-                -o StrictHostKeyChecking=no \
-                -o ConnectTimeout=5 \
-                -i {{ playbook_dir }}/../roles/kvm_provision/files/admin_id_rsa.pub \
-                {{ admin_id }}@{{ vm_fqdn }}
-  vars:
-    ansible_user: "{{ admin_id }}"
-    ansible_ssh_pass: "{{ admin_set }}"
-    ansible_host: "{{ vm_fqdn }}"
-  
-- name: Set secops ssh keys
-  delegate_to: localhost
-  become: false
-  shell: |
-    sshpass -p '{{ secops_pwd }}' \
-    ssh-copy-id -f \ 
-                -o UserKnownHostsFile=/dev/null \
-                -o StrictHostKeyChecking=no \
-                -o ConnectTimeout=5 \
-                -i {{ playbook_dir }}/../roles/kvm_provision/files/secops_id_rsa.pub \
-                {{ secops_id }}@{{ vm_fqdn }}
-  vars:
-    ansible_user: "{{ secops_id }}"
-    ansible_ssh_pass: "{{ secops_pwd }}"
-    ansible_host: "{{ vm_fqdn }}"
 
+# - name: Execute user creation script on {{ vm_fqdn }}
+#   delegate_to: localhost
+#   become: false
+#   shell: |
+#     ssh -o BatchMode=yes \
+#         -o UserKnownHostsFile=/dev/null \
+#         -o StrictHostKeyChecking=no \
+#         -o ConnectTimeout=5 \
+#         {{ admin_id }}@{{ vm_fqdn }} <<'EOF'
+#         {{ user_create_script }}
+#     EOF
+#   vars:
+#     ansible_user: "{{ admin_id }}"
+#     ansible_ssh_pass: "{{ admin_set }}"
+#     ansible_host: "{{ vm_fqdn }}"

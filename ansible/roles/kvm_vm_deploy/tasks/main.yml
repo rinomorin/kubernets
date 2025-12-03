@@ -1,8 +1,6 @@
 ---
 # tasks/main.yml for kvm_vm_deploy
-# Acts as the director, importing sub-task files
----
-# tasks/main.yml for kvm_vm_deploy
+# set delegate host for KVM operations
 
 - name: Stage Zero - Pre-flight environment setup
   import_tasks: stage_zero.yml

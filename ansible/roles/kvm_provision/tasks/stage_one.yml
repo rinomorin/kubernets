@@ -1,14 +1,9 @@
 # ──────── STAGE: Check existence ─────────
 - name: Check if host acess
-  shell: hoostname
+  shell: hostname
   register: vm_host_ck
   failed_when: false
   changed_when: false
-
-
-- name: check access debug
-  debug:
-    msg: "id {{ vm_host_ck }}"
 
 - name: Check if VM exists
   shell: virsh dominfo {{ vm_host }}
@@ -37,14 +32,6 @@
     existing_vms: True
   when: vm_build_stage in ['present']
 
-- name: stage status
-  debug:
-    msg: "stage is {{ vm_build_stage }}"
-
-- name: stage status
-  debug:
-    msg: "delegate id {{ kvm_delegate }}"
-
 - name: Initialize VM stage map
   set_fact:
     vm_stage_map: "{{ vm_stage_map | default({}) | combine({ vm_host: 'unknown' }) }}"
@@ -59,47 +46,23 @@
   shell: date +%s
   register: epoch_result
   delegate_to: localhost
-  # run_once: true
   changed_when: false
 
 - name: Set global epoch fact
   set_fact:
     global_epoch: "{{ epoch_result.stdout | int }}"
-  # run_once: true
 
 - name: Set VM shutdown poll start time
   set_fact:
     vm_shutdown_start: "{{ global_epoch }}"
 
-- name: stage status
-  debug:
-    msg: "stage is {{ vm_build_stage }}"
-
 - name: Trigger build if needed
   include_tasks: define_vms.yml
   when: vm_stage_map[vm_host] in ['build', 'building']
 
--  debug:
-    msg: "stage is {{ vm_build_stage }}"
-
-- name: vm_build_state status befor poll
-  debug:
-    msg: "vm_build_state is {{ vm_build_state }}"
-
-- name: vm_build_stage status befor poll
-  debug:
-    msg: "vm_build_stage_map is {{ vm_build_stage }}"
- 
 - name: Calculate wait time in minutes
   set_fact:
     wait_time_to_shutdown_or_fail: "{{ ((build_loops | int) * 10 // 60) }}"
-
-- name: Display wait time
-  debug:
-    msg: "This will wait up to {{ wait_time_to_shutdown_or_fail }} minutes before resuming to next tasks"
-
-- debug:
-    msg: "vm_build_state is {{ vm_build_stage }} and {{vm_stage_map[vm_host]}}"
 
 - name: Probe VM with echo until vm shutdown
   when: vm_stage_map[vm_host] in ['build', 'building'] and  vm_build_stage | trim != "present"
@@ -113,6 +76,23 @@
   until: (vm_state.stdout | default('')) == "shutdown"
   retries: "{{ build_loops|int }}"
   delay: 10          # 10 seconds between attempts
+
+- name: Attach new NICs to a powered-off VM
+  delegate_to: "{{ kvm_delegate }}"
+  become: true
+  shell: |
+    virsh attach-interface \
+      --domain {{ vm_host }} \
+      --type network \
+      --source {{ item }} \
+      --model virtio \
+      --config --live
+  loop:
+    - br-cluster
+    - br-nat
+  when: 
+    - vm_state.stdout | default('') == "shutdown"
+    - "'helper_nodes' in group_names or 'cluster_nodes' in group_names"
 
 - name: update stage
   set_fact:
@@ -132,6 +112,3 @@
 - name: vm_build_state status
   debug:
     msg: "vm_build_state is {{ vm_build_state }}"
-
-
-

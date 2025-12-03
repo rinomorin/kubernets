@@ -1,32 +1,36 @@
 all:
+  vars:
+    ansible_user: secops
   hosts:
-    helper_node:
-      ansible_host: 192.168.100.103
-      hostname: helper01.morinsoft.ca
-    master_node:
-      ansible_host: 192.168.100.104
-      hostname: master01.morinsoft.ca
-    worker_node1:
-      ansible_host: 192.168.100.105
-      hostname: worker01.morinsoft.ca
-    worker_node2:
-      ansible_host: 192.168.100.106
-      hostname: worker02.morinsoft.ca
+    helper:
+      ansible_host: 192.168.100.20
+      hostname: helper01.home.morinsoft.ca
+    master01:
+      ansible_host: 192.168.100.30
+      hostname: master01.home.morinsoft.ca
+    worker01:
+      # ansible_host: 192.168.100.40
+      hostname: worker01.home.morinsoft.ca
+    worker02:
+      # ansible_host: 192.168.100.41
+      hostname: worker02.home.morinsoft.ca
     kvmdc01:
       ansible_host: 192.168.100.3
-      hostname: kvmdc01.morinsoft.ca
+      hostname: kvmdc01.home.morinsoft.ca
     ipa01:
       ansible_host: 192.168.100.10
-      hostname: ipa01.morinsoft.ca
+      hostname: ipa01.home.morinsoft.ca
     ipa02:
       ansible_host: 192.168.100.11
-      hostname: ipa02.morinsoft.ca
+      hostname: ipa02.home.morinsoft.ca
 
   children:
     control_nodes:
       hosts:
-        helper_node:
         master_node:
+    helper_nodes:
+      hosts:
+        helper:
     worker_nodes:
       hosts:
         worker_node1:
@@ -36,6 +40,18 @@ all:
         kvmdc01:
         ipa01:
         ipa02:
+        helper:
+    ipa:
+      hosts:
+        ipa01:
+        ipa02:
+
+    cluster_nodes:
+      hosts:
+        helper:
+        master01:
+        worker01:
+        worker02:
     dns:
       hosts:
         ipa01:
@@ -47,7 +63,12 @@ all:
     ca:
       hosts:
         ipa01:
+    ca_intermediate:
+      hosts:
         ipa02:
+    helpers:
+      hosts:
+        helper:
     ipa_servers:
       hosts:
         ipa01:

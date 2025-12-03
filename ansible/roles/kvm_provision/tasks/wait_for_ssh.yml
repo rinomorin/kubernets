@@ -11,4 +11,4 @@
 - name: Initialize VM state
   set_fact:
     vm_build_stage: "up"
-  when: sshok.stdout == "{{ vm_fqdn }}"
+  when: sshusers.stdout == "{{ vm_fqdn }}"

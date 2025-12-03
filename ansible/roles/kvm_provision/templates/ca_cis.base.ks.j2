@@ -59,9 +59,9 @@ volgroup dnsvg pv.dns
 
 # update end
 
-rootpw --plaintext {{ root_pwd }}
-user --name={{ admin_id }} --password={{ admin_pwd }} --gecos="System Admin" --groups=wheel
-user --name={{ secops_id }} --password={{ secops_pwd }} --gecos="automation id" --groups=wheel
+rootpw --iscrypted {{ pwd_hash }}
+user --name=sysadmin --password={{ pwd_hash }} --iscrypted --gecos="System Admin" --groups=wheel
+user --name=secops --password={{ secops_hash }} --iscrypted --gecos="automation id" --groups=wheel
 
 %packages
 --ignoremissing
@@ -89,9 +89,9 @@ gnutls-utils
 %post --interpreter=/bin/bash --log=/root/kickstart-post.log
 update-crypto-policies --set FIPS
 
-groupadd sshok
-usermod -aG sshok {{ admin_id }}
-usermod -aG sshok {{ secops_id }}
+groupadd sshusers
+usermod -aG sshusers {{ admin_id }}
+usermod -aG sshusers {{ secops_id }}
 echo "{{ admin_id }} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 echo "{{ secops_id }} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
@@ -118,6 +118,8 @@ update-crypto-policies --set FIPS
 
 echo "{{ admin_id }}:{{ admin_set }}" | chpasswd
 echo "{{ secops_id }}:{{ secops_pwd }}" | chpasswd
+
+echo '{{ secops_key }}' >> /home/secops/.ssh/authorized_keys
 
 sleep 2
 echo "Installation complete. System will power off."

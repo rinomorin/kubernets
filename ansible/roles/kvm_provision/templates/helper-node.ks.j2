@@ -2,119 +2,116 @@
 url --mirrorlist={{ kickstart_baseos_url | default('https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=BaseOS-9.6') }}
 repo --name=AppStream --mirrorlist={{ kickstart_appstream_url | default('https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=AppStream-9.6') }}
 
-lang {{ lang | default('en_CA.UTF-8') }}
-keyboard --vckeymap={{ keyboard_vckeymap | default('us') }} --xlayouts='{{ keyboard_xlayouts | default("us") }}'
-timezone {{ timezone_region | default('UTC') }},{{ time_zone | default('America/Toronto') }}
+lang en_CA.UTF-8
+keyboard --vckeymap=us --xlayouts='us'
+timezone UTC,UTC
 
-network --bootproto=dhcp --device={{ net_device | default('enp1s0') }} --onboot=on --hostname={{ hostname | default(inventory_hostname) }}
-timesource --ntp-server={{ ntp_server | default('pool.ntp.org') }}
+# Network information
+network --bootproto=static --ip={{ ip_addr }} --netmask={{ ip_mask }} --gateway={{ ip_gate }} --nameserver={{ dns_02 }},{{ dns_01 }} --hostname={{ ipa_host }}
+
+timesource --ntp-server=pool.ntp.org
 
 selinux --enforcing
 firewall --enabled --service=ssh
 
-ignoredisk --only-use={{ install_disk | default('sda') }}
+ignoredisk --only-use=sda
 clearpart --all --initlabel
-bootloader --location=mbr --boot-drive={{ install_disk | default('sda') }}
+bootloader --location=mbr --boot-drive=sda
 
-part /boot --fstype="xfs" --ondisk={{ install_disk | default('sda') }} --size=1024
-part /boot/efi --fstype="efi" --ondisk={{ install_disk | default('sda') }} --size=600 --fsoptions="umask=0077,shortname=winnt"
-part pv.helper01 --fstype="lvmpv" --ondisk={{ install_disk | default('sda') }} --size=96000
-volgroup node00 pv.helper01
+part /boot --fstype="xfs" --ondisk=sda --size=1024
+part /boot/efi --fstype="efi" --ondisk=sda --size=600 --fsoptions="umask=0077,shortname=winnt"
+part pv.{{ vg_short }} --fstype="lvmpv" --ondisk=sda --size=100 --grow
+volgroup {{ vg_name }} pv.{{ vg_short }}
 
-{% set volumes = [
-  {'mount': '/tmp', 'name': 'tmplv', 'size': 2048, 'opts': 'nodev,nosuid,noexec'},
-  {'mount': '/var', 'name': 'varlv', 'size': 2048},
-  {'mount': '/var/log', 'name': 'varloglv', 'size': 2048},
-  {'mount': '/var/log/audit', 'name': 'auditlv', 'size': 2048},
-  {'mount': '/var/tmp', 'name': 'vartmplv', 'size': 1024, 'opts': 'nodev,nosuid,noexec'},
-  {'mount': '/dev/shm', 'name': 'shmlv', 'size': 512, 'opts': 'nodev,nosuid,noexec'},
-  {'mount': '/home', 'name': 'homelv', 'size': 1024},
-  {'mount': '/', 'name': 'rootlv', 'size': 4096},
-  {'mount': 'swap', 'name': 'swap', 'size': 2048, 'fstype': 'swap'}
-] %}
-{% for vol in volumes %}
-logvol {{ vol.mount }} --fstype="{{ vol.fstype | default('xfs') }}" --size={{ vol.size }} --name={{ vol.name }} --vgname=node00{% if vol.opts %} --fsoptions="{{ vol.opts }}"{% endif %}
-{% endfor %}
-
-rootpw --plaintext {{ root_pw }}
-
-{% if admin_id is defined and admin_pwd is defined %}
-user --groups=wheel,sysadmin(1000) --name={{ admin_id }} --password={{ admin_pwd }} --iscrypted --uid=1000 --gecos="System Admin" --gid=1000
-{% else %}
-user --groups=wheel --name=sysadmin --password=$y$j9T$mZyy4W7Kh9UgTWwsQFXDw4cG$DzOysH7CAit3HIv1/CmY2YaqrySI2/qb19E1s8OHzU6 --iscrypted --uid=1000 --gecos="System Admin" --gid=1000
-{% endif %}
-
-%packages
-@^minimal-environment
-@standard
-@headless-management
-podman
-buildah
-skopeo
-slirp4netns
-fuse-overlayfs
-shadow-utils
-iptables
-ebtables
-iproute
-ipset
-ansible-core
-python3-pyyaml
-jq
-git
-nmap-ncat
-strace
-lsof
-tcpdump
-gnupg2
-pinentry
-certmonger
-openssl
-openscap-scanner
-scap-security-guide
-aide
-audit
-policycoreutils
-policycoreutils-python-utils
-lvm2
-nfs-utils
-iscsi-initiator-utils
+%addon com_redhat_oscap
+    content-type = scap-security-guide
+    datastream-id = scap_org.open-scap_datastream_from_xccdf_ssg-rhel9-xccdf.xml
+    xccdf-id = scap_org.open-scap_cref_ssg-rhel9-xccdf.xml
+    profile = xccdf_org.ssgproject.content_profile_cis
 %end
 
-%post --interpreter=/bin/bash
-echo "Starting post-install hardening..." >> /root/install.log
+logvol /tmp                 --fstype="xfs" --size=1024   --name=tmplv      --vgname={{ vg_name }} --fsoptions="nodev,nosuid,noexec"
+logvol /var                 --fstype="xfs" --size=2048   --name=varlv      --vgname={{ vg_name }}
+logvol /var/log             --fstype="xfs" --size=2048   --name=varloglv   --vgname={{ vg_name }}
+logvol /var/log/audit       --fstype="xfs" --size=2048   --name=auditlv    --vgname={{ vg_name }}
+logvol /var/tmp             --fstype="xfs" --size=1024   --name=vartmplv   --vgname={{ vg_name }} --fsoptions="nodev,nosuid,noexec"
+logvol /dev/shm             --fstype="xfs" --size=1024   --name=shmlv      --vgname={{ vg_name }} --fsoptions="nodev,nosuid,noexec"
+logvol /home                --fstype="xfs" --size=1024   --name=homelv     --vgname={{ vg_name }}
+logvol /                    --fstype="xfs" --size=6144   --name=rootlv     --vgname={{ vg_name }}
+logvol swap                 --fstype="swap" --size=2048   --name=swap       --vgname={{ vg_name }}
 
-groupadd sshaccess
-usermod -aG sshaccess {{ admin_id | default('admin') }}
-echo "{{ admin_id }} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+rootpw --iscrypted {{ pwd_hash }}
+user --name=sysadmin --password={{ pwd_hash }} --iscrypted --gecos="System Admin" --groups=wheel
+user --name=secops --password={{ secops_hash }} --iscrypted --gecos="automation id" --groups=wheel
 
-sed -i '/^#includedir \/etc\/sudoers.d/d' /etc/sudoers
-echo '#include /etc/sudoers.d/DFLT_HELPER_NODE' >> /etc/sudoers
+%packages
+--ignoremissing
+@core
+vim
+tmux
+git
+sssd
+freeipa-client
+ipa-admintools
+krb5-workstation
+bind-utils
+jq
+curl
+wget
+python3
+libvirt-client
+virt-install
+openssh-clients
+audit
+aide
+openscap-scanner
+scap-security-guide
+%end
 
-cat > /etc/sudoers.d/DFLT_HELPER_NODE <<EOF
-%wheel helper[0-9][0-9]*=(ALL) ALL
+
+%post --interpreter=/bin/bash --log=/root/kickstart-post.log
+# Crypto policies
+update-crypto-policies --set FIPS
+
+# User groups and sudoers
+groupadd sshusers
+usermod -aG sshusers sysadmin
+usermod -aG sshusers secops
+echo "sysadmin ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+echo "secops ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Chrony config
+cat > /etc/chrony.conf <<EOF
+server 0.ca.pool.ntp.org iburst
+server 1.ca.pool.ntp.org iburst
+server 2.ca.pool.ntp.org iburst
+server 3.ca.pool.ntp.org iburst
+allow 192.168.100.0/24
+local stratum 10
+driftfile /var/lib/chrony/drift
+makestep 1.0 3
+rtcsync
 EOF
-chmod 0440 /etc/sudoers.d/DFLT_HELPER_NODE
+systemctl enable chronyd
+systemctl restart chronyd
 
-nmcli con modify {{ net_device | default('enp1s0') }} ipv4.addresses {{ ip_addr }}/{{ ip_cid }}
-nmcli con modify {{ net_device | default('enp1s0') }} ipv4.gateway {{ ip_gate }}
-nmcli con modify {{ net_device | default('enp1s0') }} ipv4.dns {{ ip_dns | default('192.168.100.1,8.8.8.8') }}
-nmcli con modify {{ net_device | default('enp1s0') }} ipv4.method manual
-nmcli con modify {{ net_device | default('enp1s0') }} ipv6.method ignore
-nmcli con mod {{ net_device | default('enp1s0') }} connection.autoconnect yes
-nmcli con up {{ net_device | default('enp1s0') }}
+# Hosts entry
+echo "{{ ip_addr }} {{ ipa_host }} {{ ipa_host.split('.')[0] }}" >> /etc/hosts
 
+# Hostname
 hostnamectl set-hostname {{ hostname | default(inventory_hostname) }}
 
+# Updates and services
 dnf update -y
-
 systemctl enable auditd
 systemctl start auditd
 
+# AIDE init
 aide --init && mv /var/lib/aide/aide.db.new.gz /var/lib/aide/aide.db.gz
 
+# OSCAP scan and remediation
 PROFILE="xccdf_org.ssgproject.content_profile_cis_level2_server"
-DATastream="/usr/share/xml/scap/ssg/content/ssg-rocky9-ds.xml"
+DATASTREAM="/usr/share/xml/scap/ssg/content/ssg-rocky9-ds.xml"
 RESULTS="/root/oscap-results.xml"
 REPORT="/root/oscap-results.html"
 FIXLOG="/root/oscap-fix.log"
@@ -124,7 +121,7 @@ oscap xccdf eval \
   --profile "$PROFILE" \
   --results "$RESULTS" \
   --report "$REPORT" \
-  "$DATastream" | tee -a "$FIXLOG"
+  "$DATASTREAM" | tee -a "$FIXLOG"
 
 echo "[+] Applying remediations (excluding GRUB rules)..." | tee -a "$FIXLOG"
 oscap xccdf eval \
@@ -133,11 +130,16 @@ oscap xccdf eval \
   --remediate \
   --skip-rule xccdf_org.ssgproject.content_rule_grub2_password \
   --skip-rule xccdf_org.ssgproject.content_rule_grub2_enable_password \
-  "$DATastream" | tee -a "$FIXLOG"
+  "$DATASTREAM" | tee -a "$FIXLOG"
 
 echo "Helper node hardened. oscap report saved to /root/oscap-results.html" >> /root/install.log
 
-reboot
-%end
+echo "{{ admin_id }}:{{ admin_set }}" | chpasswd
+echo "{{ secops_id }}:{{ secops_pwd }}" | chpasswd
 
-reboot --eject
+echo '{{ secops_key }}' >> /home/secops/.ssh/authorized_keys
+
+sleep 2
+echo "Installation complete. System will power off."
+%end
+shutdown

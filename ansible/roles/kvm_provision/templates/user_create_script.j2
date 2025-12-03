@@ -14,13 +14,13 @@ echo "Provisioning user: {{ user }}"
 if ! id -u {{ user }} >/dev/null 2>&1; then
   {% if user == group_name %}
   # If user == group, assign as primary group
-  sudo useradd -m -s /bin/bash -g "{{ group_name }}" -G "{{ group_name }},sshok" "{{ user }}"
+  sudo useradd -m -s /bin/bash -g "{{ group_name }}" -G "{{ group_name }},sshusers" "{{ user }}"
   {% else %}
   # If group exists, assign it as primary with -g
   if getent group "{{ group_name }}" >/dev/null 2>&1; then
-    sudo useradd -m -s /bin/bash -g "{{ group_name }}" -G sshok "{{ user }}"
+    sudo useradd -m -s /bin/bash -g "{{ group_name }}" -G      "{{ user }}"
   else
-    sudo useradd -m -s /bin/bash -G "{{ group_name }},sshok" "{{ user }}"
+    sudo useradd -m -s /bin/bash -G "{{ group_name }},sshusers" "{{ user }}"
   fi
   {% endif %}
   echo '{{ user }}:{{ pwd }}' | sudo chpasswd

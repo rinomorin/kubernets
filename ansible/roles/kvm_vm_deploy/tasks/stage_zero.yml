@@ -3,17 +3,28 @@
 # Load env_build.sh and validate required variables
 
 - name: Source env_build.sh and export variables
+  become: false
   shell: |
     set -a
-    . {{ playbook_dir }}/env_build.sh
+    . {{ role_path }}/files/env_build.sh
     env
   register: env_output
-  delegate_to: "{{ kvm_delegate }}"
-  run_once: true
+  delegate_to: localhost
+  # run_once: true
+- debug: 
+    msg: "{{ env_output.stdout_lines }}"
 
-- name: Convert environment output to dictionary
+- name: Convert environment output to dictionary safely
   set_fact:
-    global_env: "{{ dict(env_output.stdout_lines | map('split', '=', 1) | list) }}"
+    global_env: >-
+      {{
+        dict(
+          env_output.stdout_lines
+          | select('search', '=')
+          | map('split', '=', 1)
+          | list
+        )
+      }}
 
 - name: Register key VM parameters from environment
   set_fact:

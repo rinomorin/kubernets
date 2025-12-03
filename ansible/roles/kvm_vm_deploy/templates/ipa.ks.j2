@@ -1,0 +1,134 @@
+#version=RHEL9
+url --mirrorlist=https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=BaseOS-9.6
+repo --name=AppStream --mirrorlist=https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=AppStream-9.6
+
+lang en_CA.UTF-8
+keyboard --vckeymap=us --xlayouts='us'
+timezone UTC,UTC
+
+network --bootproto=static --ip={{ ip_addr }} --netmask={{ ip_mask }} --gateway={{ ip_gate }} --nameserver={{ dns_01 }},{{ dns_02 }} --hostname={{ ipa_host }}
+timesource --ntp-server=pool.ntp.org
+
+selinux --enforcing
+firewall --enabled --service=ssh
+
+ignoredisk --only-use=sda
+clearpart --all --initlabel
+bootloader --location=mbr --boot-drive=sda
+
+part /boot --fstype="xfs" --ondisk=sda --size=1024
+part /boot/efi --fstype="efi" --ondisk=sda --size=300 --fsoptions="umask=0077,shortname=winnt"
+part pv.{{ vg_short }} --fstype="lvmpv" --ondisk=sda --size=48128
+volgroup {{ vg_name }} pv.{{ vg_short }}
+
+%addon com_redhat_kdump --enable --reserve-mb='auto'
+%end
+
+%addon com_redhat_oscap
+    content-type = scap-security-guide
+    datastream-id = scap_org.open-scap_datastream_from_xccdf_ssg-rhel9-xccdf.xml
+    xccdf-id = scap_org.open-scap_cref_ssg-rhel9-xccdf.xml
+    profile = xccdf_org.ssgproject.content_profile_cis
+%end
+
+logvol /tmp                 --fstype="xfs" --size=1024   --name=tmplv      --vgname={{ vg_name }} --fsoptions="nodev,nosuid,noexec"
+logvol /var                 --fstype="xfs" --size=2048   --name=varlv      --vgname={{ vg_name }}
+logvol /var/log             --fstype="xfs" --size=2048   --name=varloglv   --vgname={{ vg_name }}
+logvol /var/log/audit       --fstype="xfs" --size=2048   --name=auditlv    --vgname={{ vg_name }}
+logvol /var/tmp             --fstype="xfs" --size=1024   --name=vartmplv   --vgname={{ vg_name }} --fsoptions="nodev,nosuid,noexec"
+logvol /dev/shm             --fstype="xfs" --size=1024   --name=shmlv      --vgname={{ vg_name }} --fsoptions="nodev,nosuid,noexec"
+logvol /home                --fstype="xfs" --size=1024   --name=homelv     --vgname={{ vg_name }}
+logvol /                    --fstype="xfs" --size=6144   --name=rootlv     --vgname={{ vg_name }}
+logvol swap                 --fstype="swap" --size=2048   --name=swap       --vgname={{ vg_name }}
+
+rootpw --iscrypted {{ pwd_hash }}
+user --name=sysadmin --password={{ pwd_hash }} --iscrypted --gecos="System Admin" --groups=wheel
+user --name=secops --password=On32Secure4Sec0ps~ --gecos="automation id" --groups=wheel
+
+%packages
+--ignoremissing
+@^minimal-environment
+@standard
+@headless-management
+openscap-scanner
+scap-security-guide
+aide
+audit
+libpwquality
+policycoreutils
+policycoreutils-python-utils
+gnupg2
+lvm2
+iscsi-initiator-utils
+chrony
+openssl
+sssd
+rsyslog
+logrotate
+gnutls-utils
+%end
+
+
+%packages
+skopeo
+slirp4netns
+fuse-overlayfs
+shadow-utils
+iptables
+ebtables
+iproute
+ipset
+ansible-core
+python3-pyyaml
+jq
+git
+nmap-ncat
+strace
+lsof
+tcpdump
+gnupg2
+pinentry
+certmonger
+openssl
+nfs-utils
+iscsi-initiator-utils
+%end
+
+
+%post --interpreter=/bin/bash --log=/root/kickstart-post.log
+update-crypto-policies --set FIPS
+
+groupadd sshok
+usermod -aG sshok sysadmin
+usermod -aG sshok secops
+echo "sysadmin ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+echo "secops ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+cat > /etc/chrony.conf <<EOF
+server 0.ca.pool.ntp.org iburst
+server 1.ca.pool.ntp.org iburst
+server 2.ca.pool.ntp.org iburst
+server 3.ca.pool.ntp.org iburst
+allow 192.168.100.0/24
+local stratum 10
+driftfile /var/lib/chrony/drift
+makestep 1.0 3
+rtcsync
+EOF
+systemctl enable chronyd
+systemctl restart chronyd
+
+echo "{{ ip_addr }} {{ ipa_host }} {{ ipa_host.split('.')[0] }}" >> /etc/hosts
+
+systemctl enable named-pkcs11
+systemctl restart named-pkcs11
+
+update-crypto-policies --set FIPS
+
+echo "sysadmin:{{ pwd_var }}" | chpasswd
+echo "secops:{{ pwd_var }}~" | chpasswd
+
+sleep 2
+echo "Installation complete. System will power off."
+%end
+shutdown

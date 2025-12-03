@@ -17,15 +17,7 @@
 - name: set ip_addr
   set_fact:
     ip_addr: "{{ ansible_host }}"
-  when: ansible_host is defined and ansible_host|length > 0
-
-- name: set defauts ip info
-  set_fact:
-    ip_addr: "{{ ansible_host }}"
-    ip_mask: "{{ default_netmask }}"
-    ip_gate: "{{ ansible_host.split('.')[:3] | join('.') }}.1"
-    net_device: "{{ default_net_device }}"
-  when: ansible_host is defined
+  when: ansible_host
 
 - name: Validate required extra_vars
   assert:
@@ -151,7 +143,7 @@
       failed_when: false
       
     - name: Undefine VM
-      command: "virsh undefine {{ vm_host }} --nvram"
+      command: "virsh undefine {{ vm_host }}"
       
     - name: Remove VM disk(s) after undefine
       file:
@@ -168,38 +160,20 @@
 - debug:
     msg: "vm_build_state is {{ vm_build_state }}"
 
-- name: Set default kickstart template
+- name: Set kickstart template based on group
   set_fact:
-    kickstart_template_set: default.ks.j2
-  when: 
-   - kickstart_template_set is not defined
-   - "'kvm' not in group_names"
-
-
-- name: Set kickstart template for helper nodes
-  set_fact:
-    kickstart_template_set: helper-node.ks.j2
-  when: 
-   - "'helper_nodes' in group_names"
-   - "'kvm' not in group_names"
-
-- name: Set kickstart template for CA nodes
-  set_fact:
-    kickstart_template_set: ca_cis.base.ks.j2
-  when: 
-   - "'ca' in group_names"
-   - "'kvm' not in group_names"
-
-- name: Set kickstart template for CA nodes
-  set_fact:
-    kickstart_template_set: ca_cis.base.ks.j2
-  when: 
-   - "'ca_intermediate' in group_names"
-   - "'kvm' not in group_names"
-
-- name: show kickstart_template_set
-  debug:
-    msg: "kickstart_template_set is {{ kickstart_template_set }} for {{ group_names }}"
+    kickstart_template_set: >-
+      {% if inventory_hostname in groups['control_nodes'] %}
+        helper-node.ks.j2
+      {% elif inventory_hostname in groups['dns'] 
+            or inventory_hostname in groups['ldap'] 
+            or inventory_hostname in groups['ntp'] 
+            or inventory_hostname in groups['ca'] %}
+        ca_cis.base.ks.j2
+      {% else %}
+        default.ks.j2
+      {% endif %}
+  when: "'dns' in group_names"
 
 - name: clean variable
   set_fact:
@@ -211,47 +185,16 @@
     msg: "ks = {{ kickstart_template }} to {{ existing_vms }}"
   when: kickstart_template is defined
 
-- name: set vm variables
-  set_fact:
-    tdisk_size: 50
-    tcpu_count: 2
-    tram_size: 4096
-    tvg_name: "vg_{{ inventory_hostname_short }}"
-    tvg_short: "{{ inventory_hostname_short }}"
-    tpwd_hash: "{{ lookup('env','admin_hash') }}"
-    tsecops_hash: "{{ lookup('env','secops_hash') }}"
-    tsecops_key: "{{ lookup('env','secops_key') }}"
-
-- name: set vm helper variables
-  set_fact:
-    tdisk_size: 70
-    tcpu_count: 2
-    tram_size: 4096
-    tvg_name: "vg_{{ inventory_hostname_short }}"
-    tvg_short: "{{ inventory_hostname_short }}"
-    tpwd_hash: "{{ lookup('env','admin_hash') }}"
-    tsecops_hash: "{{ lookup('env','secops_hash') }}"
-    tsecops_key: "{{ lookup('env','secops_key') }}"
-  when: "'helper_nodes' in group_names"
+- name: Show secops
+  debug: msg="secops_id {{ secops_id}}, secops_pwd {{ secops_pwd }}"
 
 
 - name: Generate Kickstart files for new or forced VMs
   template:
     src: "{{ kickstart_template }}"
     dest: "/home/kvm_admin/kickstarts/{{ vm_host }}.ks"
-  when: 
-    - not existing_vms
-    - kickstart_template is defined
-    - "'kvm' not in group_names"
+  when: not existing_vms and kickstart_template is defined
   vars:
-    disk_size: "{{ tdisk_size }}"
-    vcpu_count: "{{ tcpu_count }}"
-    ram_size: "{{ tram_size }}"
-    vg_name:  "{{ tvg_name }}"  
-    vg_short: "{{ tvg_short }}"
-    secops_hash: "{{ tsecops_hash }}"
-    pwd_hash: "{{ tpwd_hash }}"
-    ipa_host: "{{ vm_fqdn }}"
     ip_address: "{{ ip_addr }}"
     hostname: "{{ vm_fqdn }}"
     gateway: "{{ ip_gate }}"
@@ -262,16 +205,6 @@
     root_pwd: "{{ root_set }}"
     admin_pwd: "{{ admin_set }}"
     install_disk: "sda"
-    dns_01: "8.8.8.8"
-    dns_02: "{{ ip_gate }}"
-    cluster_ip_addr: "{{ lookup('env', 'cluster_ip_addr') }}"
-    cluster_netmask: "{{ lookup('env', 'cluster_netmask') }}"
-    cluster_gateway: "{{ lookup('env', 'cluster_gateway') }}"
-    default_netmask: "{{ lookup('env', 'default_netmask') }}"
-    default_net_device: "{{ lookup('env', 'default_net_device') }}"
-    cluster_net_device: "{{ lookup('env', 'cluster_net_device') }}"
-    nat_net_device: "{{ lookup('env', 'nat_net_device') }}"
-
 
 - name: Execute virt-install non-interactively and wait for completion
   when: 
@@ -281,18 +214,17 @@
   command: >
     virt-install
       --name {{ vm_host }}
-      --ram {{ tram_size }}
-      --vcpus {{ tcpu_count }}
+      --ram {{ ram }}
+      --vcpus {{ vcpu }}
       --initrd-inject="/home/kvm_admin/kickstarts/{{ vm_host }}.ks"
       --extra-args="inst.ks=file:/{{ vm_host }}.ks console=ttyS0,115200n8"
-      --disk path=/var/lib/libvirt/images/{{ vm_host }}.qcow2,size={{ tdisk_size }},bus=sata
+      --disk path=/var/lib/libvirt/images/{{ vm_host }}.qcow2,size=50,bus=sata
       --os-variant {{ os_variant }}
-      --network default
+      --network network={{ default_network }}
       --graphics none
       --console pty,target_type=serial
       --location {{ iso }}
       --noautoconsole
-
 
 - debug:
     msg: "vm_build_state is {{ vm_build_state }}"

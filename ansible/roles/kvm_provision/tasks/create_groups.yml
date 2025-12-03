@@ -1,7 +1,3 @@
-
-- name: show groups list
-  debug: msg="groups - {{ default_groups }}"
-
 - name: Ensure required groups exist on VM
   delegate_to: localhost
   become: false
@@ -12,7 +8,8 @@
         -o UserKnownHostsFile=/dev/null \
         -o StrictHostKeyChecking=no \
         -o ConnectTimeout=5 \
-        {{ admin_id }}@{{ vm_fqdn }} '
+        -i /tmp/is_rsa \
+        {{ secops_id }}@{{ vm_fqdn }} '
         for grp in {{ group_list | join(" ") }}; do
           getent group "$grp" || sudo groupadd "$grp"
         done

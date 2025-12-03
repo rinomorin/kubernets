@@ -1,3 +1,9 @@
+- name: Show staus of vm_build_state at stage three start
+  debug:
+    msg: |
+      "vm_build_state is {{ vm_build_state }} at stage three start"
+      "vm_build_stage is {{ vm_build_stage }} at stage three start"
+
 - name: setup ssh keys for main id
   import_tasks: add_keys.yml
 
@@ -40,6 +46,25 @@
 - name: Stage Three Provision Sudoers tmplates
   import_tasks: render_sudoers_templates.yml
 
+- name: Set tmp state
+  set_fact:
+    vm_tmp_state: "{{ vm_build_state }}"
+
 - name: Stage four set secure id and is compliance 
   import_tasks: secops_templates.yml
+  vars:
+    vm_build_state: "{{ vm_tmp_state }}"
 
+- name: Show final vm_build_state at stage three end
+  debug:
+    msg: "vm_build_state is {{ vm_build_state }} at stage three end"
+
+- name: Set global_vm_build_state for next module
+  set_fact:
+    global_vm_build_state: "configured"
+  when: vm_build_state == "non-compliant"
+
+- name: Set global_vm_build_state for next module
+  set_fact:
+    global_vm_build_state: "ready"
+  when: vm_build_state == "compliant"
