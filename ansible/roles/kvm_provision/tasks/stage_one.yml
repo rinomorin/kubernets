@@ -77,23 +77,6 @@
   retries: "{{ build_loops|int }}"
   delay: 10          # 10 seconds between attempts
 
-- name: Attach new NICs to a powered-off VM
-  delegate_to: "{{ kvm_delegate }}"
-  become: true
-  shell: |
-    virsh attach-interface \
-      --domain {{ vm_host }} \
-      --type network \
-      --source {{ item }} \
-      --model virtio \
-      --config --live
-  loop:
-    - br-cluster
-    - br-nat
-  when: 
-    - vm_state.stdout | default('') == "shutdown"
-    - "'helper_nodes' in group_names or 'cluster_nodes' in group_names"
-
 - name: update stage
   set_fact:
     vm_build_state: "booted"  
@@ -112,3 +95,21 @@
 - name: vm_build_state status
   debug:
     msg: "vm_build_state is {{ vm_build_state }}"
+
+- name: Attach new NICs to VM
+  delegate_to: "{{ kvm_delegate }}"
+  become: true
+  shell: |
+    virsh attach-interface \
+      --domain {{ vm_host }} \
+      --type network \
+      --source {{ item }} \
+      --model virtio \
+      --config
+  loop:
+    - br-cluster
+    - br-nat
+  when: 
+    - vm_state.stdout | default('') == "shutdown"
+    - "'helper_nodes' in group_names or 'cluster_nodes' in group_names"
+
