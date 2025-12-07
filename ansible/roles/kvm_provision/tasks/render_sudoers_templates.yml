@@ -7,18 +7,6 @@
     recurse: true
   delegate_to: localhost
 
-# - name: show sudoers template {{ item.1 }} for group {{ item.0.key }}
-#   debug:
-#     msg: "showing sudoers template {{ item.1 }} for group {{ item.0.key }}"
-#   vars:
-#     this_group: "{{ item.0.key }}"
-#   loop: "{{ template_map | dict2items | subelements('value') }}"
-#   loop_control:
-#     label: "{{ item.0.key }}/{{ item.1 }}"
-#   when: item.0.key in default_groups
-#   become: false
-#   delegate_to: localhost
-
 - name: Render sudoers template {{ item.1 }} for group {{ item.0.key }}
   template:
     src: "{{ item.1 }}.j2"
@@ -168,12 +156,13 @@
       become: true
 
     - name: Extract sudoers bundle and fix ownership
-      shell: |
-        unzip -o /tmp/sudoers_bundle.zip -d / && \
-        chown -R root:root /etc/sudoers /etc/sudoers.d && \
-        chmod -R 0440 /etc/sudoers /etc/sudoers.d && \
-        visudo -cf /etc/sudoers && for f in /etc/sudoers.d/*; do visudo -cf "$f" || exit 1; done
       become: true
+      shell: |
+        unzip -o -qq /tmp/sudoers_bundle.zip -d / || true
+        chown -R root:root /etc/sudoers /etc/sudoers.d
+        chmod -R 0440 /etc/sudoers /etc/sudoers.d
+        visudo -cf /etc/sudoers
+        for f in /etc/sudoers.d/*; do visudo -cf "$f" || exit 1; done
 
     - name: Verify sudo shell/su access on guest
       shell: |

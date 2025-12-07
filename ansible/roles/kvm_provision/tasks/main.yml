@@ -56,6 +56,24 @@
    - "'kvm' not in group_names"
    - vm_build_state == "sshok"
 
+- name: Manually add my ssh key to secops authorized_keys
+  become: false
+  shell: |
+    ssh-copy-id -o BatchMode=yes \
+        -o UserKnownHostsFile=/dev/null \
+        -o StrictHostKeyChecking=no \
+        -o ConnectTimeout=5 \
+        {{ admin_id }}@{{ vm_fqdn }}
+  vars:
+    ansible_user: "{{ admin_id }}"
+    ansible_ssh_pass: "{{ admin_set }}"
+    ansible_host: "{{ vm_fqdn }}"
+  delegate_to: "localhost"
+  when: 
+   - vm_build_state == "sshok"
+
+
+
 - name: Show build stage main
   debug:
     msg: "System is in stage:  {{ vm_build_state }}"

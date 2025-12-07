@@ -29,6 +29,10 @@
   changed_when: false
 
 - name: Check CIS scan state
+  vars:
+    ansible_user: "{{ secops_id }}"
+    ansible_ssh_pass: "{{ secops_pwd }}"
+    ansible_host: "{{ vm_fqdn }}"
   delegate_to: "{{ vm_host }}"
   become: true
   shell: |
@@ -41,11 +45,16 @@
   changed_when: false
 
 - name: Check if oscap log exists-
+  vars:
+    ansible_user: "{{ secops_id }}"
+    ansible_ssh_pass: "{{ secops_pwd }}"
+    ansible_host: "{{ vm_fqdn }}"
   delegate_to: "{{ vm_host }}"
   become: true
   shell: ls /var/log/oscap.log
   register: cis_check2
   changed_when: false
+  failed_when: false
 
 - name: Show CIS scan state debug
   debug:
@@ -58,8 +67,8 @@
 - name: Run initiate oscap scan via SSH
   become: true
   vars:
-    ansible_user: "{{ secops_id }}"
-    ansible_ssh_pass: "{{ secops_pwd }}"
+    ansible_user: "{{ admin_id }}"
+    ansible_ssh_pass: "{{ admin_set }}"
     ansible_host: "{{ vm_fqdn }}"
   delegate_to: "{{ vm_host }}"
   ignore_errors: true
@@ -75,11 +84,11 @@
 
 - name: get oscap log fail count if exists
   become: true
-  delegate_to: "{{ vm_host }}"
   vars:
-    ansible_user: "{{ secops_id }}"
-    ansible_ssh_pass: "{{ secops_pwd }}"
+    ansible_user: "{{ admin_id }}"
+    ansible_ssh_pass: "{{ admin_set }}"
     ansible_host: "{{ vm_fqdn }}"
+  delegate_to: "{{ vm_host }}"
   shell: |
     if [ -f /var/log/oscap.log ]; then
       grep "Result[[:space:]]\+fail" /var/log/oscap.log|wc -l
@@ -90,14 +99,21 @@
   changed_when: false
   failed_when: false
   when:
+    - cis_check.stdout == "built"
+    - "'oscap.log' not in (cis_check2.stdout | default(''))"
+
+- name: Show oscap log content
+  debug:
+    msg: "oscap_log_content is {{ oscap_log_content.stdout }}"
+  when:
     - cis_check.stdout == "built"   
     - "'oscap.log' in (cis_check2.stdout| default(''))"
 
 - name: Compliance for ipa servers
   become: true
   vars:
-    ansible_user: "{{ secops_id }}"
-    ansible_ssh_pass: "{{ secops_pwd }}"
+    ansible_user: "{{ admin_id }}"
+    ansible_ssh_pass: "{{ admin_set }}"
     ansible_host: "{{ vm_fqdn }}"
   delegate_to: "{{ vm_host }}"
   block:
@@ -175,8 +191,8 @@
 - name: Compliance for helper_nodes
   become: true
   vars:
-    ansible_user: "{{ secops_id }}"
-    ansible_ssh_pass: "{{ secops_pwd }}"
+    ansible_user: "{{ admin_id  }}"
+    ansible_ssh_pass: "{{ admin_set }}"
     ansible_host: "{{ vm_fqdn }}"
   delegate_to: "{{ vm_host }}"
   block:
@@ -219,6 +235,11 @@
     - name: Run helper oscap initial scan (Final)
       ignore_errors: true
       failed_when: false
+      vars:
+        ansible_user: "{{ admin_id  }}"
+        ansible_ssh_pass: "{{ admin_set }}"
+        ansible_host: "{{ vm_fqdn }}"
+      delegate_to: "{{ vm_host }}"
       shell: |
         /usr/bin/oscap xccdf eval \
           --profile xccdf_org.ssgproject.content_profile_cis \
@@ -238,20 +259,23 @@
   become: true
   delegate_to: "{{ vm_host }}"
   vars:
-    ansible_user: "{{ secops_id }}"
-    ansible_ssh_pass: "{{ secops_pwd }}"
+    ansible_user: "{{ admin_id }}"
+    ansible_ssh_pass: "{{ admin_set }}"
     ansible_host: "{{ vm_fqdn }}"
   shell: |
     if [ -f /var/log/oscap.log ]; then
       grep "Result[[:space:]]\+fail" /var/log/oscap.log|wc -l
     else
-      echo "no oscap log found"
+      echo -1
     fi
   register: oscap_log_content
   changed_when: false
-  when:
-    - cis_check.stdout == "scanned"
-
+  failed_when: false
+  
+- name: Show oscap log content
+  debug:
+    msg: "oscap_log_content is {{ oscap_log_content.stdout }}"
+    
 - name: violation default 
   set_fact:
     violation: 0

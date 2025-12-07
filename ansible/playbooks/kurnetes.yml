@@ -49,18 +49,28 @@
   roles:
     - role: kvm_provision 
 
-# - name: Build Stage
-#   hosts: all
-#   tasks:
-#     - name: show vm_stage_map
-#       debug: msg="{{ inventory_hostname }} is in {{ global_vm_build_state }} state"
-#       when: 
-#         - "'kvm' not in group_names"
+- name: Build Stage
+  hosts: all
+  tasks:
+    - name: show vm_stage_map
+      debug: msg="{{ inventory_hostname }} is in {{ global_vm_build_state }} state"
+      when: 
+        - "'kvm' not in group_names"
     
-#     - name: set global state
-#       set_fact: 
-#          vm_build_state: '{{ global_vm_build_state | default("skipped") }}'
-      
+    - name: set global state
+      set_fact: 
+         vm_build_state: '{{ global_vm_build_state | default("skipped") }}'
+
+- hosts: all
+  gather_facts: false
+  vars:
+    vm_build_state: "{{ global_vm_build_state | default('skipped') }}"
+  roles:
+    - ipa_setup
+  # when: 
+  #   - vm_build_state == "scanned" or vm_build_state == "non-compliant"
+
+
 # - hosts: all
 #   gather_facts: no
 #   become: yes

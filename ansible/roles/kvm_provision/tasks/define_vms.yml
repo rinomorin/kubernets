@@ -271,6 +271,7 @@
     default_net_device: "{{ lookup('env', 'default_net_device') }}"
     cluster_net_device: "{{ lookup('env', 'cluster_net_device') }}"
     nat_net_device: "{{ lookup('env', 'nat_net_device') }}"
+  no_log: true
 
 
 - name: Execute virt-install non-interactively and wait for completion
@@ -288,6 +289,8 @@
       --disk path=/var/lib/libvirt/images/{{ vm_host }}.qcow2,size={{ tdisk_size }},bus=sata
       --os-variant {{ os_variant }}
       --network default
+      {{ '--network network=br-cluster,link_state=down' if 'cluster_nodes' in group_names else '' }}
+      {{ '--network network=br-nat,link_state=down' if 'cluster_nodes' in group_names else '' }}
       --graphics none
       --console pty,target_type=serial
       --location {{ iso }}

@@ -26,7 +26,7 @@ export ipa_dm_password="On32dr1v3H0me~"
 export ipa_admin_password="On32L00kUpToo~"
 
 export ipa_dispatcher_enable_summary=true
-export ipa_dispatcher_enable_promotion=true
+export ipa_dispatcher_enable_promotion=tr
 
 # iso file path
 export iso_path="/var/lib/libvirt/images/Rocky-9.6-x86_64-boot.iso"
@@ -40,7 +40,7 @@ export cluster_netmask="255.255.255.0"
 export cluster_gateway="10.0.0.1"
 export cluster_net_device="ens2s0"
 export nat_net_device="ens3s0"
+export ipa_master="ipa01.$ipa_domain"
 
 # export kubeadm_cluster_name="home.morinsoft"
 # export kubeadm_pod_network_cidr="10.244.0.0/16"
-

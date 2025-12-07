@@ -98,6 +98,7 @@ systemctl restart chronyd
 # Hosts entry
 echo "{{ ip_addr }} {{ ipa_host }} {{ ipa_host.split('.')[0] }}" >> /etc/hosts
 
+
 # Hostname
 hostnamectl set-hostname {{ hostname | default(inventory_hostname) }}
 
@@ -138,6 +139,20 @@ echo "{{ admin_id }}:{{ admin_set }}" | chpasswd
 echo "{{ secops_id }}:{{ secops_pwd }}" | chpasswd
 
 echo '{{ secops_key }}' >> /home/secops/.ssh/authorized_keys
+
+nmcli con modify enp2s0 ipv4.addresses {{ cluster_ip_addr }}/{{ ip_cid }}
+nmcli con modify enp2s0 ipv4.gateway {{ cluster_gateway }}
+nmcli con modify enp2s0 ipv4.method manual
+nmcli con modify enp2s0 ipv4.never-default yes
+nmcli con modify enp2s0 ipv6.method ignore
+nmcli con modify enp2s0 connection.autoconnect yes
+nmcli con up enp2s0
+
+nmcli con modify enp3s0 ipv4.method auto
+nmcli con modify enp3s0 ipv4.never-default yes
+nmcli con modify enp3s0 ipv6.method ignore
+nmcli con modify enp3s0 connection.autoconnect yes
+nmcli con up enp3s0
 
 sleep 2
 echo "Installation complete. System will power off."

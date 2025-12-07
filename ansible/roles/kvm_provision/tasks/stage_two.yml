@@ -66,6 +66,7 @@
   until: (ssh_check.stdout | default('')) == "sshok"
   retries: "{{ build_loops|int }}"
   delay: 10          # 10 seconds between attempts
+  no_log: true
 
 - name: Show SSH check result
   debug:
@@ -77,77 +78,30 @@
     vm_build_stage: "booted"
   when: (ssh_check.stdout | default('')).find('sshok') != -1
 
-- block:
-    - name: Dump VM NICs (MAC + bridge) from KVM host
-      delegate_to: "{{ kvm_delegate }}"
-      become: true
-      shell: |
-        virsh dumpxml {{ vm_host }} \
-          | grep -iE "mac ad|network" \
-          | awk '{print $NF}' \
-          | tr -d "\n" \
-          | sed "s/type='network'>/\n/g" \
-          | sed 's/\/>/ /g' \
-          | grep bridge
-      register: vm_nics_raw
-
-    - name: Parse NIC lines into list
-      set_fact:
-        vm_nics: "{{ vm_nics_raw.stdout_lines }}"
-
-    - name: Show VM NICs
-      debug:
-        var: vm_nics
-
-    - name: Gather guest NICs by MAC
-      vars:
-        ansible_user: "{{ admin_id }}"
-        ansible_ssh_pass: "{{ admin_set }}"
-        ansible_host: "{{ vm_fqdn }}"
-      delegate_to: "{{ vm_host }}"
-      become: false
-      loop: "{{ vm_nics }}"
-      loop_control:
-        loop_var: nic
-      shell: |
-        ip -o link show | grep {{ nic.split()[0].split('=')[1] | trim("'") }} | awk '{print $2}' | sed 's/://'
-      register: nic_results
-
-    - name: Build network→device map
-      set_fact:
-        net_dev_map: "{{ dict(vm_nics | map('regex_replace','.*bridge=\\'(.*?)\\'.*','\\1') | zip(nic_results.results | map(attribute='stdout'))) }}"
-
-    - name: Show network→device map
-      debug:
-        var: net_dev_map
-
-    - name: Configure cluster NIC
-      delegate_to: "{{ vm_host }}"
-      vars:
-        ansible_user: "{{ admin_id }}"
-        ansible_ssh_pass: "{{ admin_set }}"
-        ansible_host: "{{ vm_fqdn }}"
-      become: true
-      shell: >
-        nmcli con modify {{ net_dev_map['br-cluster'] }} ipv4.addresses {{ cluster_ip_addr }}/{{ ip_cid }}
-        nmcli con modify {{ net_dev_map['br-cluster'] }} ipv4.gateway {{ cluster_gateway }}
-        nmcli con modify {{ net_dev_map['br-cluster'] }} ipv4.method manual
-        nmcli con modify {{ net_dev_map['br-cluster'] }} ipv4.never-default yes
-        nmcli con modify {{ net_dev_map['br-cluster'] }} ipv6.method ignore
-        nmcli con modify {{ net_dev_map['br-cluster'] }} connection.autoconnect yes
-        nmcli con up {{ net_dev_map['br-cluster'] }}
-
-    - name: Configure NAT NIC
-      vars:
-        ansible_user: "{{ admin_id }}"
-        ansible_ssh_pass: "{{ admin_set }}"
-        ansible_host: "{{ vm_fqdn }}"
-      delegate_to: "{{ vm_host }}"
-      become: true
-      shell: >
-        nmcli con modify {{ net_dev_map['br-nat'] }} ipv4.method auto
-        nmcli con modify {{ net_dev_map['br-nat'] }} ipv4.never-default yes
-        nmcli con modify {{ net_dev_map['br-nat'] }} ipv6.method ignore
-        nmcli con modify {{ net_dev_map['br-nat'] }} connection.autoconnect yes
-        nmcli con up {{ net_dev_map['br-nat'] }}
+- name: Configure cluster NIC
+  delegate_to: "{{ vm_host }}"
+  vars:
+    ansible_user: "{{ admin_id }}"
+    ansible_ssh_pass: "{{ admin_set }}"
+    ansible_host: "{{ vm_fqdn }}" 
+  become: true
+  shell: |
+    if nmcli -t -f NAME,DEVICE con show | grep -q enp2s0; then
+      nmcli con modify enp2s0 ipv4.addresses {{ cluster_ip_addr }}/{{ ip_cid }}
+      nmcli con modify enp2s0 ipv4.gateway {{ cluster_gateway }}
+      nmcli con modify enp2s0 ipv4.method manual
+      nmcli con modify enp2s0 ipv4.never-default yes
+      nmcli con modify enp2s0 ipv6.method ignore
+      nmcli con modify enp2s0 connection.autoconnect yes
+      nmcli con up enp2s0
+    fi
+    if nmcli -t -f NAME,DEVICE con show | grep -q enp3s0; then
+      nmcli con modify enp3s0 ipv4.method auto
+      nmcli con modify enp3s0 ipv4.never-default yes
+      nmcli con modify enp3s0 ipv6.method ignore
+      nmcli con modify enp3s0 connection.autoconnect yes
+      nmcli con up enp3s0
+    fi
   when: "'helper_nodes' in group_names or 'cluster_nodes' in group_names"
+  no_log: true
+

@@ -14,7 +14,6 @@
       done
     '
 
-
 - name: Render user creation script
   template:
     src: user_create_script.j2

@@ -38,24 +38,3 @@
 - name: Execute user creation script
   become: true
   shell: /tmp/user_create_script.sh
-  # vars:
-  #   ansible_user: "{{ admin_id }}"
-  #   ansible_ssh_pass: "{{ admin_set }}"
-  #   ansible_host: "{{ vm_fqdn }}"
-
-
-# - name: Execute user creation script on {{ vm_fqdn }}
-#   delegate_to: localhost
-#   become: false
-#   shell: |
-#     ssh -o BatchMode=yes \
-#         -o UserKnownHostsFile=/dev/null \
-#         -o StrictHostKeyChecking=no \
-#         -o ConnectTimeout=5 \
-#         {{ admin_id }}@{{ vm_fqdn }} <<'EOF'
-#         {{ user_create_script }}
-#     EOF
-#   vars:
-#     ansible_user: "{{ admin_id }}"
-#     ansible_ssh_pass: "{{ admin_set }}"
-#     ansible_host: "{{ vm_fqdn }}"
