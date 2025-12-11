@@ -1,3 +1,0 @@
-- name: Re-evaluate bootstrap readiness
-  debug:
-    msg: "Rechecking bootstrap readiness for {{ inventory_hostname }}"

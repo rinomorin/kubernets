@@ -1,3 +1,0 @@
-# roles/kube_dispatcher_dashboard_render/tasks/main.yml
-- name: Include dashboard rendering logic
-  import_tasks: Render_Dashboard.yml
