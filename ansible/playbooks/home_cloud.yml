@@ -1,10 +1,12 @@
----
 - hosts: all
   gather_facts: false
-  vars_files:
-    - vars/ipa.yml
+  vars:
+    vm_build_state: "{{ global_vm_build_state | default('skipped') }}"
   roles:
-    - role: kvm_vm_deploy
-      vars:
-        host_type: "ipa-server"
-        sub_type: "ca-intermediate"
+    - helpers
+
+# ---
+# - hosts: all
+#   gather_facts: false
+#   roles:
+#     - role: ipa_dns

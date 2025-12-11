@@ -1,0 +1,7 @@
+- name: Add SRV records
+  loop: "{{ ipa_services }}"
+  loop_control:
+    label: "{{ item.name }}"
+  command: >
+    ipa dnsrecord-add {{ dns_zone }}
+    {{ item.name }} --srv-rec="{{ item.port }} 0 100 {{ ansible_fqdn }}"

@@ -1,0 +1,15 @@
+- name: Check if VPN prep flag exists
+  stat:
+    path: "/var/log/vpn_ready/{{ inventory_hostname }}.json"
+  register: vpn_flag
+
+- name: Emit VPN health summary
+  copy:
+    dest: "/var/log/vpn_health/{{ inventory_hostname }}.json"
+    content: |
+      {
+        "host": "{{ inventory_hostname }}",
+        "vpn_ready_flag": {{ vpn_flag.stat.exists }},
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  delegate_to: localhost

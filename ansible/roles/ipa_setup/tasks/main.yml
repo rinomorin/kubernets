@@ -3,48 +3,51 @@
   set_fact:
     ipa_master: "{{ groups['ca'][0] }}"
     ipa_master_ip: "{{ hostvars[groups['ca'][0]].ansible_host }}"
+    ipa_ca_intermediate: "{{ groups['ca_intermediate'][0] }}"
+    ipa_ca_intermediate_ip: "{{ hostvars[groups['ca_intermediate'][0]].ansible_host }}"
+    ipa_helper: "{{ groups['helpers'][0] }}"
+    ipa_helper_ip: "{{ hostvars[groups['helpers'][0]].ansible_host }}"
   run_once: true
   delegate_to: localhost
 
-- name: Set ipa intermediate system globally
-  set_fact:
-    ipa_ca_intermediate: "{{ groups['ca_intermediate'][0] }}"
-    ipa_ca_intermediate_ip: "{{ hostvars[groups['ca_intermediate'][0]].ansible_host }}"
-  run_once: true
-  delegate_to: localhost
+- name: Check if ipa-server package is installed
+  become: yes
+  shell: "rpm -q ipa-server || true"
+  register: ipa_pkg
+  changed_when: false
+  when:
+    - "'ca' in group_names or 'ca_intermediate' in group_names"
+- debug: msg="{{ ipa_pkg }}"
+  when:
+    - "'ca' in group_names or 'ca_intermediate' in group_names"
+- name: Import IPA status check tasks
+  import_tasks: check_ipa.yml
+  when:
+    - "'ca' in group_names or 'ca_intermediate' in group_names"
+    - ipa_pkg.stdout is not search("not installed")
+
+- debug: 
+    msg:
+      - "global_vm_build_state {{ global_vm_build_state}}"
+      - "vm_build_state {{ vm_build_stage }}"
 
 - name: set ipa ca
   block:
     - name: current IPA 
-      debug: msg="{{ inventory_hostname }} ipa_role is {{ ipa_role }}"
+      debug: 
+        msg: |
+          {{ inventory_hostname }} ipa_role is {{ ipa_role }}
+          {{ group_names }}
 
     - name: Include install.yml
       import_tasks: install.yml
 
     - name: configure ipa ca
       import_tasks: ipa_ca.yml
-
-    # - name: configure certificates
-    #   import_tasks: configure_certificates.yml
-    
-    # - name: configure dns
-    #   import_tasks: configure_dns.yml
-
-    # - name: configure dhcp
-    #   import_tasks: configure_dhcp.yml
-
-    # - name: configure ntp
-    #   import_tasks: configure_ntp.yml
-
-    # - name: configure krb5
-    #   import_tasks: configure_krb5.yml
-
-    # - name: finalize ipa ca
-    #   import_tasks: finalize_ipa.yml
-
   when: 
     - "'ca' in group_names"
-    - vm_build_state == "scanned" or vm_build_state == "non-compliant" or vm_build_state == "compliant"
+    - vm_build_state in ["scanned","non-compliant","compliant"]
+
 
 # role/ipa_setup/tasks/main.yml
 - name: set ipa ca_intermediate
@@ -58,86 +61,24 @@
     - name: Prep for ca intermediate
       import_tasks: ipa_ca_intermediate.yml
 
-
   when: 
     - "'ca_intermediate' in group_names"
-    - vm_build_state == "scanned" or vm_build_state == "non-compliant" or vm_build_state == "compliant"
+    - vm_build_state in ["scanned","non-compliant","compliant"]
 
-# - name: set ipa ca
-#   block:
-#     - name: current IPA 
-#       debug: msg="{{ inventory_hostname }} ipa_role is {{ ipa_role }}"
+- debug: 
+    msg:
+      - "global_vm_build_state {{ global_vm_build_state}}"
+      - "vm_build_state {{ vm_build_stage }}"
 
-#     - name: Include install.yml
-#       import_tasks: install.yml
+- name: Secure final ipa host
+  import_tasks: secops.yml
+  when: 
+    - "'ca' in group_names or 'ca_intermediate' in group_names"
+    - vm_build_stage in ["scanned", "non-compliant", "compliant"]
+  
+- name: update global_vm_build_state
+  set_fact:
+    global_vm_build_state: "{{ vm_build_stage }}"
+    vm_build_state: "{{ vm_build_stage }}"
 
-#   when: "'ca_intermediate' in group_names"
 
-# - name: current IPA 
-#   debug: msg="{{ inventory_hostname }} ipa_role is {{ ipa_role }}"
-
-# - name: Check if IPA is already installed
-#   stat:
-#     path: /etc/ipa/default.conf
-#   register: ipa_installed
-
-# - name: Log IPA install status
-#   debug:
-#     msg: "IPA already installed on {{ inventory_hostname }}, skipping install"
-#   when: ipa_installed.stat.exists
-
-# - name: Show ipa_role from hostvars
-#   debug:
-#     msg: "hostvars role for {{ inventory_hostname }} is {{ hostvars[inventory_hostname].ipa_role }}"
-
-# - name: Skip IPA master install if already configured
-#   debug:
-#     msg: |
-#       IPA master already installed on {{ inventory_hostname }}, skipping configure_master.yml
-#       ipa_role={{ hostvars[inventory_hostname].ipa_role }}
-#       status={{ ipa_installed.stat.exists }}
-#   when:
-#     - hostvars[inventory_hostname].ipa_role == "master"
-#     - ipa_installed.stat.exists
-
-# - name: Include configure_master.yml
-#   include_tasks: configure_master.yml
-#   when:
-#     - hostvars[inventory_hostname].ipa_role == "master"
-#     - not ipa_installed.stat.exists
-
-# - name: Skip IPA replica install if already configured
-#   debug:
-#     msg: "IPA replica already installed on {{ inventory_hostname }}, skipping configure_replica.yml"
-#   when:
-#     - hostvars[inventory_hostname].ipa_role == "replica"
-#     - ipa_installed.stat.exists
-
-# - name: Include configure_replica.yml
-#   include_tasks: configure_replica.yml
-#   when:
-#     - hostvars[inventory_hostname].ipa_role == "replica"
-#     - not ipa_installed.stat.exists
-
-# - name: Emit IPA install status
-#   copy:
-#     dest: "/var/log/ipa_install_status/{{ inventory_hostname }}.json"
-#     content: |
-#       {
-#         "role": "{{ ipa_role }}",
-#         "installed": {{ ipa_installed.stat.exists }},
-#         "timestamp": "{{ ansible_date_time.iso8601 }}"
-#       }
-#   delegate_to: localhost
-
-# - name: Configure IPA master
-#   include_tasks: configure_master.yml
-#   when: hostvars[inventory_hostname].ipa_role | trim == "master"
-
-#   # when: ipa_role == "master"
-
-# - name: Configure IPA replica
-#   include_tasks: configure_replica.yml
-#   when: hostvars[inventory_hostname].ipa_role | trim == "replica"
-
-#   # when: ipa_role == "replica"

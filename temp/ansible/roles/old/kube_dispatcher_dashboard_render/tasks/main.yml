@@ -1,0 +1,159 @@
+- name: Load merged execution summary
+  slurp:
+    src: "/var/log/kube_dispatcher_execution_summary_merged.json"
+  delegate_to: localhost
+  register: merged_raw
+
+- name: Parse execution matrix
+  set_fact:
+    execution_matrix: >-
+      {{
+        merged_raw.content
+        | b64decode
+        | from_json
+        | default({})
+        | dict2items
+        | selectattr('key', 'equalto', 'execution_details')
+        | map(attribute='value')
+        | first
+        | default([])
+      }}
+
+- name: Render HTML dashboard with color-coded rows
+  copy:
+    dest: "/var/log/kube_dispatcher_dashboard.html"
+    content: |
+      <html>
+      <head>
+        <title>Kube Promotion Lifecycle Dashboard</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h2 { color: #2c3e50; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+          th { background-color: #f4f4f4; }
+          tr.unified { background-color: #e8f5e9; }
+          tr.override { background-color: #e3f2fd; }
+          tr.re_promotion { background-color: #fffde7; }
+        </style>
+      </head>
+      <body>
+        <h2>Kube Promotion Lifecycle Dashboard</h2>
+        <table>
+          <tr>
+            <th>Host</th>
+            <th>Role</th>
+            <th>Promotion Source</th>
+            <th>Triggered Roles</th>
+            <th>Timestamp</th>
+          </tr>
+          {% for node in execution_matrix %}
+          <tr class="{{ node.promotion_source }}">
+            <td>{{ node.host }}</td>
+            <td>{{ node.role }}</td>
+            <td>{{ node.promotion_source }}</td>
+            <td>{{ node.triggered_roles | join(', ') }}</td>
+            <td>{{ node.timestamp }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </body>
+      </html>
+  delegate_to: localhost
+- name: Render HTML dashboard with filters, sorting, and search
+  copy:
+    dest: "/var/log/kube_dispatcher_dashboard.html"
+    content: |
+      <html>
+      <head>
+        <title>Kube Promotion Lifecycle Dashboard</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h2 { color: #2c3e50; }
+          select, input { margin-right: 10px; padding: 5px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+          th { background-color: #f4f4f4; cursor: pointer; }
+          tr.unified { background-color: #e8f5e9; }
+          tr.override { background-color: #e3f2fd; }
+          tr.re_promotion { background-color: #fffde7; }
+        </style>
+        <script>
+          function filterTable() {
+            const sourceFilter = document.getElementById("sourceFilter").value.toLowerCase();
+            const searchInput = document.getElementById("searchInput").value.toLowerCase();
+            const rows = document.querySelectorAll("tbody tr");
+            rows.forEach(row => {
+              const host = row.cells[0].innerText.toLowerCase();
+              const role = row.cells[1].innerText.toLowerCase();
+              const source = row.className.toLowerCase();
+              const matchesSource = (sourceFilter === "all" || source === sourceFilter);
+              const matchesSearch = (host.includes(searchInput) || role.includes(searchInput));
+              row.style.display = (matchesSource && matchesSearch) ? "" : "none";
+            });
+          }
+
+          function sortTable(n) {
+            const table = document.getElementById("dashboardTable");
+            let switching = true, dir = "asc", switchcount = 0;
+            while (switching) {
+              switching = false;
+              const rows = table.rows;
+              for (let i = 1; i < rows.length - 1; i++) {
+                let shouldSwitch = false;
+                const x = rows[i].getElementsByTagName("TD")[n];
+                const y = rows[i + 1].getElementsByTagName("TD")[n];
+                if ((dir === "asc" && x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) ||
+                    (dir === "desc" && x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase())) {
+                  shouldSwitch = true;
+                  break;
+                }
+              }
+              if (shouldSwitch) {
+                rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                switching = true;
+                switchcount++;
+              } else if (switchcount === 0 && dir === "asc") {
+                dir = "desc";
+                switching = true;
+              }
+            }
+          }
+        </script>
+      </head>
+      <body>
+        <h2>Kube Promotion Lifecycle Dashboard</h2>
+        <label for="sourceFilter">Filter by Promotion Source:</label>
+        <select id="sourceFilter" onchange="filterTable()">
+          <option value="all">All</option>
+          <option value="unified">Unified</option>
+          <option value="override">Override</option>
+          <option value="re_promotion">Re-promotion</option>
+        </select>
+        <label for="searchInput">Search Hostname or Role:</label>
+        <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="e.g. worker01 or helper">
+        <table id="dashboardTable">
+          <thead>
+            <tr>
+              <th onclick="sortTable(0)">Host</th>
+              <th onclick="sortTable(1)">Role</th>
+              <th onclick="sortTable(2)">Promotion Source</th>
+              <th onclick="sortTable(3)">Triggered Roles</th>
+              <th onclick="sortTable(4)">Timestamp</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for node in execution_matrix %}
+            <tr class="{{ node.promotion_source }}">
+              <td>{{ node.host }}</td>
+              <td>{{ node.role }}</td>
+              <td>{{ node.promotion_source }}</td>
+              <td>{{ node.triggered_roles | join(', ') }}</td>
+              <td>{{ node.timestamp }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </body>
+      </html>
+  delegate_to: localhost

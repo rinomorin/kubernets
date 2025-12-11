@@ -1,0 +1,328 @@
+
+- name: Test password-based SSH login from localhost to {{ vm_host }}
+  delegate_to: localhost
+  become: false
+  shell: |
+    sshpass -p '{{ secops_pwd }}' ssh -o BatchMode=no \
+      -o StrictHostKeyChecking=no \
+      -o ConnectTimeout=5 \
+      {{ secops_id }}@{{ vm_host }} 'echo "✅ Password login successful"'
+  register: ssh_password_test
+  failed_when: "'Permission denied' in ssh_password_test.stderr"
+  changed_when: false
+
+- name: Set remote login user to {{ secops_id }} for remaining tasks
+  set_fact:
+    ansible_user: "{{ secops_id }}"
+    ansible_become: true
+
+- name: Confirm key-based login works from localhost
+  delegate_to: localhost
+  become: false
+  shell: |
+    ssh -o BatchMode=yes \
+        -o StrictHostKeyChecking=no \
+        -o ConnectTimeout=5 \
+        {{ secops_id }}@{{ vm_host }} 'echo "✅ Key-based login successful"'
+  register: ssh_key_test
+  failed_when: "'Permission denied' in ssh_key_test.stderr"
+  changed_when: false
+
+- name: Check CIS scan state
+  vars:
+    ansible_user: "{{ secops_id }}"
+    ansible_ssh_pass: "{{ secops_pwd }}"
+    ansible_host: "{{ vm_fqdn }}"
+  delegate_to: "{{ vm_host }}"
+  become: true
+  shell: |
+    if [ -f /var/log/oscap.log ]; then
+      echo "scanned"
+    else
+      echo "built"
+    fi
+  register: cis_check
+  changed_when: false
+
+- name: Check if oscap log exists-
+  vars:
+    ansible_user: "{{ secops_id }}"
+    ansible_ssh_pass: "{{ secops_pwd }}"
+    ansible_host: "{{ vm_fqdn }}"
+  delegate_to: "{{ vm_host }}"
+  become: true
+  shell: ls /var/log/oscap.log
+  register: cis_check2
+  changed_when: false
+  failed_when: false
+
+- name: Show CIS scan state debug
+  debug:
+    var: cis_check
+
+- name: Show CIS scan state
+  debug:
+    msg: "CIS scan state is {{ cis_check.stdout }}"
+
+- name: Run initiate oscap scan via SSH
+  become: true
+  vars:
+    ansible_user: "{{ admin_id }}"
+    ansible_ssh_pass: "{{ admin_set }}"
+    ansible_host: "{{ vm_fqdn }}"
+  delegate_to: "{{ vm_host }}"
+  ignore_errors: true
+  failed_when: false
+  shell: |  
+    /usr/bin/oscap xccdf eval \
+    --profile xccdf_org.ssgproject.content_profile_cis \
+    --report /tmp/{{inventory_hostname_short}}-cis2-report.html \
+    /usr/share/xml/scap/ssg/content/ssg-rl9-ds.xml > /var/log/oscap.log
+  when:
+    - cis_check.stdout == "built"
+    - "'oscap.log' not in (cis_check2.stdout | default(''))"
+
+- name: get oscap log fail count if exists
+  become: true
+  vars:
+    ansible_user: "{{ admin_id }}"
+    ansible_ssh_pass: "{{ admin_set }}"
+    ansible_host: "{{ vm_fqdn }}"
+  delegate_to: "{{ vm_host }}"
+  shell: |
+    if [ -f /var/log/oscap.log ]; then
+      grep "Result[[:space:]]\+fail" /var/log/oscap.log|wc -l
+    else
+      echo "no oscap log found"
+    fi
+  register: oscap_log_content
+  changed_when: false
+  failed_when: false
+  when:
+    - cis_check.stdout == "built"
+    - "'oscap.log' not in (cis_check2.stdout | default(''))"
+
+- name: Show oscap log content
+  debug:
+    msg: "oscap_log_content is {{ oscap_log_content.stdout }}"
+  when:
+    - cis_check.stdout == "built"   
+    - "'oscap.log' in (cis_check2.stdout| default(''))"
+
+- name: Compliance for ipa servers
+  become: true
+  vars:
+    ansible_user: "{{ admin_id }}"
+    ansible_ssh_pass: "{{ admin_set }}"
+    ansible_host: "{{ vm_fqdn }}"
+  delegate_to: "{{ vm_host }}"
+  block:
+    - name: Run ca oscap initial scan (initial)
+      ignore_errors: true
+      failed_when: false
+      shell: |
+        /usr/bin/oscap xccdf eval \
+        --profile xccdf_org.ssgproject.content_profile_cis \
+        --report /root/rocky9-cis2-report2.html \
+        --skip-rule xccdf_org.ssgproject.content_rule_sudo_require_authentication \
+        --skip-rule xccdf_org.ssgproject.content_rule_grub2_password \
+        --skip-rule xccdf_org.ssgproject.content_rule_package_bind_removed \
+        --skip-rule xccdf_org.ssgproject.content_rule_package_httpd_removed \
+        --skip-rule xccdf_org.ssgproject.content_rule_package_openldap-clients_removed \
+        --skip-rule xccdf_org.ssgproject.content_rule_service_rpcbind_disabled \
+        --skip-rule xccdf_org.ssgproject.content_rule_service_nfs_disabled \
+        --skip-rule xccdf_org.ssgproject.content_rule_sshd_disable_gssapi_auth \
+        --skip-rule xccdf_org.ssgproject.content_rule_no_empty_passwords \
+        --skip-rule xccdf_org.ssgproject.content_rule_package_samba_removed \
+        --report /tmp/{{ inventory_hostname_short }}-cis2-report.html \
+        /usr/share/xml/scap/ssg/content/ssg-rl9-ds.xml > /var/log/oscap.log
+      when:
+        - cis_check.stdout == "built"
+        - (oscap_log_content.stdout | int) > 2
+
+    - name: Run ca oscap scan (remediation)
+      ignore_errors: true
+      failed_when: false
+      shell: |
+        /usr/bin/oscap xccdf eval \
+        --profile xccdf_org.ssgproject.content_profile_cis \
+        --report /root/rocky9-cis2-report3.html \
+        --skip-rule xccdf_org.ssgproject.content_rule_sudo_require_authentication \
+        --skip-rule xccdf_org.ssgproject.content_rule_grub2_password \
+        --skip-rule xccdf_org.ssgproject.content_rule_package_bind_removed \
+        --skip-rule xccdf_org.ssgproject.content_rule_package_httpd_removed \
+        --skip-rule xccdf_org.ssgproject.content_rule_package_openldap-clients_removed \
+        --skip-rule xccdf_org.ssgproject.content_rule_service_rpcbind_disabled \
+        --skip-rule xccdf_org.ssgproject.content_rule_service_nfs_disabled \
+        --skip-rule xccdf_org.ssgproject.content_rule_sshd_disable_gssapi_auth \
+        --skip-rule xccdf_org.ssgproject.content_rule_no_empty_passwords \
+        --skip-rule xccdf_org.ssgproject.content_rule_package_samba_removed \
+        --report /tmp/{{ inventory_hostname_short }}-cis2-report.html \
+        --remediate \
+        /usr/share/xml/scap/ssg/content/ssg-rl9-ds.xml > /var/log/oscap.log
+      when:
+        - cis_check.stdout == "built"
+        - (oscap_log_content.stdout | int) > 2
+
+    - name: Run ca oscap initial scan
+      ignore_errors: true
+      failed_when: false
+      shell: |
+        /usr/bin/oscap xccdf eval \
+        --profile xccdf_org.ssgproject.content_profile_cis \
+        --report /root/rocky9-cis2-report2.html \
+        --skip-rule xccdf_org.ssgproject.content_rule_sudo_require_authentication \
+        --skip-rule xccdf_org.ssgproject.content_rule_grub2_password \
+        --skip-rule xccdf_org.ssgproject.content_rule_package_bind_removed \
+        --skip-rule xccdf_org.ssgproject.content_rule_package_httpd_removed \
+        --skip-rule xccdf_org.ssgproject.content_rule_package_openldap-clients_removed \
+        --skip-rule xccdf_org.ssgproject.content_rule_service_rpcbind_disabled \
+        --skip-rule xccdf_org.ssgproject.content_rule_service_nfs_disabled \
+        --skip-rule xccdf_org.ssgproject.content_rule_sshd_disable_gssapi_auth \
+        --skip-rule xccdf_org.ssgproject.content_rule_no_empty_passwords \
+        --skip-rule xccdf_org.ssgproject.content_rule_package_samba_removed \
+        --report /tmp/{{ inventory_hostname_short }}-cis2-report.html \
+        /usr/share/xml/scap/ssg/content/ssg-rl9-ds.xml > /var/log/oscap.log
+      when:
+        - cis_check.stdout == "built"
+        - (oscap_log_content.stdout | int) > 2
+  when: "'ca' in group_names or 'ca_intermediate' in group_names"
+
+- name: Compliance for helper_nodes
+  become: true
+  vars:
+    ansible_user: "{{ admin_id  }}"
+    ansible_ssh_pass: "{{ admin_set }}"
+    ansible_host: "{{ vm_fqdn }}"
+  delegate_to: "{{ vm_host }}"
+  block:
+    - name: Run helper oscap initial
+      ignore_errors: true
+      failed_when: false
+      shell: |
+        /usr/bin/oscap xccdf eval \
+          --profile xccdf_org.ssgproject.content_profile_cis \
+          --report /root/rocky9-cis2-report2.html \
+          --skip-rule xccdf_org.ssgproject.content_rule_sudo_require_authentication \
+          --skip-rule xccdf_org.ssgproject.content_rule_grub2_password \
+          --skip-rule xccdf_org.ssgproject.content_rule_package_openldap-clients_removed \
+          --skip-rule xccdf_org.ssgproject.content_rule_service_rpcbind_disabled \
+          --skip-rule xccdf_org.ssgproject.content_rule_sshd_disable_gssapi_auth \
+        /usr/share/xml/scap/ssg/content/ssg-rl9-ds.xml > /var/log/oscap.log
+      when:
+        - cis_check.stdout == "built"
+        - (oscap_log_content.stdout | int) > 2
+    
+    - name: Run helper oscap initial
+      ignore_errors: true
+      failed_when: false
+      shell: |
+        /usr/bin/oscap xccdf eval \
+          --profile xccdf_org.ssgproject.content_profile_cis \
+          --report /root/rocky9-cis2-report2.html \
+          --skip-rule xccdf_org.ssgproject.content_rule_sudo_require_authentication \
+          --skip-rule xccdf_org.ssgproject.content_rule_grub2_password \
+          --skip-rule xccdf_org.ssgproject.content_rule_package_openldap-clients_removed \
+          --skip-rule xccdf_org.ssgproject.content_rule_service_rpcbind_disabled \
+          --skip-rule xccdf_org.ssgproject.content_rule_sshd_disable_gssapi_auth \
+          --remediate \
+        /usr/share/xml/scap/ssg/content/ssg-rl9-ds.xml > /var/log/oscap.log
+      when:
+        - cis_check.stdout == "built"
+        - (oscap_log_content.stdout | int) > 2
+
+
+    - name: Run helper oscap initial scan (Final)
+      ignore_errors: true
+      failed_when: false
+      vars:
+        ansible_user: "{{ admin_id  }}"
+        ansible_ssh_pass: "{{ admin_set }}"
+        ansible_host: "{{ vm_fqdn }}"
+      delegate_to: "{{ vm_host }}"
+      shell: |
+        /usr/bin/oscap xccdf eval \
+          --profile xccdf_org.ssgproject.content_profile_cis \
+          --report /root/rocky9-cis2-report2.html \
+          --skip-rule xccdf_org.ssgproject.content_rule_sudo_require_authentication \
+          --skip-rule xccdf_org.ssgproject.content_rule_grub2_password \
+          --skip-rule xccdf_org.ssgproject.content_rule_package_openldap-clients_removed \
+          --skip-rule xccdf_org.ssgproject.content_rule_service_rpcbind_disabled \
+            --skip-rule xccdf_org.ssgproject.content_rule_sshd_disable_gssapi_auth \
+          /usr/share/xml/scap/ssg/content/ssg-rl9-ds.xml > /var/log/oscap.log
+      when:
+        - cis_check.stdout == "built"
+        - (oscap_log_content.stdout | int) > 2
+  when: "'helper_nodes' in group_names"
+
+- name:   load oscap log fail count if exists
+  become: true
+  delegate_to: "{{ vm_host }}"
+  vars:
+    ansible_user: "{{ admin_id }}"
+    ansible_ssh_pass: "{{ admin_set }}"
+    ansible_host: "{{ vm_fqdn }}"
+  shell: |
+    if [ -f /var/log/oscap.log ]; then
+      grep "Result[[:space:]]\+fail" /var/log/oscap.log|wc -l
+    else
+      echo -1
+    fi
+  register: oscap_log_content
+  changed_when: false
+  failed_when: false
+  
+- name: Show oscap log content
+  debug:
+    msg: "oscap_log_content is {{ oscap_log_content.stdout }}"
+    
+- name: violation default 
+  set_fact:
+    violation: 0
+    cis2_scan: "scanned"
+
+- name: set oscap log content to 0 if no log found
+  set_fact:
+    violation: -1
+  when: oscap_log_content.stdout == "no oscap log found"
+
+- name: set oscap log content to 0 if no log found
+  set_fact:
+    violation: "{{ (oscap_log_content.stdout | int) }}"
+  when: (oscap_log_content.stdout | int) > 0
+
+- name: show oscap log content
+  debug:
+    msg: "oscap_log_content is {{ violation }}"
+
+- name: Set build Stage (pass compliant)
+  set_fact:
+    vm_build_state: "compliant"
+    vm_build_stage: "compliant"
+  when:
+    - cis2_scan == "scanned" 
+    - violation == 0
+  
+- name: Set build Stage (pass with findings)
+  set_fact:
+    vm_build_state: "non-compliant"
+    vm_build_stage: "pass with {{ violation }} findings"
+  when:
+    - cis2_scan == "scanned" 
+    - violation|int >= 1 and violation|int <= 2
+
+- name: Set build Stage (fail non-compliant)
+  set_fact:
+    vm_build_state: "non-compliant"
+    vm_build_stage: "failed with {{ violation }} findings"
+  when:
+    - cis2_scan == "scanned" 
+    - violation|int >= 3
+
+- name: Set build Stage (fail non-compliant)
+  set_fact:
+    vm_build_state: "non-compliant"
+    vm_build_stage: "failed to run oscap"
+  when:
+    - cis2_scan == "scanned" 
+    - violation|int == -1

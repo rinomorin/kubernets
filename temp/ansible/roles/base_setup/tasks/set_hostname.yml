@@ -1,0 +1,3 @@
+- name: Set hostname using inventory or override map
+  hostname:
+    name: "{{ base_host_map[inventory_hostname] | default(inventory_hostname) }}"

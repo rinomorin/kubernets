@@ -1,0 +1,67 @@
+- name: Load re-promotion summary
+  slurp:
+    src: "/var/log/kube_dispatcher_repromotion_summary.json"
+  delegate_to: localhost
+  register: repromotion_raw
+
+- name: Parse re-promoted nodes
+  set_fact:
+    repromoted_nodes: >-
+      {{
+        repromotion_raw.content
+        | b64decode
+        | from_json
+        | default({})
+        | dict2items
+        | selectattr('key', 'equalto', 're_promoted_nodes')
+        | map(attribute='value')
+        | first
+        | default([])
+      }}
+
+- name: Load node matrix
+  slurp:
+    src: "/var/log/kube_dispatcher_matrix/{{ inventory_hostname }}.json"
+  delegate_to: localhost
+  register: node_matrix_raw
+
+- name: Parse node matrix
+  set_fact:
+    node_matrix: "{{ node_matrix_raw.content | b64decode | from_json }}"
+
+- name: Trigger helper next-stage logic
+  include_tasks: next_stage_helper.yml
+  when:
+    - inventory_hostname in repromoted_nodes
+    - node_matrix.kube_role == "helper"
+
+- name: Trigger master next-stage logic
+  include_tasks: next_stage_master.yml
+  when:
+    - inventory_hostname in repromoted_nodes
+    - node_matrix.kube_role == "master"
+
+- name: Trigger worker next-stage logic
+  include_tasks: next_stage_worker.yml
+  when:
+    - inventory_hostname in repromoted_nodes
+    - node_matrix.kube_role == "worker"
+
+- name: Emit re-promotion execution log
+  copy:
+    dest: "/var/log/kube_execution_summary/{{ inventory_hostname }}.json"
+    content: |
+      {
+        "host": "{{ inventory_hostname }}",
+        "role": "{{ node_matrix.kube_role }}",
+        "promoted": true,
+        "promotion_source": "re_promotion",
+        "triggered_roles": {{ (
+          ['vpn_access_prep'] if node_matrix.kube_role == 'helper' else []
+        ) + (
+          ['kube_service_deploy', 'monitoring_agent_deploy'] if node_matrix.kube_role in ['master', 'worker'] else []
+        ) | to_json }},
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  when: inventory_hostname in repromoted_nodes
+  delegate_to: localhost

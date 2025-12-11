@@ -1,0 +1,48 @@
+- name: Load final promotion summary
+  slurp:
+    src: "/var/log/kube_final_promotion_summary.json"
+  delegate_to: localhost
+  register: final_promotion_raw
+
+- name: Parse final promotable nodes
+  set_fact:
+    final_promotable_nodes: >-
+      {{
+        final_promotion_raw.content
+        | b64decode
+        | from_json
+        | default({})
+        | dict2items
+        | selectattr('key', 'equalto', 'promotable_nodes')
+        | map(attribute='value')
+        | first
+        | default([])
+      }}
+
+- name: Load node matrix
+  slurp:
+    src: "/var/log/kube_dispatcher_matrix/{{ inventory_hostname }}.json"
+  delegate_to: localhost
+  register: node_matrix_raw
+
+- name: Parse node matrix
+  set_fact:
+    node_matrix: "{{ node_matrix_raw.content | b64decode | from_json }}"
+
+- name: Trigger helper next-stage logic
+  include_tasks: next_stage_helper.yml
+  when:
+    - inventory_hostname in final_promotable_nodes
+    - node_matrix.kube_role == "helper"
+
+- name: Trigger master next-stage logic
+  include_tasks: next_stage_master.yml
+  when:
+    - inventory_hostname in final_promotable_nodes
+    - node_matrix.kube_role == "master"
+
+- name: Trigger worker next-stage logic
+  include_tasks: next_stage_worker.yml
+  when:
+    - inventory_hostname in final_promotable_nodes
+    - node_matrix.kube_role == "worker"

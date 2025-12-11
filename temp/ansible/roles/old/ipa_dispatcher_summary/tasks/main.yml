@@ -1,0 +1,15 @@
+- name: Emit dispatcher summary
+  copy:
+    dest: "/var/log/ipa_dispatcher_summary/{{ inventory_hostname }}.json"
+    content: |
+      {
+        "host": "{{ inventory_hostname }}",
+        "role": "{{ ipa_role | default('unknown') }}",
+        "verified": {{ ipa_verified | default(false) }},
+        "compliant": {{ ipa_compliance_status | default(false) }},
+        "replication_ok": {{ ipa_replication_ok | default(false) }},
+        "dns_zone_count": {{ ipa_dns_zone_count | default(0) }},
+        "kerberos_ticket_valid": {{ ipa_kerberos_ticket_valid | default(false) }},
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  delegate_to: localhost

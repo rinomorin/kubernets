@@ -1,0 +1,14 @@
+- name: Scaffold VPN access logic
+  debug:
+    msg: "VPN access prep triggered for {{ inventory_hostname }} — awaiting cloud.morinsoft.ca readiness"
+
+- name: Emit VPN readiness flag
+  copy:
+    dest: "/var/log/vpn_ready/{{ inventory_hostname }}.json"
+    content: |
+      {
+        "host": "{{ inventory_hostname }}",
+        "vpn_ready": true,
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  delegate_to: localhost

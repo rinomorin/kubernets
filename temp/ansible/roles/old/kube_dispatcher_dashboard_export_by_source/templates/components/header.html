@@ -1,0 +1,83 @@
+<header>
+  <h1>{{ dashboard_title }}</h1>
+
+  <div class="filter-controls">
+    <button onclick="toggleFilters()">🎛️ Toggle Filters</button>
+    <button onclick="resetFilters()">♻️ Reset Filters</button>
+    </div>
+
+    <div id="filterPanel" data-section="filters" class="collapsible">
+    <label>
+        Role:
+        <select data-filter="role">
+        <option value="">All</option>
+        <option value="web">Web</option>
+        <option value="db">Database</option>
+        <option value="cache">Cache</option>
+        </select>
+    </label>
+
+    <label>
+        Source:
+        <select data-filter="source">
+        <option value="">All</option>
+        <option value="internal">Internal</option>
+        <option value="external">External</option>
+        </select>
+    </label>
+
+    <label>
+        Host contains:
+        <input type="text" data-filter="host" placeholder="e.g. node01" />
+    </label>
+
+    <button onclick="applyFilters()">🔍 Apply Filters</button>
+    </div>
+
+    <div class="preset-controls">
+    <label>
+        Presets:
+        <select id="presetSelector" onchange="loadSelectedPreset()">
+        <option value="">— Select Preset —</option>
+        </select>
+    </label>
+    <button onclick="saveNamedPreset()">💾 Save as New Preset</button>
+    <button onclick="deleteSelectedPreset()">🗑️ Delete Preset</button>
+    </div>
+
+   <div class="filters">
+    <label>
+        Role:
+        <select data-filter="role">
+        <option value="">All</option>
+        <option value="web">Web</option>
+        <option value="db">Database</option>
+        <option value="cache">Cache</option>
+        </select>
+    </label>
+
+    <label>
+        Source:
+        <select data-filter="source">
+        <option value="">All</option>
+        <option value="internal">Internal</option>
+        <option value="external">External</option>
+        </select>
+    </label>
+
+    <label>
+        Host contains:
+        <input type="text" data-filter="host" placeholder="e.g. node01" />
+    </label>
+
+    <button onclick="applyFilters()">🔍 Apply Filters</button>
+    </div>
+
+  <div class="controls">
+    <button onclick="clearSort()">🧹 Clear Sort</button>
+    <button onclick="restoreLastSort()">🔁 Restore Last Sort</button>
+    <button onclick="exportTable('csv')">📤 Export CSV</button>
+    <button onclick="exportTable('json')">📤 Export JSON</button>
+  </div>
+  <div id="ariaLiveRegion" aria-live="polite" style="position:absolute;left:-9999px;"></div>
+</header>

@@ -1,0 +1,58 @@
+- name: Load unified promotion summary
+  slurp:
+    src: "/var/log/kube_unified_promotion_summary.json"
+  delegate_to: localhost
+  register: unified_raw
+
+- name: Parse unified promotable nodes
+  set_fact:
+    unified_promotable_nodes: >-
+      {{
+        unified_raw.content
+        | b64decode
+        | from_json
+        | default({})
+        | dict2items
+        | selectattr('key', 'equalto', 'promotable_nodes')
+        | map(attribute='value')
+        | first
+        | default([])
+      }}
+
+- name: Load override promotion summary
+  slurp:
+    src: "/var/log/kube_override_promotion_summary.json"
+  delegate_to: localhost
+  register: override_raw
+
+- name: Parse override-promotable nodes
+  set_fact:
+    override_promotable_nodes: >-
+      {{
+        override_raw.content
+        | b64decode
+        | from_json
+        | default({})
+        | dict2items
+        | selectattr('key', 'equalto', 'override_promotable_nodes')
+        | map(attribute='value')
+        | first
+        | default([])
+      }}
+
+- name: Merge final promotion list
+  set_fact:
+    final_promotable_nodes: "{{ unified_promotable_nodes + override_promotable_nodes | unique }}"
+
+- name: Emit final promotion summary
+  copy:
+    dest: "/var/log/kube_final_promotion_summary.json"
+    content: |
+      {
+        "timestamp": "{{ ansible_date_time.iso8601 }}",
+        "promotable_nodes": {{ final_promotable_nodes | to_json }},
+        "from_unified_gate": {{ unified_promotable_nodes | to_json }},
+        "from_override": {{ override_promotable_nodes | to_json }},
+        "total": {{ final_promotable_nodes | length }}
+      }
+  delegate_to: localhost

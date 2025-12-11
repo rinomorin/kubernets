@@ -1,0 +1,54 @@
+- name: Load promotion summary
+  slurp:
+    src: "/var/log/kube_dispatcher_promotion_summary.json"
+  delegate_to: localhost
+  register: promotion_summary_raw
+
+- name: Parse promotable nodes
+  set_fact:
+    kube_promotable_nodes: "{{ promotion_summary_raw.content | b64decode | from_json | default({})['promotable_nodes'] | default([]) }}"
+
+- name: Load node matrix
+  slurp:
+    src: "/var/log/kube_dispatcher_matrix/{{ inventory_hostname }}.json"
+  delegate_to: localhost
+  register: node_matrix_raw
+
+- name: Parse node matrix
+  set_fact:
+    node_matrix: "{{ node_matrix_raw.content | b64decode | from_json }}"
+
+- name: Trigger helper next-stage logic
+  include_tasks: next_stage_helper.yml
+  when:
+    - inventory_hostname in kube_promotable_nodes
+    - node_matrix.kube_role == "helper"
+
+- name: Trigger master next-stage logic
+  include_tasks: next_stage_master.yml
+  when:
+    - inventory_hostname in kube_promotable_nodes
+    - node_matrix.kube_role == "master"
+
+- name: Trigger worker next-stage logic
+  include_tasks: next_stage_worker.yml
+  when:
+    - inventory_hostname in kube_promotable_nodes
+    - node_matrix.kube_role == "worker"
+
+- name: Trigger service deployment for promoted nodes
+  include_role:
+    name: kube_service_deploy
+  when: inventory_hostname in kube_promotable_nodes
+
+- name: Trigger monitoring agent deployment
+  include_role:
+    name: monitoring_agent_deploy
+  when: inventory_hostname in kube_promotable_nodes
+
+- name: Trigger VPN prep for helper nodes
+  include_role:
+    name: vpn_access_prep
+  when:
+    - inventory_hostname in kube_promotable_nodes
+    - node_matrix.kube_role == "helper"

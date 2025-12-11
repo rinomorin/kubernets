@@ -1,0 +1,21 @@
+- name: Re-deploy master services
+  import_role:
+    name: kube_service_deploy
+
+- name: Re-deploy monitoring agent on master node
+  import_role:
+    name: monitoring_agent_deploy
+
+- name: Emit master re-promotion marker
+  copy:
+    dest: "/var/log/kube_repromotion_flags/{{ inventory_hostname }}.json"
+    content: |
+      {
+        "host": "{{ inventory_hostname }}",
+        "role": "master",
+        "re_promotion": true,
+        "triggered_roles": ["kube_service_deploy", "monitoring_agent_deploy"],
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  delegate_to: localhost
+  

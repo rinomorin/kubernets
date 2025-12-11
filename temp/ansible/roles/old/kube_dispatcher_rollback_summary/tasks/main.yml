@@ -1,0 +1,35 @@
+- name: Gather all rollback logs
+  find:
+    paths: "/var/log/kube_rollback_log"
+    patterns: "*.json"
+  delegate_to: localhost
+  register: rollback_files
+
+- name: Read each rollback log
+  slurp:
+    src: "{{ item.path }}"
+  loop: "{{ rollback_files.files }}"
+  delegate_to: localhost
+  register: raw_rollback_data
+
+- name: Parse and aggregate rollback data
+  set_fact:
+    rollback_matrix: >-
+      {{
+        raw_rollback_data.results
+        | map(attribute='content')
+        | map('b64decode')
+        | map('from_json')
+        | list
+      }}
+
+- name: Emit dispatcher-wide rollback summary
+  copy:
+    dest: "/var/log/kube_dispatcher_rollback_summary.json"
+    content: |
+      {
+        "timestamp": "{{ ansible_date_time.iso8601 }}",
+        "rolled_back_nodes": {{ rollback_matrix | map(attribute='host') | list | to_json }},
+        "rollback_details": {{ rollback_matrix | to_nice_json }}
+      }
+  delegate_to: localhost

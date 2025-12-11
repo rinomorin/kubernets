@@ -1,0 +1,9 @@
+- name: Check resolution of aliases
+  vars:
+    alias_list: >-
+      {{
+        infra_alias_map | dict2items |
+        map(attribute='value') | map('keys') | flatten
+      }}
+  loop: "{{ alias_list }}"
+  command: dig +short {{ item }}.api.morinsoft.ca

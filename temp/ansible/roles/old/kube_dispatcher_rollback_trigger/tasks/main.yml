@@ -1,0 +1,50 @@
+- name: Load dispatcher-wide execution summary
+  slurp:
+    src: "/var/log/kube_dispatcher_execution_summary.json"
+  delegate_to: localhost
+  register: execution_summary_raw
+
+- name: Parse executed nodes
+  set_fact:
+    executed_nodes: >-
+      {{
+        execution_summary_raw.content
+        | b64decode
+        | from_json
+        | default({})
+        | dict2items
+        | selectattr('key', 'equalto', 'execution_details')
+        | map(attribute='value')
+        | first
+        | default([])
+      }}
+
+- name: Trigger rollback for this node
+  vars:
+    node_info: "{{ executed_nodes | selectattr('host', 'equalto', inventory_hostname) | list | first }}"
+  block:
+    - name: Rollback helper node
+      include_tasks: rollback_helper.yml
+      when: node_info.role == "helper"
+
+    - name: Rollback master node
+      include_tasks: rollback_master.yml
+      when: node_info.role == "master"
+
+    - name: Rollback worker node
+      include_tasks: rollback_worker.yml
+      when: node_info.role == "worker"
+
+    - name: Emit rollback log
+      copy:
+        dest: "/var/log/kube_rollback_log/{{ inventory_hostname }}.json"
+        content: |
+          {
+            "host": "{{ inventory_hostname }}",
+            "role": "{{ node_info.role }}",
+            "rollback_triggered": true,
+            "original_roles": {{ node_info.triggered_roles | to_json }},
+            "timestamp": "{{ ansible_date_time.iso8601 }}"
+          }
+      delegate_to: localhost
+  when: inventory_hostname in executed_nodes | map(attribute='host') | list

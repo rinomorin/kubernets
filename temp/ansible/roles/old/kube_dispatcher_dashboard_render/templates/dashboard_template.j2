@@ -1,0 +1,133 @@
+<html>
+<head>
+  <title>{{ title }}</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    h2 { color: #2c3e50; }
+    input, button { margin: 5px 5px 10px 0; padding: 6px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background-color: #f4f4f4; cursor: pointer; }
+    tr.unified { background-color: #e8f5e9; }
+    tr.override { background-color: #e3f2fd; }
+    tr.re_promotion { background-color: #fffde7; }
+    tr.rollback { background-color: #fdecea; }
+    tr.escalated { background-color: #fff8e1; }
+  </style>
+  <script>
+    function searchTable() {
+      const input = document.getElementById("searchInput").value.toLowerCase();
+      const rows = document.querySelectorAll("tbody tr");
+      rows.forEach(row => {
+        const host = row.cells[0].innerText.toLowerCase();
+        const role = row.cells[1].innerText.toLowerCase();
+        row.style.display = (host.includes(input) || role.includes(input)) ? "" : "none";
+      });
+    }
+
+    function sortTable(n) {
+      const table = document.getElementById("dashboardTable");
+      let switching = true, dir = "asc", switchcount = 0;
+      while (switching) {
+        switching = false;
+        const rows = table.rows;
+        for (let i = 1; i < rows.length - 1; i++) {
+          let shouldSwitch = false;
+          const x = rows[i].getElementsByTagName("TD")[n];
+          const y = rows[i + 1].getElementsByTagName("TD")[n];
+          if ((dir === "asc" && x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) ||
+              (dir === "desc" && x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase())) {
+            shouldSwitch = true;
+            break;
+          }
+        }
+        if (shouldSwitch) {
+          rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+          switching = true;
+          switchcount++;
+        } else if (switchcount === 0 && dir === "asc") {
+          dir = "desc";
+          switching = true;
+        }
+      }
+    }
+
+    function exportTable(format) {
+      const rows = Array.from(document.querySelectorAll("tbody tr")).filter(row => row.style.display !== "none");
+      const headers = Array.from(document.querySelectorAll("thead th")).map(th => th.innerText.trim());
+      const data = rows.map(row => {
+        return Array.from(row.cells).map(cell => cell.innerText.trim());
+      });
+
+      if (format === "csv") {
+        let csv = headers.join(",") + "\\n";
+        data.forEach(row => {
+          csv += row.join(",") + "\\n";
+        });
+        downloadFile(csv, "dashboard_export.csv", "text/csv");
+      }
+
+      if (format === "json") {
+        const json = data.map(row => {
+          const obj = {};
+          headers.forEach((h, i) => obj[h] = row[i]);
+          return obj;
+        });
+        downloadFile(JSON.stringify(json, null, 2), "dashboard_export.json", "application/json");
+      }
+    }
+
+    function downloadFile(content, filename, type) {
+      const blob = new Blob([content], { type });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+    }
+  </script>
+</head>
+<body>
+  <h2>{{ title }}</h2>
+  <input type="text" id="searchInput" onkeyup="searchTable()" placeholder="Search hostname or role...">
+  <button onclick="exportTable('csv')">Export CSV</button>
+  <button onclick="exportTable('json')">Export JSON</button>
+  <table id="dashboardTable">
+    <thead>
+      <tr>
+        <th onclick="sortTable(0)">Host</th>
+        <th onclick="sortTable(1)">Role</th>
+        <th onclick="sortTable(2)">Promotion Source</th>
+        <th onclick="sortTable(3)">Triggered Roles</th>
+        <th onclick="sortTable(4)">Rollback</th>
+        <th onclick="sortTable(5)">Escalation</th>
+        <th onclick="sortTable(6)">Timestamp</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for node in matrix %}
+      <tr class="{{ node.promotion_source }}{% if node.rollback_triggered %} rollback{% endif %}{% if node.escalation_flag %} escalated{% endif %}">
+        <td>{{ node.host }}</td>
+        <td>{{ node.role }}</td>
+        <td>{{ node.promotion_source }}</td>
+        <td>{{ node.triggered_roles | join(', ') }}</td>
+        <td>
+          {% if node.rollback_triggered %}
+            <span title="Rollback was triggered for this node">🔴</span>
+          {% else %}
+            <span title="No rollback triggered">—</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if node.escalation_flag %}
+            <span title="Escalation required: override or retry applied">⚠️</span>
+          {% else %}
+            <span title="No escalation">—</span>
+          {% endif %}
+        </td>
+        <td>{{ node.timestamp }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

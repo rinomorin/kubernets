@@ -1,0 +1,32 @@
+- name: Check VM state
+  shell: |
+    virsh list --all | sed 's/shut off/shutdown/' | grep -i {{ vm_host }}|awk '{print $NF}'
+  register: vm_state
+  changed_when: false
+  failed_when: false
+  delegate_to: "{{ kvm_delegate }}"
+
+- name: Set VM build state
+  set_fact:
+    vm_build_state: "{{ vm_state.stdout | default('undefined') }}"
+
+- name: update status
+  set_fact:
+    vm_build_state: "building"
+  when: 
+    - vm_state.stdout | default('undefined') == "running"
+    - vm_build_stage == "unknown"
+
+- name: show vm_status
+  debug: msg="{{ vm_host }} is currently {{ vm_build_state }}"
+
+- name: Get current epoch time
+  become: false
+  shell: date +%s
+  register: epoch_now
+  delegate_to: localhost
+  changed_when: false
+
+- name: Update VM timeout
+  set_fact:
+    vm_timeout: "{{ (epoch_now.stdout | int) - (vm_shutdown_start | int) }}"

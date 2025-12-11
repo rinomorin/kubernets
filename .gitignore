@@ -1,4 +1,5 @@
 # Ignore Python virtual environment
 venv312/
 # Ignore real environment file
-ansible/roles/kvm_vm_deploy/files/env_build.sh
+*/env_build.sh
+*/env_vars.sh

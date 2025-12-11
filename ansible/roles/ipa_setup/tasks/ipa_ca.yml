@@ -150,11 +150,12 @@
   register: add_host_record
   changed_when: "'record already exists' not in add_host_record.stdout"
   failed_when: false
-
-- name: Ensure {{ ipa_ca_intermediate }} forward A record
+ 
+- name: Ensure {{ ipa_ca_intermediate }}cat ../each forward A record
   become: yes
   command: >
     ipa dnsrecord-add {{ ipa_domain }} {{ ipa_ca_intermediate }} --a-rec={{ ipa_ca_intermediate_ip }}
+    ipa dnsrecord-add {{ ipa_domain }} {{ ipa_helper }} --a-rec={{ ipa_helper_ip }}
   register: add_a_intermediate
   changed_when: "'already exists' not in add_a_intermediate.stdout"
   failed_when: false
@@ -188,7 +189,6 @@
     msg:
       - "Forward lookup {{ ipa_ca_intermediate }}: {{ forward_check.stdout }}"
 
-
 - name: Ensure PTR record for {{ ipa_master }}
   become: yes
   command: >
@@ -208,6 +208,17 @@
   register: add_ptr_intermediate
   changed_when: "'record already exists' not in add_ptr_intermediate.stdout"
   failed_when: false
+
+- name: Ensure {{ ipa_helper }} reverse PTR record
+  become: yes
+  command: >
+    ipa dnsrecord-add {{ ipa_helper_ip.split('.')[:-1] | reverse | join('.') }}.in-addr.arpa
+    {{ ipa_helper_ip.split('.')[-1] }} 
+    --ptr-rec={{ ipa_helper }}.{{ ipa_domain }}.
+  register: add_prt_helper_ip
+  changed_when: "'record already exists' not in add_ptr_intermediate.stdout"
+  failed_when: false
+
 
 - name: show add_ptr_intermediate
   debug:

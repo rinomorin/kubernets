@@ -1,0 +1,90 @@
+- name: Load original execution summary
+  slurp:
+    src: "/var/log/kube_dispatcher_execution_summary.json"
+  delegate_to: localhost
+  register: original_raw
+
+- name: Parse original execution matrix
+  set_fact:
+    original_execution_matrix: >-
+      {{
+        original_raw.content
+        | b64decode
+        | from_json
+        | default({})
+        | dict2items
+        | selectattr('key', 'equalto', 'execution_details')
+        | map(attribute='value')
+        | first
+        | default([])
+      }}
+
+- name: Load re-promotion summary
+  slurp:
+    src: "/var/log/kube_dispatcher_repromotion_summary.json"
+  delegate_to: localhost
+  register: repromotion_raw
+
+- name: Parse re-promotion matrix
+  set_fact:
+    repromotion_execution_matrix: >-
+      {{
+        repromotion_raw.content
+        | b64decode
+        | from_json
+        | default({})
+        | dict2items
+        | selectattr('key', 'equalto', 'details')
+        | map(attribute='value')
+        | first
+        | default([])
+      }}
+
+- name: Load rollback summary
+  slurp:
+    src: "/var/log/kube_dispatcher_rollback_summary.json"
+  delegate_to: localhost
+  register: rollback_raw
+
+- name: Parse rollback matrix
+  set_fact:
+    rollback_matrix: >-
+      {{
+        rollback_raw.content
+        | b64decode
+        | from_json
+        | default({})
+        | dict2items
+        | selectattr('key', 'equalto', 'rollback_details')
+        | map(attribute='value')
+        | first
+        | default([])
+      }}
+
+- name: Merge execution matrices
+  set_fact:
+    merged_execution_matrix: >-
+      {{
+        (original_execution_matrix + repromotion_execution_matrix)
+        | map('combine', {
+            'rollback_triggered': false,
+            'escalation_flag': false
+          })
+        | map('combine', {
+            'rollback_triggered': (
+              rollback_matrix | selectattr('host', 'equalto', item.host) | list | length > 0
+            )
+          })
+        | list
+      }}
+
+- name: Emit merged dispatcher-wide execution summary
+  copy:
+    dest: "/var/log/kube_dispatcher_execution_summary_merged.json"
+    content: |
+      {
+        "timestamp": "{{ ansible_date_time.iso8601 }}",
+        "executed_nodes": {{ merged_execution_matrix | map(attribute='host') | list | to_json }},
+        "execution_details": {{ merged_execution_matrix | to_nice_json }}
+      }
+  delegate_to: localhost

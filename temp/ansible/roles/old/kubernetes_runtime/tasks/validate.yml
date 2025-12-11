@@ -1,0 +1,26 @@
+- name: Check if kubelet binary is present
+  ansible.builtin.command: which kubelet
+  register: kubelet_bin_check
+  failed_when: kubelet_bin_check.rc != 0
+  changed_when: false
+
+- name: Check kubelet systemd service status
+  ansible.builtin.systemd:
+    name: "{{ kubernetes_service_name }}"
+  register: kubelet_service_status
+
+- name: Assert kubelet service is active
+  ansible.builtin.assert:
+    that:
+      - kubelet_service_status.status.ActiveState == "active"
+    fail_msg: "kubelet service is not active"
+    success_msg: "kubelet service is running"
+
+- name: Get kubelet version
+  ansible.builtin.command: kubelet --version
+  register: kubelet_version
+  changed_when: false
+
+- name: Display kubelet version
+  ansible.builtin.debug:
+    msg: "kubelet version: {{ kubelet_version.stdout }}"

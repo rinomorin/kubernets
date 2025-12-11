@@ -1,0 +1,27 @@
+# roles/kube_dispatcher_dashboard_render/tasks/Render_Dashboard.yml
+- name: Ensure dashboard output directory exists
+  file:
+    path: "{{ dashboard_output_path }}"
+    state: directory
+    mode: "0755"
+
+- name: Render dashboard template
+  template:
+    src: dashboard_template.j2
+    dest: "{{ dashboard_output_path }}/index.html"
+    mode: "0644"
+
+- name: Copy static assets
+  copy:
+    src: "{{ item }}"
+    dest: "{{ dashboard_output_path }}/assets/{{ item | basename }}"
+    mode: "0644"
+  with_fileglob:
+    - "{{ role_path }}/templates/assets/scripts/*"
+    - "{{ role_path }}/templates/assets/styles/*"
+    - "{{ role_path }}/templates/assets/icons/*"
+  ignore_errors: true
+
+- name: Announce dashboard render complete
+  debug:
+    msg: "Dispatcher-grade dashboard rendered to {{ dashboard_output_path }}"

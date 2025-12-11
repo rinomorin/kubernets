@@ -1,0 +1,12 @@
+- name: Prepare DNS entry for cloud.morinsoft.ca
+  command: >
+    ipa dnsrecord-add morinsoft.ca cloud --a-ip-address=192.168.100.20
+  when: "'morinsoft.ca' in inventory_hostname"
+
+- name: Scaffold Squid proxy prep
+  debug:
+    msg: "Squid proxy prep triggered for {{ inventory_hostname }}"
+
+- name: Scaffold VPN access logic
+  debug:
+    msg: "VPN access prep triggered for {{ inventory_hostname }}"

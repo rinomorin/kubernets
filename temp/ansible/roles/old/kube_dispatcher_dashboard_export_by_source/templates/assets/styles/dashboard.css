@@ -1,0 +1,67 @@
+.sort-icon {
+  margin-left: 5px;
+  font-size: 0.9em;
+  color: #007acc;
+}
+.sort-icon:focus {
+  outline: 2px solid #007acc;
+  outline-offset: 2px;
+  background-color: #e6f7ff;
+  border-radius: 3px;
+}
+.shortcut-hint {
+  font-size: 0.75em;
+  color: #888;
+  margin-left: 6px;
+}
+th.sorted {
+  background-color: #f0f8ff;
+  font-weight: bold;
+  border-bottom: 2px solid #007acc;
+}
+#filterPanel {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #ccc;
+  background-color: #f9f9f9;
+}
+.filter-controls {
+  margin-bottom: 5px;
+}
+.collapsible {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease-out, padding 0.3s ease;
+  padding: 0 10px;
+  border: 1px solid #ccc;
+  background-color: #f9f9f9;
+}
+
+.collapsible.open {
+  max-height: 500px; /* adjust as needed */
+  padding: 10px;
+}
+
+.preset-controls {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.preset-controls select {
+  min-width: 180px;
+}
+async function syncPresetToBackend(name, filters) {
+  await fetch("/api/presets", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, filters }),
+  });
+}
+
+async function fetchPresetsFromBackend() {
+  const res = await fetch("/api/presets");
+  const presets = await res.json();
+  localStorage.setItem("filterPresets", JSON.stringify(presets));
+  populatePresetDropdown();
+}

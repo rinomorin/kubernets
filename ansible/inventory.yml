@@ -45,7 +45,6 @@ all:
       hosts:
         ipa01:
         ipa02:
-
     cluster_nodes:
       hosts:
         helper:

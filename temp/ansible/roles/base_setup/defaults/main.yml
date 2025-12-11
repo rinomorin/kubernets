@@ -1,0 +1,27 @@
+# Optional override: use this if you want to explicitly map hostnames
+base_host_map:
+  helper_node: helper01.morinsoft.ca
+  master_node: master01.morinsoft.ca
+  worker_node1: worker01.morinsoft.ca
+  worker_node2: worker02.morinsoft.ca
+
+base_hosts_entries: |
+  192.168.100.103 helper01.morinsoft.ca helper_node
+  192.168.100.104 master01.morinsoft.ca master_node
+  192.168.100.105 worker01.morinsoft.ca worker_node1
+  192.168.100.106 worker02.morinsoft.ca worker_node2
+
+dns_zone: "{{ ansible_domain }}"
+ipa_services:
+  - { name: '_ldap._tcp', port: 389 }
+  - { name: '_kerberos._tcp', port: 88 }
+  - { name: '_kerberos._udp', port: 88 }
+  - { name: '_ntp._udp', port: 123 }
+  - { name: '_kerberos-master._tcp', port: 88 }
+  - { name: '_kpasswd._tcp', port: 464 }
+  - { name: '_pkinit._tcp', port: 88 }
+
+ipa_services:
+      - { principal: "DNS/when: {{ inventory_hostname }}", cert_path: "/etc/pki/tls/certs/dns.crt", key_path: "/etc/pki/tls/private/dns.key" }
+      - { principal: "LDAP/{{ inventory_hostname }}", cert_path: "/etc/pki/tls/certs/ldap.crt", key_path: "/etc/pki/tls/private/ldap.key" }
+      - { principal: "HTTP/{{ inventory_hostname }}", cert_path: "/etc/pki/tls/certs/http.crt", key_path: "/etc/pki/tls/private/http.key" }

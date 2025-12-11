@@ -1,0 +1,15 @@
+dashboard_title: "Promotion Source Dashboard"
+user_id: "anonymous"
+user_role: "viewer"
+
+columns:
+  - name: "Host"
+    key: "host"
+  - name: "Role"
+    key: "role"
+  - name: "Promotion Source"
+    key: "source"
+
+rows: []
+export_timestamp: "{{ lookup('pipe', 'date +%Y-%m-%dT%H:%M:%S') }}"
+dashboard_output_path: /var/www/dispatcher-dashboard

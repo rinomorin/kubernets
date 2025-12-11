@@ -1,0 +1,1 @@
+ansible/roles/kvm_vm_deploy/scripts/validate_env_build.sh

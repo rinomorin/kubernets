@@ -1,0 +1,107 @@
+  # roles/kvm_provision/tasks/start_vm.yml
+
+- name: Start VMs in dependency order
+  include_tasks: vm_boot_order.yml
+  vars:
+    ordered_groups: ['ca','ca_intermediate','helpers', 'dns']
+  when: vm_build_state != "running"  
+
+- name: Display wait time
+  debug:
+    msg: "This will wait up to {{ wait_time_to_shutdown_or_fail }} minutes before resuming to next tasks"
+
+- name: Probe VM with vish until vm power up
+  shell: |
+    virsh list --all | sed 's/shut off/shutdown/' | grep -i "^.*{{ vm_host }}.*" | awk '{print $NF}'
+  register: vm_state
+  vars:
+  delegate_to: "{{ kvm_delegate }}"
+  failed_when: false
+  changed_when: false
+  until: (vm_state.stdout | default('')) == "running"
+  retries: "{{ build_loops|int }}"
+  delay: 10          # 10 seconds between attempts
+
+- name: Wait before after stating
+  wait_for:
+    timeout: 30
+  delegate_to: localhost
+  become: false
+  when: vm_build_state != "running"
+
+- name: vm_build_state status
+  debug:
+    msg: "vm_build_state is {{ vm_build_state }}"
+
+- name: Update vm_build_state to running (from polling)
+  set_fact:
+    vm_build_state: "running"
+    vm_build_stage: "booting"
+  when: (vm_state_check.stdout | default('')) == "running"
+
+- name: Update vm_build_state to running (already known)
+  set_fact:
+    vm_build_state: "running"
+    vm_build_stage: "booting"
+  when: vm_state_check is not defined and vm_build_state == "running"
+
+- name: Wait before SSH check
+  wait_for:
+    timeout: 30
+  delegate_to: localhost
+  become: false
+  when: vm_build_state == "running"
+
+- name: Probe VM with echo until SSH is ready
+  become: false
+  shell: echo sshok
+  register: ssh_check
+  vars:
+    ansible_user: "{{ admin_id }}"
+    ansible_ssh_pass: "{{ admin_set }}"
+    ansible_host: "{{ vm_fqdn }}"
+  delegate_to: "{{ vm_host }}"
+  failed_when: false
+  changed_when: false
+  until: (ssh_check.stdout | default('')) == "sshok"
+  retries: "{{ build_loops|int }}"
+  delay: 10          # 10 seconds between attempts
+  no_log: true
+
+- name: Show SSH check result
+  debug:
+    msg: "SSH check result is {{ ssh_check.stdout }}"
+
+- name: Mark VM as ready
+  set_fact:
+    vm_build_state: "sshok"
+    vm_build_stage: "booted"
+  when: (ssh_check.stdout | default('')).find('sshok') != -1
+
+- name: Configure cluster NIC
+  delegate_to: "{{ vm_host }}"
+  vars:
+    ansible_user: "{{ admin_id }}"
+    ansible_ssh_pass: "{{ admin_set }}"
+    ansible_host: "{{ vm_fqdn }}" 
+  become: true
+  shell: |
+    if nmcli -t -f NAME,DEVICE con show | grep -q enp2s0; then
+      nmcli con modify enp2s0 ipv4.addresses {{ cluster_ip_addr }}/{{ ip_cid }}
+      nmcli con modify enp2s0 ipv4.gateway {{ cluster_gateway }}
+      nmcli con modify enp2s0 ipv4.method manual
+      nmcli con modify enp2s0 ipv4.never-default yes
+      nmcli con modify enp2s0 ipv6.method ignore
+      nmcli con modify enp2s0 connection.autoconnect yes
+      nmcli con up enp2s0
+    fi
+    if nmcli -t -f NAME,DEVICE con show | grep -q enp3s0; then
+      nmcli con modify enp3s0 ipv4.method auto
+      nmcli con modify enp3s0 ipv4.never-default yes
+      nmcli con modify enp3s0 ipv6.method ignore
+      nmcli con modify enp3s0 connection.autoconnect yes
+      nmcli con up enp3s0
+    fi
+  when: "'helper_nodes' in group_names or 'cluster_nodes' in group_names"
+  no_log: true
+

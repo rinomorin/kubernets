@@ -1,0 +1,77 @@
+- name: Load rule skip map
+  become: false
+  delegate_to: localhost
+  oscap:
+    hostname: "{{ inventory_hostname }}"
+    json_path: "{{ role_path }}/files/rule_db.json"
+    mode: skip
+  register: skip_rules
+
+- name: Load rule status map
+  delegate_to: localhost
+  become: false
+  oscap:
+    hostname: "{{ inventory_hostname }}"
+    json_path: "{{ role_path }}/files/rule_db.json"
+    mode: status
+  register: status_rules
+
+- name: Show skip_rules
+  debug:
+    var: skip_rules
+
+- name: Set SCAP scan path based on distribution
+  set_fact:
+    secops_scan_path: >-
+      {% if ansible_distribution == 'Rocky' %}
+        /usr/share/xml/scap/ssg/content/ssg-rl9-ds.xml
+      {% else %}
+        /usr/share/xml/scap/ssg/content/ssg-rhel9-ds.xml
+      {% endif %}
+
+
+- name: Load rule skip map and generate scan command
+  become: false
+  delegate_to: localhost
+  oscap:
+    hostname: "{{ inventory_hostname }}"
+    mode: prep-scan
+    profile: "xccdf_org.ssgproject.content_profile_cis"
+    scan_path: "{{ secops_scan_path }}"
+    skips: "{{ skip_rules }}"
+  register: oscan_scanner
+
+- name: Temporarily skip password last change rule in memory
+  set_fact:
+    skip_rules:
+      rule_skip: >-
+        {{
+          skip_rules.rule_skip | combine({
+            'xccdf_org.ssgproject.content_rule_accounts_password_last_change_is_in_past': true
+          })
+        }}
+
+- name: Load rule skip map and generate fix scan command
+  become: false
+  delegate_to: localhost
+  oscap:
+    hostname: "{{ inventory_hostname }}"
+    mode: prep-fix-scan
+    profile: "xccdf_org.ssgproject.content_profile_cis"
+    scan_path: "{{ secops_scan_path }}"
+    skips: "{{ skip_rules }}"
+  register: fix_oscan_scanner
+
+- name: Revert password last change rule in memory
+  set_fact:
+    skip_rules:
+      rule_skip: >-
+        {{
+          skip_rules.rule_skip | combine({
+            'xccdf_org.ssgproject.content_rule_accounts_password_last_change_is_in_past': false
+          })
+        }}
+
+- name: Show generated scan command
+  debug:
+    var: oscan_scanner.scan_command

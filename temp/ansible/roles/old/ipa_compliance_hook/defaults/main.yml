@@ -1,0 +1,3 @@
+ipa_compliance_enforce: true
+ipa_compliance_emit_decision: true
+ipa_compliance_decision_path: "/var/log/ipa_compliance"

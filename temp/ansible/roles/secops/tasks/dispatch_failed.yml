@@ -1,0 +1,224 @@
+- name: Log OSCAP initial scan start to rsyslog
+  ansible.builtin.command: >
+    logger -t oscap-scan "SCAN_START: {{ inventory_hostname }} at {{ ansible_date_time.iso8601 }}"
+  become: true
+
+- name: Log OSCAP initial scan start
+  ansible.builtin.lineinfile:
+    path: /var/log/oscap-scan.log
+    line: "SCAN_START: {{ inventory_hostname }} at {{ ansible_date_time.iso8601 }}"
+    create: yes
+    mode: '0644'
+  become: true
+
+- name: Copy OSCAP html html file from remote to localhost
+  fetch:
+    src: "/tmp/{{ inventory_hostname }}-report-initial.html"
+    dest: "/tmp/{{ inventory_hostname }}-report-initial-orig.html"
+    flat: true
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Copy OSCAP result file from remote to localhost
+  fetch:
+    src: "/tmp/{{ inventory_hostname }}-result.xml"
+    dest: "/tmp/{{ inventory_hostname }}-result-orig.xml"
+    flat: true
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Set file permissions to 644
+  delegate_to: localhost
+  become: false
+  ansible.builtin.file:
+    path: "/tmp/{{ inventory_hostname }}-report-initial-orig.html"
+    mode: '0644'
+
+- name: Parse OSCAP result and extract rule results
+  delegate_to: localhost
+  become: false
+  vars:
+    result_file: "/tmp/{{ inventory_hostname }}-result-orig.xml"
+  shell: |
+    python3 -c '
+    import xml.etree.ElementTree as ET, json
+    tree = ET.parse("{{ result_file }}")
+    root = tree.getroot()
+    ns = {"xccdf": "http://checklists.nist.gov/xccdf/1.2"}
+    rules = {}
+    for r in root.findall(".//xccdf:rule-result", ns):
+        rid = r.attrib["idref"]
+        res = r.find("xccdf:result", ns)
+        if res is not None:
+            rules[rid] = res.text
+    print(json.dumps(rules))
+        '
+  register: rule_list_raw
+  changed_when: false
+
+- name: Set rule_skip fact
+  set_fact:
+    rule_skip: "{{ skip_rules.rule_skip }}"
+
+- name: Parse OSCAP result and extract failed rules
+  delegate_to: localhost
+  become: false
+  vars:
+    result_file: "/tmp/{{ inventory_hostname }}-result-orig.xml"
+  shell: |
+    python3 -c '
+    import xml.etree.ElementTree as ET, json
+    tree = ET.parse("{{ result_file }}")
+    root = tree.getroot()
+    ns = {"xccdf": "http://checklists.nist.gov/xccdf/1.2"}
+    failed = []
+    for r in root.findall(".//xccdf:rule-result", ns):
+        rid = r.attrib["idref"]
+        res = r.find("xccdf:result", ns)
+        if res is not None and res.text == "fail":
+            short = rid.split("_rule_")[-1]
+            failed.append({"short_name": short, "status": "fail"})
+    print(json.dumps(failed))
+    '
+  register: rule_fail_list
+  changed_when: false
+
+
+- name: Set failed rule list
+  set_fact:
+    rule_is: "{{ rule_fail_list.stdout | from_json }}"
+
+- name: Log OSCAP remediation scan to rsyslog
+  ansible.builtin.command: >
+    logger -t oscap-scan "SCAN_REMEDIATION: {{ inventory_hostname }} at {{ ansible_date_time.iso8601 }}"
+  become: true
+
+- name: Log OSCAP remediation scan execution
+  ansible.builtin.lineinfile:
+    path: /var/log/oscap-scan.log
+    line: "SCAN_REMEDIATION: {{ inventory_hostname }} at {{ ansible_date_time.iso8601 }}"
+  become: true
+
+
+- name: Run oscap scan with remediation
+  become: true
+  shell: "{{ fix_oscan_scanner.scan_command }}"
+  args:
+    executable: /bin/bash
+  register: oscan_fix_result
+
+- name: Ensure AllowGroups sshok is set in sshd_config
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^AllowGroups'
+    line: 'AllowGroups sshok'
+    state: present
+    create: yes
+    backup: yes
+
+- name: Restart sshd to apply group restriction
+  become: true
+  ansible.builtin.systemd:
+    name: sshd
+    state: restarted
+
+- name: Set password aging defaults in /etc/login.defs
+  ansible.builtin.lineinfile:
+    path: /etc/login.defs
+    regexp: '^{{ item.key }}'
+    line: '{{ item.key }} {{ item.value }}'
+    state: present
+    create: no
+  loop:
+    - { key: 'PASS_MAX_DAYS', value: '30' }
+    - { key: 'PASS_MIN_DAYS', value: '1' }
+    - { key: 'PASS_WARN_AGE', value: '14' }
+
+- name: Get list of non-system users with valid shells
+  ansible.builtin.command: >
+    awk -F: '$3 >= 1000 && $7 ~ /\/(bash|sh|zsh)$/ {print $1}' /etc/passwd
+  register: user_list
+  changed_when: false
+
+- name: Apply password aging to non-system users
+  ansible.builtin.command: chage -M 30 -m 1 -W 14 {{ item }}
+  loop: "{{ user_list.stdout_lines }}"
+  when: user_list.stdout_lines | length > 0
+
+- name: Run oscap scan with remediation
+  become: true
+  shell: "{{ fix_oscan_scanner.scan_command }}"
+  args:
+    executable: /bin/bash
+  register: oscan_fix_result
+
+- name: Copy OSCAP html html file from remote to localhost
+  fetch:
+    src: "/tmp/{{ inventory_hostname }}-report-initial.html"
+    dest: "/tmp/{{ inventory_hostname }}-report-initial.html"
+    flat: true
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Copy OSCAP result file from remote to localhost
+  fetch:
+    src: "/tmp/{{ inventory_hostname }}-result.xml"
+    dest: "/tmp/{{ inventory_hostname }}-result.xml"
+    flat: true
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Parse OSCAP result and extract failed rules
+  delegate_to: localhost
+  become: false
+  vars:
+    result_file: "/tmp/{{ inventory_hostname }}-result.xml"
+  shell: |
+    python3 -c '
+    import xml.etree.ElementTree as ET, json
+    tree = ET.parse("{{ result_file }}")
+    root = tree.getroot()
+    ns = {"xccdf": "http://checklists.nist.gov/xccdf/1.2"}
+    failed = []
+    for r in root.findall(".//xccdf:rule-result", ns):
+        rid = r.attrib["idref"]
+        res = r.find("xccdf:result", ns)
+        if res is not None and res.text == "fail":
+            short = rid.split("_rule_")[-1]
+            failed.append({"short_name": short, "status": "fail"})
+    print(json.dumps(failed))
+    '
+  register: rule_fail_list2
+  changed_when: false
+
+
+- name: Set failed rule list
+  set_fact:
+    rule_is: "{{ rule_fail_list2.stdout | from_json }}"
+
+
+- name: Set file permissions to 644
+  ansible.builtin.file:
+    path: "/tmp/{{ inventory_hostname }}-report-initial.html"
+    mode: '0644'
+
+- name: Log OSCAP clean scan completion
+  ansible.builtin.lineinfile:
+    path: /var/log/oscap-scan.log
+    line: "SCAN_COMPLETE: {{ inventory_hostname }} at {{ ansible_date_time.iso8601 }}"
+  when: rule_is | selectattr('status', 'equalto', 'fail') | list | length == 0
+  become: true
+
+- name: Log OSCAP clean scan completion to rsyslog
+  ansible.builtin.command: >
+    logger -t oscap-scan "SCAN_COMPLETE: {{ inventory_hostname }} at {{ ansible_date_time.iso8601 }}"
+  when: rule_is | selectattr('status', 'equalto', 'fail') | list | length == 0
+  become: true
+
+
+- name: check scan result
+  debug: 
+    msg: |
+      {{ rule_is }}
+
+- name: check scan result 2
+  debug: 
+    msg: |
+      {{ oscan_fix_result }}

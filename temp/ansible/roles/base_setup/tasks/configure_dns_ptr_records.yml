@@ -1,0 +1,19 @@
+- name: Add PTR records
+  vars:
+    alias_entries: >-
+      {{
+        infra_alias_map | dict2items |
+        map(attribute='value') | map('dict2items') | flatten
+      }}
+  loop: "{{ alias_entries }}"
+  loop_control:
+    label: "{{ item.key }}"
+  vars:
+    alias: "{{ item.key }}"
+    target_host: "{{ item.value }}"
+    target_ip: "{{ hostvars[target_host.split('.')[0]].ansible_host }}"
+    reverse_zone: "{{ '.'.join(target_ip.split('.')[0:3] | reverse) }}.in-addr.arpa"
+    last_octet: "{{ target_ip.split('.')[-1] }}"
+  command: >
+    ipa dnsrecord-add {{ reverse_zone }}
+    {{ last_octet }} --ptr-rec={{ alias }}.{{ ansible_domain }}.

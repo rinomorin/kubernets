@@ -1,0 +1,16 @@
+- name: Add Kubernetes repo
+  ansible.builtin.yum_repository:
+    name: kubernetes
+    description: Kubernetes 1.34 upstream
+    baseurl: "{{ kubernetes_repo_url }}"
+    gpgkey: "{{ kubernetes_gpg_key }}"
+    gpgcheck: yes
+    enabled: yes
+
+- name: Install Kubernetes packages
+  ansible.builtin.dnf:
+    name: "{{ item }}"
+    state: present
+    enablerepo: kubernetes
+  loop: "{{ kubernetes_packages }}"
+  notify: Restart kubelet

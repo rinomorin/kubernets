@@ -1,0 +1,7 @@
+- name: Prepare VPN access
+  import_role:
+    name: vpn_access_prep
+
+- name: Install monitoring agent
+  import_role:
+    name: monitoring_agent_deploy

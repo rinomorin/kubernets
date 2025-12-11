@@ -1,0 +1,60 @@
+- name: Probe VM with key-based SSH
+  shell: |
+    ssh -o BatchMode=yes \
+        -o UserKnownHostsFile=/dev/null \
+        -o StrictHostKeyChecking=no \
+        -o ConnectTimeout=5 \
+        {{ secops_id }}@{{ vm_fqdn }} 'echo sshkey'
+  register: ssh_key_check
+  delegate_to: localhost
+  become: false
+  failed_when: false
+  changed_when: false
+
+- name: Show SSH key check result
+  debug:
+    msg: "{{ admin_id }} SSH key check result is {{ ssh_key_check.stderr }}"
+
+
+- name: Manually add my ssh key to secops authorized_keys
+  become: true
+  shell: |
+    mkdir -p /home/{{ secops_id }}/.ssh && \
+    echo {{ secops_edkey }} > /home/{{ secops_id }}/.ssh/authorized_keys && \
+    echo {{ secops_key }} >> /home/{{ secops_id }}/.ssh/authorized_keys && \
+    chmod 600 /home/{{ secops_id }}/.ssh/authorized_keys && \
+    chown -R {{ secops_id }}:{{ secops_id }} /home/{{ secops_id }}/.ssh
+  vars:
+    ansible_user: "{{ admin_id }}"
+    ansible_ssh_pass: "{{ admin_set }}"
+    ansible_host: "{{ vm_fqdn }}"
+  delegate_to: "{{ vm_host }}"
+  when: (ssh_key_check.stdout | default('')).find('sshkey') == -1
+
+# - name: Manually add my ssh key to secops authorized_keys
+#   delegate_to: localhost
+#   become: false
+#   shell: |
+#     ssh -o BatchMode=yes \
+#       -o UserKnownHostsFile=/dev/null \
+#       -o StrictHostKeyChecking=no \
+#       -o ConnectTimeout=5 \
+#       {{ admin_id }}@{{ vm_fqdn }} \
+#       "sudo sh -c '- name: Manually add my ssh key to secops authorized_keys
+# echo {{ secops_key }} >> /home/{{ secops_id }}/.ssh/authorized_keys && chmod 600 /home/{{ secops_id }}/.ssh/authorized_keys'"
+#   when: (ssh_key_check.stdout | default('')).find('sshkey') == -1
+
+# - name: Push public key using authorized_key
+#   authorized_key:
+#     user: "{{ default_secops_id }}"
+#     state: present
+#     key: "{{ secops_key }}"
+#   vars:
+#     ansible_user: "{{ default_secops_id }}"
+#     ansible_ssh_pass: "{{ default_secops_pwd }}"
+#     ansible_host: "{{ vm_fqdn }}"
+#   delegate_to: "{{ vm_host }}"
+#   become: false
+
+- debug: 
+    msg: "vm_fqdn is {{ vm_fqdn }}"

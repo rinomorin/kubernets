@@ -1,0 +1,14 @@
+- name: Emit node readiness summary
+  copy:
+    dest: "/var/log/kube_node_ready/{{ inventory_hostname }}.json"
+    content: |
+      {
+        "host": "{{ inventory_hostname }}",
+        "kube_role": "{{ kube_role }}",
+        "ipa_compliant": {{ ipa_compliance_status | default(false) }},
+        "dns_zone_count": {{ ipa_dns_zone_count | default(0) }},
+        "replication_ok": {{ ipa_replication_ok | default(false) }},
+        "kerberos_ticket_valid": {{ ipa_kerberos_ticket_valid | default(false) }},
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  delegate_to: localhost

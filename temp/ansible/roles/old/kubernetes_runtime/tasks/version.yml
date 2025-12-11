@@ -1,0 +1,3 @@
+- name: Set Kubernetes version fact (optional override)
+  set_fact:
+    kubernetes_version: ""  # Leave blank for latest

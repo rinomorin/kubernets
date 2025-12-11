@@ -1,0 +1,12 @@
+- name: Prepare DNS entry for node
+  command: >
+    ipa dnsrecord-add morinsoft.ca {{ inventory_hostname.split('.')[0] }} --a-ip-address={{ ansible_default_ipv4.address }}
+  when: "'morinsoft.ca' in inventory_hostname"
+
+- name: Scaffold VPN prep
+  debug:
+    msg: "VPN prep triggered for {{ inventory_hostname }} — awaiting cloud.morinsoft.ca readiness"
+
+- name: Trigger service deployment
+  debug:
+    msg: "Service deployment triggered for {{ inventory_hostname }}"

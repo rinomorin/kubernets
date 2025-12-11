@@ -1,0 +1,52 @@
+- name: Check IPA services
+  command: ipactl status
+  register: ipactl_status
+  changed_when: false
+  failed_when: ipactl_status.rc != 0
+
+- name: List replication agreements
+  command: ipa-replica-manage list
+  register: replica_list
+  changed_when: false
+  failed_when: false
+
+- name: Check LDAP replication status
+  command: ipa-replica-manage list --verbose
+  register: replica_verbose
+  changed_when: false
+  failed_when: false
+
+- name: List DNS zones
+  command: ipa dnszone-find
+  register: dns_zones
+  changed_when: false
+  failed_when: false
+
+- name: Get Kerberos ticket
+  command: kinit admin -kt /etc/krb5.keytab
+  register: kinit_result
+  changed_when: false
+  failed_when: kinit_result.rc != 0
+
+- name: Show Kerberos ticket
+  command: klist
+  register: klist_result
+  changed_when: false
+  when: kinit_result.rc == 0
+
+- name: Ensure verification summary directory exists
+  file:
+    path: "{{ ipa_verify_summary_path }}"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  run_once: true
+  when: ipa_verify_emit_summary
+
+- name: Emit IPA verification summary
+  template:
+    src: verification_summary.json.j2
+    dest: "{{ ipa_verify_summary_path }}/{{ inventory_hostname }}.json"
+    mode: '0640'
+  delegate_to: localhost
+  when: ipa_verify_emit_summary

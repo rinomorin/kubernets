@@ -72,7 +72,6 @@
 - name: Verify ipa master forward DNS from ca intermediate
   command: dig +short {{ ipa_master }}.{{ ipa_domain }} @{{ ipa_master_ip }}
   register: forward_check
-  # delegate_to: 
 
 - name: Fail if {{ ipa_master }} not resolvable
   fail:
@@ -82,7 +81,6 @@
 - name: Verify LDAP connectivity from {{ ipa_ca_intermediate }}
   command: ldapsearch -H ldap://{{ ipa_master }}.{{ ipa_domain }} -x -b "" -s base "(objectclass=*)"
   register: ldap_check
-  # delegate_to: {{ ipa_ca_intermediate }}
 
 - name: Fail if LDAP not reachable{{ ipa_ca_intermediate }}
   fail:
@@ -143,6 +141,31 @@
     mode: '0644'
     force: yes 
 
+- name: Acquire Kerberos ticket for admin
+  expect:
+    command: kinit admin@{{ ipa_domain | upper }}
+    responses:
+      '(?i)Password for admin.*': "{{ ipa_admin_password }}"
+  register: kinit_admin
+  changed_when: false
+  no_log: true
+
+- name: Check if IPA is configured on this host
+  become: yes
+  stat:
+    path: /etc/ipa/default.conf
+  register: ipa_conf
+
+- name: List active replicas (only on configured masters)
+  become: yes
+  shell: ipa-replica-manage list 2>/dev/null || true
+  register: replica_check
+  changed_when: false
+  when: ipa_conf.stat.exists
+  delegate_to: "{{ ipa_master }}"
+  run_once: true
+
+
 - name: Install IPA replica on intermediate (CA)
   become: yes
   shell: |
@@ -158,27 +181,10 @@
       --auto-reverse \
       --auto-forwarders \
       --setup-dns
-  when: ipa_conf is defined and not ipa_conf.stat.exists | default(false)
-  # no_log: true
-
-
-# - name: Install IPA replica on intermediate
-#   become: yes
-#   shell: |
-#     umask 0022 && ipa-replica-install \
-#       --unattended \
-#       --server={{ ipa_master }}.{{ ipa_domain | lower }} \
-#       --domain={{ ipa_domain | lower }} \
-#       --realm={{ ipa_domain | upper }} \
-#       --admin-password='{{ ipa_admin_password }}' \
-#       --hostname={{ inventory_hostname }}.{{ ipa_domain | lower }} \
-#       --setup-adtrust \
-#       --setup-kra \
-#       --auto-reverse \
-#       --auto-forwarders \
-#       --setup-dns
-#   when: ipa_conf is defined and not ipa_conf.stat.exists | default(false)
-  # no_log: true
+  when:
+    - not ipa_conf.stat.exists            # only if this node isn’t already configured
+    - inventory_hostname not in (replica_check.stdout | default(""))
+  no_log: true
 
 # --- Service checks ---
 - name: Check IPA related services on {{ ipa_ca_intermediate }}
@@ -242,7 +248,7 @@
   command: ldapsearch -H ldaps://localhost:636 -D "cn=Directory Manager" -w {{ ipa_dm_password }} -b "" -s base "(objectclass=*)"
   register: ldaps_check
   changed_when: false
-  # no_log: true
+  no_log: true
 
 - debug:
     msg: "{{ ldaps_check.stdout }}"

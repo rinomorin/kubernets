@@ -1,0 +1,12 @@
+- name: Stop kube services
+  systemd:
+    name: "{{ item }}"
+    state: stopped
+  loop:
+    - kube-proxy
+    - flannel
+
+- name: Stop monitoring agent
+  systemd:
+    name: node_exporter
+    state: stopped

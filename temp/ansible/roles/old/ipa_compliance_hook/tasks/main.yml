@@ -1,0 +1,46 @@
+- name: Ensure compliance decision directory exists
+  file:
+    path: "{{ ipa_compliance_decision_path }}"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  run_once: true
+  when: ipa_compliance_emit_decision
+
+- name: Evaluate IPA compliance status
+  set_fact:
+    ipa_compliance_status: >-
+      {{
+        (
+          ipa_verified | default(false)
+          and ipa_replication_ok | default(false)
+          and ipa_dns_zone_count | default(0) > 0
+          and ipa_kerberos_ticket_valid | default(false)
+        )
+      }}
+    ipa_compliance_reason: >-
+      {{
+        {
+          'verified': ipa_verified | default(false),
+          'replication': ipa_replication_ok | default(false),
+          'dns_zones': ipa_dns_zone_count | default(0),
+          'kerberos': ipa_kerberos_ticket_valid | default(false)
+        }
+      }}
+
+- name: Emit compliance decision
+  template:
+    src: compliance_decision.json.j2
+    dest: "{{ ipa_compliance_decision_path }}/{{ inventory_hostname }}.json"
+    mode: '0640'
+  delegate_to: localhost
+  when: ipa_compliance_emit_decision
+
+- name: Fail if compliance enforcement is enabled and status is not compliant
+  fail:
+    msg: >
+      IPA compliance check failed on {{ inventory_hostname }}.
+      Reasons: {{ ipa_compliance_reason | to_nice_json }}
+  when:
+    - ipa_compliance_enforce
+    - not ipa_compliance_status

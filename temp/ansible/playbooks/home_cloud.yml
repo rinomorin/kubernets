@@ -1,0 +1,10 @@
+---
+- hosts: all
+  gather_facts: false
+  vars_files:
+    - vars/ipa.yml
+  roles:
+    - role: kvm_vm_deploy
+      vars:
+        host_type: "ipa-server"
+        sub_type: "ca-intermediate"

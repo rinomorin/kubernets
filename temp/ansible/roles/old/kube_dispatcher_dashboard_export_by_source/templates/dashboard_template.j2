@@ -1,0 +1,11 @@
+<div id="reactDashboard"></div>
+<script>
+  window.__DASHBOARD_PROPS__ = {
+    columns: {{ columns | tojson }},
+    rows: {{ rows | tojson }},
+    dashboard_title: "{{ dashboard_title }}",
+    user_id: "{{ user_id }}",
+    user_role: "{{ user_role }}"
+  };
+</script>
+<script src="/static/dashboard.bundle.js"></script>

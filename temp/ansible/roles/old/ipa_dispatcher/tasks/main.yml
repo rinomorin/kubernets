@@ -1,0 +1,84 @@
+
+- name: Determine IPA role from hostname
+  set_fact:
+    ipa_role: >-
+      {% if inventory_hostname.startswith('ipa') and inventory_hostname.endswith('01') %}
+        master
+      {% elif inventory_hostname.startswith('ipa') %}
+        replica
+      {% else %}
+        undefined
+      {% endif %}
+
+- name: Fail if role is undefined
+  fail:
+    msg: "Unable to determine ipa_role from hostname {{ inventory_hostname }}"
+  when: ipa_role == 'undefined'
+
+- name: Set DNS delegation flag
+  set_fact:
+    ipa_delegate_dns: "{{ ipa_role == 'master' and ipa_dns_zones | length > 0 }}"
+
+- name: Set base provisioning role
+  set_fact:
+    ipa_is_master: "{{ ipa_role == 'master' }}"
+
+- name: Set external CA flag
+  set_fact:
+    ipa_use_external_ca: "{{ ipa_is_master and ipa_external_ca | default(false) }}"
+
+- name: Set derived provisioning flags
+  set_fact:
+    ipa_delegate_dns: "{{ ipa_is_master and ipa_dns_zones is defined }}"
+    ipa_emit_csr: "{{ ipa_use_external_ca }}"
+    ipa_wait_for_signed_ca: "{{ ipa_use_external_ca }}"
+    ipa_promote_ca: "{{ ipa_role == 'replica' and ipa_promote_ca | default(false) }}"
+
+- name: Ensure audit directory exists on localhost
+  file:
+    path: /var/log/ipa_flags
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  run_once: true
+
+- name: Emit provisioning flags
+  copy:
+    dest: "/var/log/ipa_flags/{{ inventory_hostname }}.json"
+    content: |
+      {
+        "role": "{{ ipa_role }}",
+        "is_master": {{ ipa_is_master }},
+        "use_external_ca": {{ ipa_use_external_ca }},
+        "delegate_dns": {{ ipa_delegate_dns }},
+        "emit_csr": {{ ipa_emit_csr }},
+        "wait_for_signed_ca": {{ ipa_wait_for_signed_ca }},
+        "promote_ca": {{ ipa_promote_ca }},
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  delegate_to: localhost
+
+# Host *
+#   StrictHostKeyChecking no
+#   UserKnownHostsFile /dev/null
+
+- name: Emit DNS zone audit
+  copy:
+    dest: "/var/log/ipa_dns_zones/{{ inventory_hostname }}.json"
+    content: "{{ ipa_dns_zones | to_nice_json }}"
+  delegate_to: localhost
+  when: ipa_delegate_dns
+
+- name: Emit audit facts
+  copy:
+    dest: "/var/log/ipa_provisioning/{{ inventory_hostname }}.json"
+    content: |
+      {
+        "hostname": "{{ inventory_hostname }}",
+        "role": "{{ ipa_role }}",
+        "external_ca": {{ ipa_use_external_ca }},
+        "dns_delegate": {{ ipa_delegate_dns }},
+        "promote_ca": {{ ipa_promote_ca }},
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  delegate_to: localhost

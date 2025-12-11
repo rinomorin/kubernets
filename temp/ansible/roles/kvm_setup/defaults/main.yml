@@ -1,0 +1,13 @@
+---
+virt_packages:
+  - qemu-kvm
+  - libvirt
+  - virt-install
+  - libvirt-daemon
+  - libvirt-daemon-driver-network
+  - libvirt-client
+
+wired_nic: enp0s31f6
+wifi_nic: wlp0s20f3
+libvirt_network_name: default
+

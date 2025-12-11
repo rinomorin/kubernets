@@ -1,0 +1,11 @@
+# handlers:
+#   - name: Reboot system
+#     reboot:
+#       msg: "Rebooting after authselect profile change"
+# roles/secops/handlers/main.yml
+- name: Reboot system
+  reboot:
+    msg: "Rebooting after authselect profile change"
+    connect_timeout: 5
+    reboot_timeout: 600
+    test_command: whoami

@@ -1,0 +1,67 @@
+# Begin Global sudoers standard template Ver 8.4 Date 2015-04-01 * Master * Refer xxxxxx Begin #
+# Description Standard sudoers template
+
+# Version control
+# See changelog on Global sudo wiki http://DFLT.biz/GsudoStandardAlias for previous changes
+
+#------------------------------------------------------------------------------
+
+# Sudo implementation team instruction:
+#   This special template is NOT to be #included. Instead, this template
+#   has content which must, for functional purposes, be 'spread over' the
+#   entire span of the /etc/sudoers file. For instance:
+#      Defaults env_file=/etc/sudo.env
+#   should be 'early' in the file, while:
+#      ALL ALL=!SUDOSUDO
+#   must follow the last 'additive' sudo entry to ensure proper protection.
+
+#==============================================================================
+# Defaults
+#==============================================================================
+Defaults env_file=/etc/sudo.env
+Defaults !visiblepw
+Defaults always_set_home
+Defaults match_group_by_gid
+Defaults always_query_group_plugin
+Defaults env_reset
+Defaults env_keep =  "COLORS DISPLAY HOSTNAME HISTSIZE KDEDIR LS_COLORS"
+Defaults env_keep += "MAIL PS1 PS2 QTDIR USERNAME LANG LC_ADDRESS LC_CTYPE"
+Defaults env_keep += "LC_COLLATE LC_IDENTIFICATION LC_MEASUREMENT LC_MESSAGES"
+Defaults env_keep += "LC_MONETARY LC_NAME LC_NUMERIC LC_PAPER LC_TELEPHONE"
+Defaults env_keep += "LC_TIME LC_ALL LANGUAGE LINGUAS _XKB_CHARSET XAUTHORITY"
+Defaults secure_path = /sbin:/bin:/usr/sbin:/usr/bin
+Defaults use_pty
+Defaults logfile=/var/log/sudo.log
+Defaults timestamp_timeout=5
+
+#------------------------------------------------------------------------------
+# Shell escape protection (requires secondary logging awareness)
+Defaults!DFLT_SHELLESCAPE_ALL noexec
+
+#==============================================================================
+# Include files (copied via Ansible)
+#==============================================================================
+#include {{TMPPATH}}/etc/sudoers.d/010_STD_NEG_DFLT
+#include {{TMPPATH}}/etc/sudoers.d/010_STD_ALIAS_DFLT
+#include {{TMPPATH}}/etc/sudoers.d/010_STD_SA_DFLT
+
+## DFLT Team include statements precede this comment
+
+# Optional application-level includes
+# Companies standardize template per application
+# recommended but optional 
+# 1xx_{application}_DFLT
+#include {{TMPPATH}}/etc/sudoers.d/123_AE_{{ THiS_ACCOUNT}}_DFLT
+#include {{TMPPATH}}/etc/sudoers.d/124_AWX_{{THiS_ACCOUNT}}_DFLT
+# add on to default companies standard for missing item
+##include /etc/sudoers.d/2xx_{{THiS_ACCOUNT}}_{application}_ADJ
+# local custom templates
+##include /etc/sudoers.d/3xx_{{THiS_ACCOUNT}}_{application}_LCL
+# customer templates
+##include /etc/sudoers.d/8xx_{{THiS_ACCOUNT}}_{customer_application}_CUST
+
+# Final protection line — must follow all additive entries
+root ALL=(ALL) ALL
+ALL ALL=!SUDOSUDO
+
+# End Global sudoers standard template Ver 8.4 Date 2015-04-01 * Master * Refer xxxxxx End #

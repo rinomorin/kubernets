@@ -1,0 +1,7 @@
+- name: Deploy master services
+  import_role:
+    name: kube_service_deploy
+
+- name: Install monitoring agent
+  import_role:
+    name: monitoring_agent_deploy

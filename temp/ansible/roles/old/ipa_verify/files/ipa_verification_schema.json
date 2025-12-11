@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "host": { "type": "string" },
+    "ipactl_status": { "type": "string" },
+    "replica_partners": { "type": "array", "items": { "type": "string" } },
+    "replica_verbose": { "type": "array", "items": { "type": "string" } },
+    "dns_zones": { "type": "array", "items": { "type": "string" } },
+    "kerberos_ticket": { "type": "array", "items": { "type": "string" } },
+    "timestamp": { "type": "string", "format": "date-time" }
+  },
+  "required": ["host", "ipactl_status", "timestamp"]
+}

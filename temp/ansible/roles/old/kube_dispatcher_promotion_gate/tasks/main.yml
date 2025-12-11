@@ -1,0 +1,51 @@
+- name: Gather all dispatcher matrix files
+  find:
+    paths: "/var/log/kube_dispatcher_matrix"
+    patterns: "*.json"
+  delegate_to: localhost
+  register: dispatcher_matrix_files
+
+- name: Read each dispatcher matrix file
+  slurp:
+    src: "{{ item.path }}"
+  loop: "{{ dispatcher_matrix_files.files }}"
+  delegate_to: localhost
+  register: raw_dispatcher_data
+
+- name: Parse dispatcher matrix
+  set_fact:
+    kube_dispatcher_matrix: >-
+      {{
+        raw_dispatcher_data.results
+        | map(attribute='content')
+        | map('b64decode')
+        | map('from_json')
+        | list
+      }}
+
+- name: Filter promotable nodes
+  set_fact:
+    kube_promotable_nodes: >-
+      {{
+        kube_dispatcher_matrix
+        | selectattr('env_status.kubeadm_cluster_name.missing', 'equalto', false)
+        | selectattr('env_status.kubeadm_pod_network_cidr.missing', 'equalto', false)
+        | selectattr('env_status.kubeadm_crio_version.missing', 'equalto', false)
+        | selectattr('compliance.ipa_compliant', 'equalto', true)
+        | selectattr('compliance.replication_ok', 'equalto', true)
+        | selectattr('compliance.dns_zone_count', 'gt', 0)
+        | selectattr('bootstrap.ready', 'equalto', true)
+        | map(attribute='host')
+        | list
+      }}
+
+- name: Emit promotion summary
+  copy:
+    dest: "/var/log/kube_dispatcher_promotion_summary.json"
+    content: |
+      {
+        "timestamp": "{{ ansible_date_time.iso8601 }}",
+        "promotable_nodes": {{ kube_promotable_nodes | to_json }},
+        "total": {{ kube_promotable_nodes | length }}
+      }
+  delegate_to: localhost

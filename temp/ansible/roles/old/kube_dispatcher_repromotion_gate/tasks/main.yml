@@ -1,0 +1,38 @@
+- name: Gather rollback logs
+  find:
+    paths: "/var/log/kube_rollback_log"
+    patterns: "*.json"
+  delegate_to: localhost
+  register: rollback_files
+
+- name: Read each rollback log
+  slurp:
+    src: "{{ item.path }}"
+  loop: "{{ rollback_files.files }}"
+  delegate_to: localhost
+  register: raw_rollback_data
+
+- name: Parse rollback matrix
+  set_fact:
+    rollback_matrix: >-
+      {{
+        raw_rollback_data.results
+        | map(attribute='content')
+        | map('b64decode')
+        | map('from_json')
+        | list
+        | selectattr('rollback_triggered', 'equalto', true)
+        | list
+      }}
+
+- name: Emit re-promotion summary
+  copy:
+    dest: "/var/log/kube_dispatcher_repromotion_summary.json"
+    content: |
+      {
+        "timestamp": "{{ ansible_date_time.iso8601 }}",
+        "re_promoted_nodes": {{ rollback_matrix | map(attribute='host') | list | to_json }},
+        "promotion_source": "re_promotion",
+        "details": {{ rollback_matrix | to_nice_json }}
+      }
+  delegate_to: localhost

@@ -1,0 +1,4 @@
+# Optional: You can add logic to fetch latest CRI-O version if needed
+- name: Set CRI-O version fact (default to latest)
+  set_fact:
+    crio_version: ""

@@ -1,0 +1,19 @@
+# Dispatcher-grade build and deploy
+
+build-react:
+    npm run build --prefix react-dashboard
+
+copy-assets:
+    cp -r react-dashboard/build/* jinja2-dashboard/static/
+
+build-jinja:
+    ansible-playbook render_dashboard.yml
+
+deploy:
+    make build-react
+    make copy-assets
+    make build-jinja
+
+clean:
+    rm -rf react-dashboard/build
+    rm -rf jinja2-dashboard/static/*

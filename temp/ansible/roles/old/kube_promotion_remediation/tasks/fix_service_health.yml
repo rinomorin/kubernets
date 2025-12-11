@@ -1,0 +1,13 @@
+- name: Restart failed services
+  systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - "{{ 'kubelet' if 'kubelet' in failure_diag.failure_reasons.service_health else omit }}"
+    - "{{ 'crio' if 'crio' in failure_diag.failure_reasons.service_health else omit }}"
+    - "{{ 'node_exporter' if 'node_exporter' in failure_diag.failure_reasons.service_health else omit }}"
+  when: item is not omitted
+
+- name: Re-run health check
+  import_role:
+    name: kube_service_health_check

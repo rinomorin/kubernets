@@ -1,0 +1,66 @@
+---
+- name: Gather network facts
+  ansible.builtin.setup:
+    gather_subset:
+      - network
+
+# Find the first active wired NIC (en*, eth*)
+- name: Detect active wired NIC
+  ansible.builtin.set_fact:
+    wired_nic: "{{ item }}"
+  loop: "{{ ansible_interfaces }}"
+  when:
+    - item is match('^(en|eth).*')
+    - ansible_facts['ansible_' ~ item]['active'] | default(false)
+
+# Find the first active Wi-Fi NIC (wl*)
+- name: Detect active Wi-Fi NIC
+  ansible.builtin.set_fact:
+    wifi_nic: "{{ item }}"
+  loop: "{{ ansible_interfaces }}"
+  when:
+    - item is match('^wl.*')
+    - ansible_facts['ansible_' ~ item]['active'] | default(false)
+
+- name: Show NICs chosen
+  debug:
+    msg: "Wired NIC: {{ wired_nic | default('none') }}, Wi-Fi NIC: {{ wifi_nic | default('none') }}"
+
+# Remove default NAT network
+- name: Remove default NAT network if present
+  community.libvirt.virt_net:
+    name: default
+    state: absent
+
+# Configure bridge network if wired NIC is active
+- name: Define default bridge network using wired NIC
+  community.libvirt.virt_net:
+    name: default
+    xml: |
+      <network>
+        <name>default</name>
+        <forward mode='bridge'/>
+        <bridge name='br0'/>
+      </network>
+    state: active
+    autostart: true
+  when: wired_nic is defined
+  notify: Restart libvirtd
+
+# Configure macvtap network if no wired NIC but Wi-Fi is active
+- name: Define default macvtap network bound to Wi-Fi NIC
+  community.libvirt.virt_net:
+    name: default
+    xml: |
+      <network>
+        <name>default</name>
+        <forward mode='bridge'>
+          <interface dev='{{ wifi_nic }}'/>
+        </forward>
+        <portgroup name='direct-bridge'/>
+      </network>
+    state: active
+    autostart: true
+  when: wired_nic is not defined and wifi_nic is defined
+  notify: Restart libvirtd
+

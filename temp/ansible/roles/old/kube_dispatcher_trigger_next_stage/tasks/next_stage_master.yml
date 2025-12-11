@@ -1,0 +1,15 @@
+- name: Emit master node promotion flag
+  copy:
+    dest: "/var/log/kube_master_promoted/{{ inventory_hostname }}.json"
+    content: |
+      {
+        "host": "{{ inventory_hostname }}",
+        "role": "master",
+        "promoted": true,
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  delegate_to: localhost
+
+- name: Trigger master service deployment
+  debug:
+    msg: "Master services triggered for {{ inventory_hostname }}"

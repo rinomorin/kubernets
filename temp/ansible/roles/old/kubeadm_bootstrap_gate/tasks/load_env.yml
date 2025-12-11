@@ -1,0 +1,132 @@
+- name: Load environment variables from env.sh
+  shell: |
+    set -a
+    source "{{ playbook_path }}/../../env.sh"
+    env
+  register: kube_env
+  changed_when: false
+
+- name: Extract environment variables from env.sh
+  set_fact:
+    kubeadm_cluster_name: "{{ kube_env.stdout_lines | select('match', '^kubeadm_cluster_name=') | map('regex_replace', '^kubeadm_cluster_name=', '') | list | first | default('', true) }}"
+    kubeadm_pod_network_cidr: "{{ kube_env.stdout_lines | select('match', '^kubeadm_pod_network_cidr=') | map('regex_replace', '^kubeadm_pod_network_cidr=', '') | list | first | default('', true) }}"
+    kubeadm_crio_version: "{{ kube_env.stdout_lines | select('match', '^kubeadm_crio_version=') | map('regex_replace', '^kubeadm_crio_version=', '') | list | first | default('', true) }}"
+    kubeadm_k8s_repo_url: "https://pkgs.k8s.io/core:/stable:/v1.34/rpm/"
+
+- name: Validate required environment variables
+  fail:
+    msg: >
+      Missing required environment variables in env.sh:
+      {% if not kubeadm_cluster_name %} - kubeadm_cluster_name{% endif %}
+      {% if not kubeadm_pod_network_cidr %} - kubeadm_pod_network_cidr{% endif %}
+      {% if not kubeadm_crio_version %} - kubeadm_crio_version{% endif %}
+  when:
+    - kubeadm_cluster_name == ""
+      or kubeadm_pod_network_cidr == ""
+      or kubeadm_crio_version == ""
+
+- name: Validate required environment variables
+  set_fact:
+    missing_env_vars: >-
+      {{
+        [
+          'kubeadm_cluster_name' if kubeadm_cluster_name == '' else '',
+          'kubeadm_pod_network_cidr' if kubeadm_pod_network_cidr == '' else '',
+          'kubeadm_crio_version' if kubeadm_crio_version == '' else ''
+        ] | reject('equalto', '') | list
+      }}
+
+- name: Emit dispatcher-readable error summary
+  copy:
+    dest: "/var/log/kube_env_error/{{ inventory_hostname }}.json"
+    content: |
+      {
+        "host": "{{ inventory_hostname }}",
+        "error": "Missing required environment variables",
+        "missing": {{ missing_env_vars | to_json }},
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  delegate_to: localhost
+  when: missing_env_vars | length > 0
+
+- name: Fail if required environment variables are missing
+  fail:
+    msg: >
+      Missing required environment variables in env.sh:
+      {{ missing_env_vars | join(', ') }}
+  when: missing_env_vars | length > 0
+
+- name: Emit dispatcher matrix of env status
+  copy:
+    dest: "/var/log/kube_env_matrix/{{ inventory_hostname }}.json"
+    content: |
+      {
+        "host": "{{ inventory_hostname }}",
+        "env_status": {
+          "kubeadm_cluster_name": {
+            "value": "{{ kubeadm_cluster_name }}",
+            "missing": {{ kubeadm_cluster_name == '' }}
+          },
+          "kubeadm_pod_network_cidr": {
+            "value": "{{ kubeadm_pod_network_cidr }}",
+            "missing": {{ kubeadm_pod_network_cidr == '' }}
+          },
+          "kubeadm_crio_version": {
+            "value": "{{ kubeadm_crio_version }}",
+            "missing": {{ kubeadm_crio_version == '' }}
+          }
+        },
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  delegate_to: localhost
+
+- name: Load environment variables from env.sh
+  shell: |
+    set -a
+    source "{{ playbook_path }}/../../env.sh"
+    env
+  register: kube_env
+  changed_when: false
+
+- name: Extract environment variables from env.sh
+  set_fact:
+    kubeadm_cluster_name: "{{ kube_env.stdout_lines | select('match', '^kubeadm_cluster_name=') | map('regex_replace', '^kubeadm_cluster_name=', '') | list | first | default('', true) }}"
+    kubeadm_pod_network_cidr: "{{ kube_env.stdout_lines | select('match', '^kubeadm_pod_network_cidr=') | map('regex_replace', '^kubeadm_pod_network_cidr=', '') | list | first | default('', true) }}"
+    kubeadm_crio_version: "{{ kube_env.stdout_lines | select('match', '^kubeadm_crio_version=') | map('regex_replace', '^kubeadm_crio_version=', '') | list | first | default('', true) }}"
+    kubeadm_k8s_repo_url: "https://pkgs.k8s.io/core:/stable:/v1.34/rpm/"
+
+- name: Emit dispatcher matrix of env status
+  copy:
+    dest: "/var/log/kube_env_matrix/{{ inventory_hostname }}.json"
+    content: |
+      {
+        "host": "{{ inventory_hostname }}",
+        "env_status": {
+          "kubeadm_cluster_name": {
+            "value": "{{ kubeadm_cluster_name }}",
+            "missing": {{ kubeadm_cluster_name == '' }}
+          },
+          "kubeadm_pod_network_cidr": {
+            "value": "{{ kubeadm_pod_network_cidr }}",
+            "missing": {{ kubeadm_pod_network_cidr == '' }}
+          },
+          "kubeadm_crio_version": {
+            "value": "{{ kubeadm_crio_version }}",
+            "missing": {{ kubeadm_crio_version == '' }}
+          }
+        },
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  delegate_to: localhost
+
+- name: Fail if required environment variables are missing
+  fail:
+    msg: >
+      Missing required environment variables in env.sh:
+      {% if kubeadm_cluster_name == '' %} - kubeadm_cluster_name{% endif %}
+      {% if kubeadm_pod_network_cidr == '' %} - kubeadm_pod_network_cidr{% endif %}
+      {% if kubeadm_crio_version == '' %} - kubeadm_crio_version{% endif %}
+  when:
+    - kubeadm_cluster_name == ''
+      or kubeadm_pod_network_cidr == ''
+      or kubeadm_crio_version == ''

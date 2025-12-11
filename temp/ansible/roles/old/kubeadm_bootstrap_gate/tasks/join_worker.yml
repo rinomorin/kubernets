@@ -1,0 +1,8 @@
+- name: Read join command from dispatcher
+  slurp:
+    src: "/var/log/kube_join_command.txt"
+  register: join_cmd_raw
+  delegate_to: localhost
+
+- name: Join Kubernetes cluster
+  command: "{{ join_cmd_raw.content | b64decode }}"

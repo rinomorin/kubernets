@@ -1,0 +1,10 @@
+# roles/kvm_provision/tasks/render_template.yml
+- name: Render template {{ tpl }} for group {{ group_name }}
+  delegate_to: localhost
+  become: false
+  template:
+    src: "{{ tpl }}.j2"
+    dest: "/tmp/{{ tpl | regex_replace('{{ACCOUNT}}', ACCOUNT) }}"
+    mode: '0644'
+  vars:
+    this_group: "{{ group_name }}"

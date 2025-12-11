@@ -1,0 +1,21 @@
+# check if ready
+# ──────── STAGE: Check existence ─────────
+- name: starting vm build
+  debug: msg="checking if system exist"
+
+- name: Display VM host
+  debug:
+    msg: "VM FQDN is {{ vm_host }} with fqdn {{ vm_fqdn }}"
+
+- name: Validate kvm_delegate is defined
+  assert:
+    that:
+      - kvm_delegate is defined
+      - kvm_delegate | length > 0
+    fail_msg: "kvm_delegate is not defined. Ensure 'kvm' or 'kvm_name' is set in inventory or vars."
+  run_once: yes
+
+- name: working on kvm
+  debug: 
+    msg: "delegated to {{ kvm_delegate }}" 
+

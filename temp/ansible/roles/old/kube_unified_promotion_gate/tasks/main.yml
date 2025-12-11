@@ -1,0 +1,142 @@
+- name: Gather all dispatcher matrix files
+  find:
+    paths: "/var/log/kube_dispatcher_matrix"
+    patterns: "*.json"
+  delegate_to: localhost
+  register: dispatcher_matrix_files
+
+- name: Read dispatcher matrix files
+  slurp:
+    src: "{{ item.path }}"
+  loop: "{{ dispatcher_matrix_files.files }}"
+  delegate_to: localhost
+  register: raw_dispatcher_data
+
+- name: Parse dispatcher matrix
+  set_fact:
+    kube_dispatcher_matrix: >-
+      {{
+        raw_dispatcher_data.results
+        | map(attribute='content')
+        | map('b64decode')
+        | map('from_json')
+        | list
+      }}
+
+- name: Gather all service health files
+  find:
+    paths: "/var/log/kube_service_health"
+    patterns: "*.json"
+  delegate_to: localhost
+  register: health_files
+
+- name: Read service health files
+  slurp:
+    src: "{{ item.path }}"
+  loop: "{{ health_files.files }}"
+  delegate_to: localhost
+  register: raw_health_data
+
+- name: Parse service health matrix
+  set_fact:
+    kube_health_matrix: >-
+      {{
+        raw_health_data.results
+        | map(attribute='content')
+        | map('b64decode')
+        | map('from_json')
+        | list
+      }}
+
+- name: Merge dispatcher and health data
+  set_fact:
+    kube_unified_matrix: >-
+      {{
+        kube_dispatcher_matrix
+        | map('combine', kube_health_matrix | items2dict(key_name='host'))
+        | list
+      }}
+
+- name: Filter promotable nodes
+  set_fact:
+    kube_promotable_nodes: >-
+      {{
+        kube_unified_matrix
+        | selectattr('env_status.kubeadm_cluster_name.missing', 'equalto', false)
+        | selectattr('env_status.kubeadm_pod_network_cidr.missing', 'equalto', false)
+        | selectattr('env_status.kubeadm_crio_version.missing', 'equalto', false)
+        | selectattr('compliance.ipa_compliant', 'equalto', true)
+        | selectattr('compliance.replication_ok', 'equalto', true)
+        | selectattr('compliance.dns_zone_count', 'gt', 0)
+        | selectattr('bootstrap.ready', 'equalto', true)
+        | selectattr('services.kubelet', 'equalto', 'active')
+        | selectattr('services.crio', 'equalto', 'active')
+        | selectattr('services.node_exporter', 'equalto', 'active')
+        | map(attribute='host')
+        | list
+      }}
+
+- name: Emit unified promotion summary
+  copy:
+    dest: "/var/log/kube_unified_promotion_summary.json"
+    content: |
+      {
+        "timestamp": "{{ ansible_date_time.iso8601 }}",
+        "promotable_nodes": {{ kube_promotable_nodes | to_json }},
+        "total": {{ kube_promotable_nodes | length }}
+      }
+  delegate_to: localhost
+
+- name: Block promotion if any node fails unified gate
+  fail:
+    msg: >
+      Promotion blocked. Only {{ kube_promotable_nodes | length }} nodes passed unified gate.
+      See /var/log/kube_unified_promotion_summary.json for details.
+  when: kube_promotable_nodes | length == 0
+
+- name: Emit per-node failure diagnostics
+  vars:
+    all_hosts: "{{ kube_dispatcher_matrix | map(attribute='host') | list }}"
+    failed_hosts: "{{ all_hosts | difference(kube_promotable_nodes) }}"
+  loop: "{{ failed_hosts }}"
+  loop_control:
+    loop_var: failed_host
+  delegate_to: localhost
+  vars:
+    node_data: >-
+      {{
+        (kube_dispatcher_matrix | selectattr('host', 'equalto', failed_host) | list | first)
+        | combine(kube_health_matrix | selectattr('host', 'equalto', failed_host) | list | first)
+      }}
+    failure_reasons: >-
+      {{
+        {
+          'missing_env': [
+            'kubeadm_cluster_name' if node_data.env_status.kubeadm_cluster_name.missing else '',
+            'kubeadm_pod_network_cidr' if node_data.env_status.kubeadm_pod_network_cidr.missing else '',
+            'kubeadm_crio_version' if node_data.env_status.kubeadm_crio_version.missing else ''
+          ] | reject('equalto', '') | list,
+          'compliance': [
+            'ipa_compliant' if not node_data.compliance.ipa_compliant else '',
+            'replication_ok' if not node_data.compliance.replication_ok else '',
+            'dns_zone_count' if node_data.compliance.dns_zone_count | int == 0 else '',
+            'kerberos_ticket_valid' if not node_data.compliance.kerberos_ticket_valid else ''
+          ] | reject('equalto', '') | list,
+          'bootstrap': [
+            'kube_ready_for_bootstrap' if not node_data.bootstrap.ready else ''
+          ] | reject('equalto', '') | list,
+          'service_health': [
+            'kubelet' if node_data.services.kubelet != 'active' else '',
+            'crio' if node_data.services.crio != 'active' else '',
+            'node_exporter' if node_data.services.node_exporter != 'active' else ''
+          ] | reject('equalto', '') | list
+        }
+      }}
+  copy:
+    dest: "/var/log/kube_promotion_failures/{{ failed_host }}.json"
+    content: |
+      {
+        "host": "{{ failed_host }}",
+        "failure_reasons": {{ failure_reasons | to_nice_json }},
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }

@@ -1,0 +1,7 @@
+- name: Create DNS zone if not present
+  command: >
+    ipa dnszone-add api.morinsoft.ca
+    --name-server=ipa01.api.morinsoft.ca.
+    --admin-email=hostmaster.api.morinsoft.ca
+  args:
+    creates: /var/named/dynamic/api.morinsoft.ca.db

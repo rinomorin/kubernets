@@ -1,0 +1,33 @@
+- name: Emit dispatcher matrix for node
+  copy:
+    dest: "/var/log/kube_dispatcher_matrix/{{ inventory_hostname }}.json"
+    content: |
+      {
+        "host": "{{ inventory_hostname }}",
+        "kube_role": "{{ kube_role }}",
+        "env_status": {
+          "kubeadm_cluster_name": {
+            "value": "{{ kubeadm_cluster_name }}",
+            "missing": {{ kubeadm_cluster_name == '' }}
+          },
+          "kubeadm_pod_network_cidr": {
+            "value": "{{ kubeadm_pod_network_cidr }}",
+            "missing": {{ kubeadm_pod_network_cidr == '' }}
+          },
+          "kubeadm_crio_version": {
+            "value": "{{ kubeadm_crio_version }}",
+            "missing": {{ kubeadm_crio_version == '' }}
+          }
+        },
+        "compliance": {
+          "ipa_compliant": {{ ipa_compliance_status | default(false) }},
+          "replication_ok": {{ ipa_replication_ok | default(false) }},
+          "dns_zone_count": {{ ipa_dns_zone_count | default(0) }},
+          "kerberos_ticket_valid": {{ ipa_kerberos_ticket_valid | default(false) }}
+        },
+        "bootstrap": {
+          "ready": {{ kube_ready_for_bootstrap | default(false) }}
+        },
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  delegate_to: localhost

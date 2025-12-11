@@ -1,0 +1,96 @@
+# default stages
+build_loops: "{{ bl|default(120)}}"
+existing_vms: false
+kvm_delegate: "{{ kvm_name | default((kvm | default(['kvmdc01.home.morinsoft.ca']))[0]) }}"
+vm_build_stage: "unknown"
+vm_build_state: "undefined"
+vm_timeout: 0
+
+# default system info
+vcpu: 2
+ram: 4096
+iso: "{{ lookup('env', 'iso_path') }}"
+# iso: "/var/lib/libvirt/images/Rocky-9.6-x86_64-dvd.iso"
+default_network: "default"
+os_variant: "rocky9"
+shutdown_max_timeout: 1800
+
+# default IDs
+default_secops_id: "{{ lookup('vars', 'secops_id') | default('secops', true) }}"
+default_secops_pwd: "{{ secops_pwd }}"
+default_ansible_id: "secops"
+default_ansible_pwd: "{{ lookup('env', 'secops_pwd') }}"
+secops_id: "{{ default_secops_id }}"
+secops_pwd: "{{ secops_pwd }}"
+secops_key: "{{ lookup('env','secops_key') }}"
+secops_edkey: "{{ lookup('env','secops_edkey') }}"
+admin_id: "{{ lookup('env', 'admin_id') }}"
+admin_set: "{{ lookup('env', 'admin_set') }}"
+ssh_key_path: "{{ lookup('env', 'ssh_key_path') }}"
+default_user_passwords: >-
+  {{
+    {
+      (default_secops_id | default('secops')): default_secops_pwd,
+      (default_ansible_id | default('awx_automate')): default_ansible_pwd,
+      (admin_id | default('sysadmin')): admin_set
+    }
+  }}
+
+# default ip info
+kubetnet_version: "{{ lookup('env', 'kubetnet_version') }}"
+cluster_ip_addr: "{{ lookup('env', 'cluster_ip_addr') }}"
+cluster_netmask: "{{ lookup('env', 'cluster_netmask') }}"
+cluster_gateway: "{{ lookup('env', 'cluster_gateway') }}"
+default_netmask: "{{ lookup('env', 'default_netmask') }}"
+default_net_device: "{{ lookup('env', 'default_net_device') }}"
+cluster_net_device: "{{ lookup('env', 'cluster_net_device') }}"
+nat_net_device: "{{ lookup('env', 'nat_net_device') }}"
+
+# groups we put sysadmin in temporory for setup
+sa_group: "sysadmin"
+secure_group: "{{ default_secops_id| default('secops') }}"
+awx_group: "awx_automate"
+sa_group_members: "{{ [admin_id | default('sysadmin')] }}"
+secure_group_members: "{{ [secure_group | default('secops')] }}"
+awx_group_members: ["secops","sysadmin"]
+
+
+members_map: >-
+  {{
+    {
+      sa_group: sa_group_members,
+      secure_group: secure_group_members,
+      awx_group: awx_group_members
+    }
+  }}
+  
+
+account_name2: "{{ account_name | default('MorinSoft')}}"
+ACCOUNT: "{{ account_name2 }}"
+
+sa_templates:
+  - "010_STD_ALIAS_DFLT"
+  - "010_STD_NEG_DFLT"
+  - "010_STD_SA_DFLT"
+
+secure_templates:
+  - "123_AE_ACCOUNT_DFLT"
+
+awx_templates:
+  - "124_AWX_ACCOUNT_DFLT"
+
+# group list for validation
+default_groups: [ "{{ sa_group }}", "{{ secure_group }}", "{{ awx_group }}" ]
+resolved_sa_group: "{{ sa_group | default('sysadmin') }}"
+resolved_secure_group: "{{ secure_group | default(default_secops_id) }}"
+resolved_awx_group: "{{ awx_group | default(default_ansible_id) }}"
+
+template_map: >-
+  {{
+    {
+      resolved_sa_group: sa_templates,
+      resolved_secure_group: secure_templates,
+      resolved_awx_group: awx_templates
+    }
+  }}
+

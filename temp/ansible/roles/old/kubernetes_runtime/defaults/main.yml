@@ -1,0 +1,7 @@
+kubernetes_repo_url: "https://pkgs.k8s.io/core:/stable:/v1.34/rpm/"
+kubernetes_gpg_key: "https://pkgs.k8s.io/core:/stable:/v1.34/rpm/repodata/repomd.xml.key"
+kubernetes_packages:
+  - kubeadm
+  - kubectl
+  - kubelet
+kubernetes_service_name: "kubelet"

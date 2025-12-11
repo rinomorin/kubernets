@@ -1,0 +1,6 @@
+kubeadm_cluster_config_path: "/etc/kubeadm/kubeadm-config.yaml"
+kubeadm_pod_network_cidr: "10.244.0.0/16"
+kubeadm_service_cidr: "10.96.0.0/12"
+kubeadm_dns_domain: "cluster.local"
+kubeadm_kubernetes_version: "stable"
+kubeadm_control_plane_endpoint: "helper01.morinsoft.ca:6443"

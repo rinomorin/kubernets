@@ -1,0 +1,16 @@
+- name: Add CRI-O repo
+  ansible.builtin.yum_repository:
+    name: crio
+    description: CRI-O upstream repo
+    baseurl: "{{ crio_repo_url }}"
+    gpgkey: "{{ crio_gpg_key_url }}"
+    gpgcheck: yes
+    enabled: yes
+
+- name: Install CRI-O packages
+  ansible.builtin.dnf:
+    name: "{{ item }}"
+    state: present
+    enablerepo: crio
+  loop: "{{ crio_packages }}"
+  notify: Restart CRI-O

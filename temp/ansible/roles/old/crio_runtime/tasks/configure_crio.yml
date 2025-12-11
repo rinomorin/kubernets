@@ -1,0 +1,5 @@
+- name: Enable and start CRI-O service
+  ansible.builtin.systemd:
+    name: "{{ crio_service_name }}"
+    enabled: yes
+    state: started
