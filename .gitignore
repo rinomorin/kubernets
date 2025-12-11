@@ -3,3 +3,4 @@ venv312/
 # Ignore real environment file
 */env_build.sh
 */env_vars.sh
+./env_vars.sh
