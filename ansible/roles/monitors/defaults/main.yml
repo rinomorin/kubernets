@@ -1,0 +1,1 @@
+monitor_target_dir: "{{ role_path }}/files"

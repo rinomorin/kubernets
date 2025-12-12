@@ -1,0 +1,28 @@
+---
+- name: Ensure monitor site directory exists
+  delegate_to: localhost
+  become: false
+  file:
+    path: "{{ monitor_target_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Deploy static HTML monitor page
+  delegate_to: localhost
+  become: false
+  copy:
+    dest: "{{ monitor_target_dir }}/index.html"
+    mode: '0644'
+    content: |
+      <!doctype html>
+      <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <title>Build Monitor</title>
+        <meta http-equiv="refresh" content="60">
+      </head>
+      <body>
+        <h1>Server Build Monitor</h1>
+        <p>This page reloads every 60 seconds.</p>
+      </body>
+      </html>

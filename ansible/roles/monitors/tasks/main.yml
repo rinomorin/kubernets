@@ -1,0 +1,6 @@
+---
+# roles/html_monitor/tasks/main.yml
+- block: 
+    - import_tasks: site_mon.yml
+    - import_tasks: certs.yml
+  

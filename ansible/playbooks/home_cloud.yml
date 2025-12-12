@@ -1,12 +1,18 @@
 - hosts: all
   gather_facts: false
-  vars:
-    vm_build_state: "{{ global_vm_build_state | default('skipped') }}"
   roles:
-    - helpers
+    - monitors
 
-# ---
+
 # - hosts: all
 #   gather_facts: false
+#   vars:
+#     vm_build_state: "{{ global_vm_build_state | default('skipped') }}"
 #   roles:
-#     - role: ipa_dns
+#     - helpers
+
+# ---
+- hosts: all
+  gather_facts: false
+  roles:
+    - role: ipa_dns
