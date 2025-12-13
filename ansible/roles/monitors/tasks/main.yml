@@ -1,6 +1,13 @@
 ---
 # roles/html_monitor/tasks/main.yml
-- block: 
+
+- name: Show folder location
+  debug:
+    msg: "httpd at {{ monitor_target_dir }}"
+  delegate_to: localhost
+
+- block:
     - import_tasks: site_mon.yml
     - import_tasks: certs.yml
-  
+    - import_tasks: readRoles.yml
+  delegate_to: localhost

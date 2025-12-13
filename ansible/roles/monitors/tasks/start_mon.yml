@@ -1,0 +1,40 @@
+# - name: Start Python HTTPS server on 443
+#   delegate_to: localhost
+#   become: false
+#   async: 36000
+#   poll: 0
+#   shell: |
+#     cd {{ monitor_target_dir }}
+#     nohup python3 - <<'EOF' &
+#     import http.server, ssl, socketserver
+#     PORT = 443
+#     handler = http.server.SimpleHTTPRequestHandler
+#     httpd = socketserver.TCPServer(('0.0.0.0', PORT), handler)
+#     httpd.socket = ssl.wrap_socket(httpd.socket,
+#                                    certfile="server.pem",
+#                                    server_side=True)
+#     print(f"Serving HTTPS on port {PORT}")
+#     httpd.serve_forever()
+#     EOF
+
+- name: Start Python HTTPS server on 443
+  delegate_to: localhost
+  become: false
+  shell: |
+    cd {{ monitor_target_dir }}
+    if [ ! -f server.pid ]; then
+      nohup python3 - <<'EOF' > server.log 2>&1 &
+      import http.server, ssl, socketserver, os
+      PORT = 443
+      handler = http.server.SimpleHTTPRequestHandler
+      httpd = socketserver.TCPServer(('0.0.0.0', PORT), handler)
+      httpd.socket = ssl.wrap_socket(httpd.socket,
+                                    certfile="server.pem",
+                                    server_side=True)
+      print(f"Serving HTTPS on port {PORT}")
+      with open("server.pid","w") as f: f.write(str(os.getpid()))
+      httpd.serve_forever()
+      EOF
+    fi
+  args:
+    chdir: "{{ monitor_target_dir }}"

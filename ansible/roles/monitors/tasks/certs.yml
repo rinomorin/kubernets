@@ -5,17 +5,26 @@
     path: "{{ monitor_target_dir }}"
     state: directory
     mode: '0755'
-
+  
 - name: Generate private key and self-signed certificate
+  command: >
+    openssl req -new -x509 -nodes -days 365
+    -out {{ monitor_target_dir }}/server.crt
+    -keyout {{ monitor_target_dir }}/server.key
+    -subj "/CN={{ ansible_fqdn | default(inventory_hostname) }}"
   delegate_to: localhost
-  become: false
-  shell: |
-    openssl req -new -x509 -nodes -days 365 \
-      -subj "/CN={{ ansible_fqdn | default(inventory_hostname) }}" \
-      -out {{ monitor_target_dir }}/server.crt \
-      -keyout {{ monitor_target_dir }}/server.key
-  # args:
-  #   creates: "{{ monitor_target_dir }}/server.crt"
+
+
+# - name: Generate private key and self-signed certificate
+#   delegate_to: localhost
+#   become: false
+#   run_once: true
+#   shell: |
+#     openssl req -new -x509 -nodes -days 365 \
+#       -out {{ monitor_target_dir }}/server.crt \
+#       -keyout {{ monitor_target_dir }}/server.key
+#   # args:
+#   #   creates: "{{ monitor_target_dir }}/server.crt"
 
 - name: Combine key and cert into PEM bundle
   delegate_to: localhost
@@ -24,21 +33,3 @@
   # args:
   #   creates: "{{ monitor_target_dir }}/server.pem"
 
-- name: Start Python HTTPS server on 443
-  delegate_to: localhost
-  become: false
-  async: 36000
-  poll: 0
-  shell: |
-    cd {{ monitor_target_dir }}
-    nohup python3 - <<'EOF' &
-    import http.server, ssl, socketserver
-    PORT = 443
-    handler = http.server.SimpleHTTPRequestHandler
-    httpd = socketserver.TCPServer(('0.0.0.0', PORT), handler)
-    httpd.socket = ssl.wrap_socket(httpd.socket,
-                                   certfile="server.pem",
-                                   server_side=True)
-    print(f"Serving HTTPS on port {PORT}")
-    httpd.serve_forever()
-    EOF

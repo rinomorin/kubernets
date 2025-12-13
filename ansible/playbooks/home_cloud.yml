@@ -1,28 +1,9 @@
 # Run this to monitor build
-# sudo python3 - <<'EOF'
-# import http.server, ssl, socketserver
-
-# PORT = 443
-# handler = http.server.SimpleHTTPRequestHandler
-
-# httpd = socketserver.TCPServer(('0.0.0.0', PORT), handler)
-
-# # Create a default SSL context
-# context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-# context.load_cert_chain(certfile="server.pem")
-
-# # Wrap the server socket
-# httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
-
-# print(f"Serving HTTPS on port {PORT}")
-# httpd.serve_forever()
-# EOF
 
 - hosts: all
   gather_facts: false
   roles:
-    - monitors
-
+    - role: monitors
 
 # - hosts: all
 #   gather_facts: false
@@ -32,7 +13,7 @@
 #     - helpers
 
 # ---
-- hosts: all
-  gather_facts: false
-  roles:
-    - role: ipa_dns
+# - hosts: all
+#   gather_facts: false
+#   roles:
+#     - role: ipa_dns
