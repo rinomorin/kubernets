@@ -1,4 +1,7 @@
 # Ignore Python virtual environment
+*/p312/
+./p312/
+py312/
 venv312/
 # Ignore real environment file
 */env_build.sh
