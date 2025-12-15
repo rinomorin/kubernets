@@ -16,7 +16,7 @@
 - block:
     - import_tasks: site_mon.yml
     - import_tasks: certs.yml
-    - import_tasks: readplaybook.yml
+    # - import_tasks: readplaybook.yml
   delegate_to: localhost
 
 # - debug:
