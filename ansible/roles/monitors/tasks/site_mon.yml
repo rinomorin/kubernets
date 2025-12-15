@@ -38,7 +38,8 @@
         <script>
           async function loadTasks() {
             try {
-              const response = await fetch('tasks.json');   // tasks.json must be served in same directory
+              const response = await fetch('tasks.json');   // tasks.json must be in same directory
+              if (!response.ok) throw new Error(`HTTP ${response.status}`);
               const data = await response.json();
 
               // Group tasks by role
@@ -57,7 +58,7 @@
               container.innerHTML = '';
               for (const [role, tasks] of Object.entries(roleMap)) {
                 const caption = document.createElement('h2');
-                caption.textContent = `Role: ${role}`;
+                caption.textContent = `Role: ${role} (${tasks.length} tasks)`;
                 container.appendChild(caption);
 
                 const table = document.createElement('table');
@@ -75,7 +76,7 @@
               }
             } catch (err) {
               document.getElementById('tables').innerHTML =
-                '<p style="color:red;">Failed to load tasks.json</p>';
+                `<p style="color:red;">Failed to load tasks.json: ${err.message}</p>`;
             }
           }
 
