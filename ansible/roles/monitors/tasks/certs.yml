@@ -14,9 +14,6 @@
     task_name: "Read tasks.json"
     status: "complete"
     rc: ""
-  delegate_to: localhost
-  run_once: yes
-  become: false
 
 - name: Generate private key and self-signed certificate
   command: >
@@ -37,9 +34,6 @@
     task_name: "Generate private key and self-signed certificate"
     result: "{{ result.rc }}"
     rc: "{{ parse_output.stderr }}"
-  delegate_to: localhost
-  run_once: yes
-  become: false
 
 - name: Combine key and cert into PEM bundle
   shell: cat {{ monitor_target_dir }}/server.key {{ monitor_target_dir }}/server.crt > {{ monitor_target_dir }}/server.pem
@@ -56,6 +50,4 @@
     task_name: "Combine key and cert into PEM bundle"
     result: "{{ result.rc }}"
     rc: "{{ parse_output.stderr }}"
-  delegate_to: localhost
-  run_once: yes
-  become: false
+  
