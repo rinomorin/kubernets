@@ -40,7 +40,7 @@
 #   roles:
 #     - role: ipa_dns
 
-# - hosts: all
-#   gather_facts: false
-#   roles:
-#     - role: ipa_setup
+- hosts: all
+  gather_facts: false
+  roles:
+    - role: ipa_setup
