@@ -36,11 +36,21 @@
   delegate_to: localhost
   run_once: true
   become: false
+  
+- name: Update tasks.json for {{ task_name }}
+  command: >
+    jq '(.plays[].tasks[] | select(.name=="{{ task_name }}" and .role=="{{ role_to_read }}"))
+        |= . + {status:"{{ status | default("pending") }}", error:"{{ serror | default("") }}"}'
+    {{ workDir }}/buildMon/tasks.json
+  register: updated_json
+  delegate_to: localhost
+  run_once: true
+  become: false
 
-- name: Write roles_dict to tasks.json
+- name: Save updated tasks.json
   copy:
     dest: "{{ workDir }}/buildMon/tasks.json"
-    content: "{{ roles_dict | to_nice_json }}"
+    content: "{{ updated_json.stdout }}"
     mode: '0644'
   delegate_to: localhost
   run_once: true
