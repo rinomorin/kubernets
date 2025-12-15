@@ -38,4 +38,10 @@ for line in tasks_output:
 if current_play:
     plays.append(current_play)
 
-print(json.dumps({"playbook": "playbooks/home_cloud.yml", "plays": plays}, indent=2))
+# assuming 'plays' is already built
+output = {"playbook": "playbooks/home_cloud.yml", "plays": plays}
+
+with open("tasks.json", "w") as f:
+    json.dump(output, f, indent=2)
+
+# print(json.dumps({"playbook": "playbooks/home_cloud.yml", "plays": plays}, indent=2))
