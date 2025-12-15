@@ -1,34 +1,34 @@
 # roles/monitors/tasks/update_status.yml
-- name: Update roles_dict for {{ task_name }}
-  set_fact:
-    roles_dict: >-
-      {{
-        (roles_dict | default({})) | combine({
-          role_to_read: {
-            'role_name': role_to_read,
-            'tasks': (
-              (roles_dict[role_to_read].tasks | default([]))
-              + [
-                {
-                  'name': task_name,
-                  'status': status | default(
-                    result is defined
-                    | ternary(
-                        (result.rc|default(1)) == 0 | ternary('success','failed'),
-                        'complete'
-                      )
-                  ),
-                  'rc': result.rc | default('none'),
-                  'error': serror | default('')
-                }
-              ]
-            )
-          }
-        }, recursive=True)
-      }}
-  delegate_to: localhost
-  run_once: true
-  become: false
+# - name: Update roles_dict for {{ task_name }}
+#   set_fact:
+#     roles_dict: >-
+#       {{
+#         (roles_dict | default({})) | combine({
+#           role_to_read: {
+#             'role_name': role_to_read,
+#             'tasks': (
+#               (roles_dict[role_to_read].tasks | default([]))
+#               + [
+#                 {
+#                   'name': task_name,
+#                   'status': status | default(
+#                     result is defined
+#                     | ternary(
+#                         (result.rc|default(1)) == 0 | ternary('success','failed'),
+#                         'complete'
+#                       )
+#                   ),
+#                   'rc': result.rc | default('none'),
+#                   'error': serror | default('')
+#                 }
+#               ]
+#             )
+#           }
+#         }, recursive=True)
+#       }}
+#   delegate_to: localhost
+#   run_once: true
+#   become: false
 
 - name: Update tasks.json for {{ task_name }}
   command: >
