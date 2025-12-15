@@ -8,12 +8,12 @@
   register: result
 
 - name: Update status
-  include_tasks: roles/monitors/tasks/update_status.yml
+  include_tasks: "{{ role_path }}/tasks/update_status.yml"
   vars:
     role_to_read: "monitors"
     task_name: "Ensure monitor site directory exists"
     result: "{{ ensure_dir_result }}"
-    
+
 - include_tasks: update_status.yml
   vars:
     role_to_read: monitors
