@@ -5,8 +5,8 @@
     playlist: []
   delegate_to: localhost
 
-- name: Update status for command (no register → defaults to complete)
-  include_tasks: roles/monitors/tasks/update_status.yml
+- name: Update status
+  include_tasks: update_status.yml
   vars:
     role_to_read: "monitors"
     task_name: "set file list"
