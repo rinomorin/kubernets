@@ -30,7 +30,6 @@
   run_once: true
   become: false
 
-
 - name: Update tasks.json for {{ task_name }}
   command: >
     jq '(.plays[].tasks[] | select(.name=="{{ task_name }}" and .role=="{{ role_to_read }}"))
