@@ -1,41 +1,3 @@
-#!/usr/bin/env python3
-import sys, os, subprocess, json, re
-
-def parse_tasks(output_lines, playbook_path):
-    plays = []
-    current_play = None
-    for line in output_lines:
-        if line.startswith("  play #"):
-            if current_play:
-                plays.append(current_play)
-            parts = re.match(r'  play #(\d+) \((.*?)\): (.*?)', line)
-            if parts:
-                current_play = {
-                    "id": int(parts.group(1)),
-                    "hosts": parts.group(2),
-                    "name": parts.group(3),
-                    "tags": [],
-                    "tasks": []
-                }
-        elif "tasks:" in line:
-            continue
-        elif ":" in line and "TAGS" in line:
-            role_task = line.strip().split("TAGS")[0].strip()
-            if " : " in role_task:
-                role, name = role_task.split(" : ", 1)
-                if role.strip():  # only append if role is non-empty
-                    current_play["tasks"].append({
-                        "role": role.strip(),
-                        "name": name.strip(),
-                        "tags": []
-                    })
-            else:
-                # no role present → skip this task entirely
-                continue
-    if current_play:
-        plays.append(current_play)
-    return {"playbook": playbook_path, "plays": plays}
-
 def main():
     if "-p" not in sys.argv or "-d" not in sys.argv:
         print("Usage: build_json_list.py -p <playbook.yml> -d /path/to/ansible [-i inventory.yml]")
@@ -75,8 +37,5 @@ def main():
     output_file = os.path.join(buildmon_dir, "tasks.json")
     with open(output_file, "w") as f:
         json.dump(json_data, f, indent=2)
-
-    print("Error running ansible-playbook:", result.stderr)
-    sys.exit(1)
 
     print(f"JSON saved to {output_file}")
