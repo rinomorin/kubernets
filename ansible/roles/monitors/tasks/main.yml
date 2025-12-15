@@ -5,31 +5,17 @@
     playlist: []
   delegate_to: localhost
 
+- name: Update status for command (no register → defaults to complete)
+  include_tasks: roles/monitors/tasks/update_status.yml
+  vars:
+    role_to_read: "monitors"
+    task_name: "set file list"
+
 - name: files read order
   import_tasks: read_includes.yml
-
-# - name: Show folder location
-#   debug:
-#     msg: "httpd at {{ monitor_target_dir }}"
-#   delegate_to: localhost
 
 - block:
     - import_tasks: site_mon.yml
     - import_tasks: certs.yml
     # - import_tasks: readplaybook.yml
   delegate_to: localhost
-
-# - debug:
-#   var: roles_list
-
-# - name: Render roles summary into index.html
-#   template:
-#     src: roles_summary.html.j2
-#     dest: "{{ monitor_target_dir }}/index.html"
-#     mode: '0644'
-#   vars:
-#     playbook: "{{ playbook_name }}"
-#     roles_data: "{{ roles_list }}"
-#   delegate_to: localhost
-#   run_once: true
-#   become: false

@@ -1,6 +1,12 @@
 - name: get work dir
   set_fact: 
     workDir: "{{ playbook_dir | dirname }}"
+  
+- name: Update status for command (no register → defaults to complete)
+  include_tasks: roles/monitors/tasks/update_status.yml
+  vars:
+    role_to_read: "monitors"
+    task_name: "get work dir"
 
 - name: Run playbook parser
   ansible.builtin.command:
@@ -15,6 +21,13 @@
   delegate_to: localhost
   run_once: yes
   become: false
+
+- name: Update status for command
+  include_tasks: roles/monitors/tasks/update_status.yml
+  vars:
+    role_to_read: "monitors"
+    task_name: "Run playbook parser"
+    result: "{{ parse_output }}"
 
 - name: Show parser output
   debug:

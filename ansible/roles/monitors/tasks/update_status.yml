@@ -6,6 +6,7 @@
 #   result: registered result from the task
 
 # roles/monitors/tasks/update_status.yml
+# roles/monitors/tasks/update_status.yml
 - name: Update roles_dict for {{ task_name }}
   set_fact:
     roles_dict: >-
@@ -14,10 +15,20 @@
           role_to_read: {
             'role_name': role_to_read,
             'tasks': (
-              (roles_dict[role_to_read].tasks | default([])) | map('combine', {
-                'status': (result is succeeded) | ternary('success','failed'),
-                'rc': result.rc | default('none')
-              }) | list
+              (roles_dict[role_to_read].tasks | default([]))
+              + [
+                {
+                  'name': task_name,
+                  'status': (
+                    (result is defined)
+                    | ternary(
+                        (result is succeeded) | ternary('success','failed'),
+                        'complete'
+                      )
+                  ),
+                  'rc': (result.rc | default('none'))
+                }
+              ]
             )
           }
         }, recursive=True)
