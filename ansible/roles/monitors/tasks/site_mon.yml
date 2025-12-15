@@ -8,7 +8,7 @@
     mode: '0755'
     recurse: yes
 
-- name: Deploy static HTML monitor page
+- name: Deploy dynamic HTML monitor page
   delegate_to: localhost
   become: false
   copy:
@@ -21,10 +21,87 @@
         <meta charset="utf-8">
         <title>Build Monitor</title>
         <meta http-equiv="refresh" content="60;url=index.html">
-
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          table { border-collapse: collapse; margin-bottom: 30px; width: 100%; }
+          th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
+          h2 { margin-top: 40px; }
+        </style>
       </head>
       <body>
         <h1>Server Build Monitor</h1>
         <p>This page reloads every 60 seconds.</p>
+
+        <div id="tables"></div>
+
+        <script>
+          async function loadTasks() {
+            try {
+              const response = await fetch('tasks.json');
+              const data = await response.json();
+
+              // Group tasks by role
+              const roleMap = {};
+              data.plays.forEach(play => {
+                play.tasks.forEach(task => {
+                  if (!roleMap[task.role]) {
+                    roleMap[task.role] = [];
+                  }
+                  roleMap[task.role].push(task.name);
+                });
+              });
+
+              // Render tables
+              const container = document.getElementById('tables');
+              container.innerHTML = '';
+              for (const [role, tasks] of Object.entries(roleMap)) {
+                const table = document.createElement('table');
+                const caption = document.createElement('h2');
+                caption.textContent = `Role: ${role}`;
+                container.appendChild(caption);
+
+                const headerRow = document.createElement('tr');
+                headerRow.innerHTML = '<th>#</th><th>Task Name</th>';
+                table.appendChild(headerRow);
+
+                tasks.forEach((taskName, idx) => {
+                  const row = document.createElement('tr');
+                  row.innerHTML = `<td>${idx + 1}</td><td>${taskName}</td>`;
+                  table.appendChild(row);
+                });
+
+                container.appendChild(table);
+              }
+            } catch (err) {
+              document.getElementById('tables').innerHTML =
+                '<p style="color:red;">Failed to load tasks.json</p>';
+            }
+          }
+
+          loadTasks();
+        </script>
       </body>
       </html>
+
+
+# - name: Deploy static HTML monitor page
+#   delegate_to: localhost
+#   become: false
+#   copy:
+#     dest: "{{ monitor_target_dir }}/index.html"
+#     mode: '0644'
+#     content: |
+#       <!doctype html>
+#       <html lang="en">
+#       <head>
+#         <meta charset="utf-8">
+#         <title>Build Monitor</title>
+#         <meta http-equiv="refresh" content="60;url=index.html">
+
+#       </head>
+#       <body>
+#         <h1>Server Build Monitor</h1>
+#         <p>This page reloads every 60 seconds.</p>
+#       </body>
+#       </html>
