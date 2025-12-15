@@ -36,3 +36,12 @@
   delegate_to: localhost
   run_once: true
   become: false
+
+- name: Write roles_dict to tasks.json
+  copy:
+    dest: "{{ workDir }}/buildMon/tasks.json"
+    content: "{{ roles_dict | to_nice_json }}"
+    mode: '0644'
+  delegate_to: localhost
+  run_once: true
+  become: false
