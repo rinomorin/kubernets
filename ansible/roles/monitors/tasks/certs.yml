@@ -5,7 +5,8 @@
     path: "{{ monitor_target_dir }}"
     state: directory
     mode: '0755'
-  register: result
+  status: "{{ result.stdout }}"
+  rc: "{{ parse_output.stderr }}"
 
 - name: Update status
   include_tasks: "{{role_path}}/tasks/update_status.yml"
