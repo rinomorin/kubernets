@@ -38,7 +38,7 @@ def parse_tasks(output_lines, playbook_path):
 
 def main():
     if "-p" not in sys.argv or "-d" not in sys.argv:
-        print("Usage: build_json_list.py -p <playbook.yml> -d /path/to/ansible [-i inventory.yml]")
+        print("Usage: build_json_list.py -p <playbook.yml> -d /path/to/ansible [-i inventory.yml] [-r roles_path]")
         sys.exit(1)
 
     playbook_index = sys.argv.index("-p") + 1
@@ -52,9 +52,17 @@ def main():
         inventory_index = sys.argv.index("-i") + 1
         inventory_file = sys.argv[inventory_index]
 
+    # Optional roles_path
+    roles_path = None
+    if "-r" in sys.argv:
+        roles_index = sys.argv.index("-r") + 1
+        roles_path = sys.argv[roles_index]
+
     cmd = ["ansible-playbook", playbook_path, "--list-tasks"]
     if inventory_file:
         cmd.extend(["-i", inventory_file])
+    if roles_path:
+        cmd.extend(["-e", f"ansible_roles_path={roles_path}"])
 
     result = subprocess.run(
         cmd,
