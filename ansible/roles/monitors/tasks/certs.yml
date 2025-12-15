@@ -33,6 +33,7 @@
     role_to_read: monitors
     task_name: "Generate private key and self-signed certificate"
     result: "{{ result.rc }}"
+    rc: "{{ parse_output.stderr }}"
 
 - name: Combine key and cert into PEM bundle
   shell: cat {{ monitor_target_dir }}/server.key {{ monitor_target_dir }}/server.crt > {{ monitor_target_dir }}/server.pem
@@ -48,3 +49,4 @@
     role_to_read: monitors
     task_name: "Combine key and cert into PEM bundle"
     result: "{{ result.rc }}"
+    rc: "{{ parse_output.stderr }}"
