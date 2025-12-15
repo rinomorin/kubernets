@@ -1,13 +1,3 @@
----
-# Usage: include_tasks: update_status.yml
-# Vars required:
-#   role_to_read: logical role name (e.g. monitors)
-#   task_name: descriptive task name
-#   result: registered result from the task
-- name: get work dir
-  set_fact: 
-    workDir: "{{ playbook_dir | dirname }}"
-
 # roles/monitors/tasks/update_status.yml
 # roles/monitors/tasks/update_status.yml
 - name: Update roles_dict for {{ task_name }}
@@ -23,13 +13,17 @@
                 {
                   'name': task_name,
                   'status': (
-                      result is defined
-                      | ternary(
-                          (result is succeeded) | ternary('success','failed'),
-                          'complete'
-                        )
-                    ),
-                    'rc': (result is defined and result.rc is defined) | ternary(result.rc, 'none')
+                    status
+                    | default(
+                        result is defined
+                        | ternary(
+                            (result.rc|default(1)) == 0 | ternary('success','failed'),
+                            'complete'
+                          )
+                      )
+                  ),
+                  'rc': result.rc | default('none'),
+                  'error': serror | default('')
                 }
               ]
             )
@@ -40,15 +34,6 @@
   run_once: true
   become: false
 
-- name: Update tasks.json for {{ task_name }}
-  command: >
-    jq '(.plays[].tasks[] | select(.name=="{{ task_name }}" and .role=="{{ role_to_read }}"))
-        |= . + {status:"{{ status | default("pending") }}", error:"{{ serror | default("") }}"}'
-    {{ workDir }}/buildMon/tasks.json
-  register: updated_json
-  delegate_to: localhost
-  run_once: true
-  become: false
 
 - name: Save updated tasks.json
   copy:
