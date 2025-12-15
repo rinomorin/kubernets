@@ -32,7 +32,7 @@
   vars:
     role_to_read: monitors
     task_name: "Generate private key and self-signed certificate"
-    result: "{{ result.rc }}"
+    status: "{{ result.stdout }}"
     rc: "{{ parse_output.stderr }}"
 
 - name: Combine key and cert into PEM bundle
@@ -48,6 +48,6 @@
   vars:
     role_to_read: monitors
     task_name: "Combine key and cert into PEM bundle"
-    result: "{{ result.rc }}"
+    status: "{{ result.stdout }}"
     rc: "{{ parse_output.stderr }}"
   
