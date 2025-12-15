@@ -23,11 +23,16 @@ def parse_tasks(output_lines, playbook_path):
             role_task = line.strip().split("TAGS")[0].strip()
             if " : " in role_task:
                 role, name = role_task.split(" : ", 1)
+                # only append if role is not empty
+                if role.strip():
+                    current_play["tasks"].append({
+                        "role": role.strip(),
+                        "name": name.strip(),
+                        "tags": []
+                    })
             else:
-                role, name = None, role_task
-            # Skip tasks with null role
-            if role is not None:
-                current_play["tasks"].append({"role": role, "name": name, "tags": []})
+                # no role present → skip entirely
+                continue
     if current_play:
         plays.append(current_play)
     return {"playbook": playbook_path, "plays": plays}
