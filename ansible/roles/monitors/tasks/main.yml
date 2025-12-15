@@ -13,11 +13,11 @@
 #     msg: "httpd at {{ monitor_target_dir }}"
 #   delegate_to: localhost
 
-# - block:
-#     - import_tasks: site_mon.yml
-#     - import_tasks: certs.yml
-#     - import_tasks: readplaybook.yml
-#   delegate_to: localhost
+- block:
+    - import_tasks: site_mon.yml
+    - import_tasks: certs.yml
+    - import_tasks: readplaybook.yml
+  delegate_to: localhost
 
 # - debug:
 #   var: roles_list
