@@ -27,9 +27,6 @@
           th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
           th { background-color: #f2f2f2; }
           h2 { margin-top: 40px; }
-          .status-pending { background-color: #fff3cd; }   /* yellow */
-          .status-success { background-color: #d4edda; }   /* green */
-          .status-error   { background-color: #f8d7da; }   /* red */
         </style>
       </head>
       <body>
@@ -41,33 +38,19 @@
         <script>
           async function loadTasks() {
             try {
-              const response = await fetch('tasks.json');
+              const response = await fetch('tasks.json');   // tasks.json must be in same directory
               if (!response.ok) throw new Error(`HTTP ${response.status}`);
               const data = await response.json();
 
-              // Ensure each task has status/error fields
-              data.plays.forEach(play => {
-                play.tasks.forEach(task => {
-                  if (typeof task.status === 'undefined' || task.status === '') {
-                    task.status = "pending";
-                  }
-                  if (typeof task.error === 'undefined') {
-                    task.error = "";
-                  }
-                });
-              });
-
-              // Group tasks by role, but skip "Update status"
+              // Group tasks by role
               const roleMap = {};
               data.plays.forEach(play => {
-                play.tasks
-                  .filter(task => task.name !== "Update status")   // <-- filter here
-                  .forEach(task => {
-                    if (!roleMap[task.role]) {
-                      roleMap[task.role] = [];
-                    }
-                    roleMap[task.role].push(task);
-                  });
+                play.tasks.forEach(task => {
+                  if (!roleMap[task.role]) {
+                    roleMap[task.role] = [];
+                  }
+                  roleMap[task.role].push(task.name);
+                });
               });
 
               // Render tables
@@ -80,23 +63,12 @@
 
                 const table = document.createElement('table');
                 const headerRow = document.createElement('tr');
-                headerRow.innerHTML = '<th>#</th><th>Task Name</th><th>Status</th><th>Error</th>';
+                headerRow.innerHTML = '<th>#</th><th>Task Name</th>';
                 table.appendChild(headerRow);
 
-                tasks.forEach((task, idx) => {
+                tasks.forEach((taskName, idx) => {
                   const row = document.createElement('tr');
-                  let statusClass = '';
-                  if (task.status === 'pending') statusClass = 'status-pending';
-                  else if (task.status === 'success') statusClass = 'status-success';
-                  else if (task.status === 'failed') statusClass = 'status-failed';
-                  else if (task.status === 'complete') statusClass = 'status-complete';
-
-                  row.innerHTML = `
-                    <td>${idx + 1}</td>
-                    <td>${task.name}</td>
-                    <td class="${statusClass}">${task.status}</td>
-                    <td>${task.error}</td>
-                  `;
+                  row.innerHTML = `<td>${idx + 1}</td><td>${taskName}</td>`;
                   table.appendChild(row);
                 });
 
@@ -109,6 +81,7 @@
           }
 
           loadTasks();
+        </script>
       </body>
       </html>
 
