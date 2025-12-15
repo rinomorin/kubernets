@@ -21,6 +21,7 @@
   vars:
     role_to_read: "monitors"
     task_name: "Run playbook parser"
+    result: "{{ parse_output }}"
 
 - name: Read tasks.json
   ansible.builtin.slurp:
@@ -36,7 +37,8 @@
     role_to_read: "monitors"
     task_name: "Read tasks.json"
     status: "complete"
-    
+    serror: ""
+
 - name: Parse tasks.json
   set_fact:
     tasks_data: "{{ tasks_file.content | b64decode | from_json }}"
@@ -45,8 +47,9 @@
   include_tasks: update_status.yml
   vars:
     role_to_read: "monitors"
-    task_name: "Parse tasks.json"
+    task_name: "Read tasks.json"
     status: "complete"
+    serror: ""
 
 - name: Show ordered task list
   debug:
