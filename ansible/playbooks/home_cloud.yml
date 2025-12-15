@@ -1,5 +1,4 @@
 # Run this to monitor build
-
 - hosts: all
   gather_facts: false
   roles:
@@ -25,7 +24,6 @@
   gather_facts: no
   roles:
     - role: kvm_provision 
-
 
 # - hosts: all
 #   gather_facts: false

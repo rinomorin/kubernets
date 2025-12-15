@@ -5,12 +5,6 @@
     playlist: []
   delegate_to: localhost
 
-- name: Update status
-  include_tasks: update_status.yml
-  vars:
-    role_to_read: "monitors"
-    task_name: "set file list"
-
 - name: files read order
   import_tasks: read_includes.yml
 
