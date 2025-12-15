@@ -27,6 +27,7 @@
   vars:
     role_to_read: "monitors"
     task_name: "Run playbook parser"
+    status: "complete"
     result: "{{ parse_output }}"
 
 - name: Show parser output
