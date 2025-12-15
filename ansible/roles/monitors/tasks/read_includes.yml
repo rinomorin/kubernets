@@ -42,112 +42,27 @@
   run_once: yes
   become: false
 
+- name: Update status
+  include_tasks: update_status.yml
+  vars:
+    role_to_read: "monitors"
+    task_name: "Read tasks.json"
+    status: "complete"
+    result: "{{ tasks_file }}"
+
 - name: Parse tasks.json
   set_fact:
     tasks_data: "{{ tasks_file.content | b64decode | from_json }}"
+
+- name: Update status
+  include_tasks: update_status.yml
+  vars:
+    role_to_read: "monitors"
+    task_name: "Parse tasks.json"
+    status: "complete"
+    result: ""
 
 - name: Show ordered task list
   debug:
     var: tasks_data
 
-# - name: Extract raw task names from each file into temp file
-#   ansible.builtin.shell: |
-#     role="{{ item | regex_search('roles/([^/]+)') }}"/
-#     tmpfile="/tmp/tasks_$(basename {{ item }})"
-#     grep -a1 'name:' "{{ item }}" \
-#       | grep -vE '#|debug' \
-#       | grep 'name:' \
-#       | awk -F: -v r="$role" '{gsub(/^[ \t]+/, "", $2); print r "|" $2}' > "$tmpfile"
-#     echo "$tmpfile"
-#   loop: "{{ parse_output.stdout_lines }}"
-#   register: task_files
-#   delegate_to: localhost
-#   become: false
-#   run_once: yes
-#   changed_when: false
-
-# - name: Read back task names in order
-#   ansible.builtin.shell: cat "{{ item.stdout }}"
-#   loop: "{{ task_files.results }}"
-#   register: ordered_tasks
-#   delegate_to: localhost
-#   become: false
-#   run_once: yes
-#   changed_when: false
-
-# - name: Build ordered list of role/file/tasks
-#   set_fact:
-#     mylist: "{{ mylist | default([]) + [ { 'role': role, 'file': item.item, 'tasks': item.stdout_lines | map('regex_replace','^[^|]+\\|','') | list } ] }}"
-#   vars:
-#     role: "{{ item.stdout_lines[0].split('|')[0] if item.stdout_lines|length>0 else (item.item | regex_search('roles/([^/]+)')) }}"
-#   loop: "{{ ordered_tasks.results }}"
-#   when: item.stdout_lines is defined and item.stdout_lines | length > 0
-#   run_once: yes
-
-# - name: Show ordered role/file/tasks
-#   debug:
-#     var: mylist
-#   run_once: yes
-
-# - name: Aggregate tasks by role
-#   set_fact:
-#     tasks_by_role: >-
-#       {{
-#         tasks_by_role | default({}) |
-#         combine({
-#           (item.item | regex_search('roles/([^/]+)')):
-#           (tasks_by_role[item.item | regex_search('roles/([^/]+)')] | default([]))
-#           + item.stdout_lines
-#         })
-#       }}
-#   loop: "{{ file_tasks.results }}"
-#   when: item.stdout_lines is defined and item.stdout_lines | length > 0
-#   run_once: yes
-
-# - name: Show tasks grouped by role
-#   debug:
-#     var: tasks_by_role
-#   run_once: yes
-# - name: Get roles and includes from playbook
-#   delegate_to: localhost
-#   run_once: yes
-#   become: false
-#   shell: |
-#     grep -vE "^#|^$" {{ playbook_dir }}/"{{playbook_name}}" \
-#     | grep -E "include_tasks|import_tasks|role:" \
-#     | sed 's/- //g'
-#   register: playbook_files
-
-# - name: Initialize order list
-#   run_once: yes
-#   set_fact:
-#     order_list: []
-#     tasks_list: []
-#     vars_list: []
-#   delegate_to: localhost
-
-# - name: Build order list from playbook lines
-#   set_fact:
-#     order_list: "{{ order_list + [ {
-#       'type': (role_file.split(':') | first | trim),
-#       'value': (role_file.split(':') | last | trim)
-#       } ] }}"
-#   loop: "{{ playbook_files.stdout_lines }}"
-#   loop_control:
-#     loop_var: role_file
-#   delegate_to: localhost
-  
-# - name: show list
-#   debug:
-#     msg: "{{ order_list }}"
-#   run_once: yes
-#   delegate_to: localhost
-
-# - name: loop order_list
-#   include_tasks: read_main.yml
-#   loop: "{{ order_list }}"
-#   loop_control:
-#     loop_var: role_to_read
-#   vars:
-#     type: "{{ role_to_read.type }}"
-#     role_file: "{{ playbook_dir }}/../roles/{{ role_to_read.value }}"
