@@ -1,5 +1,9 @@
 ---
 # roles/html_monitor/tasks/main.yml
+- name: get work dir
+  set_fact: 
+    workDir: "{{ playbook_dir | dirname }}"
+
 - name: set file list
   set_fact: 
     playlist: []

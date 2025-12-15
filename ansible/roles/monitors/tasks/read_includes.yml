@@ -1,7 +1,3 @@
-- name: get work dir
-  set_fact: 
-    workDir: "{{ playbook_dir | dirname }}"
-
 - name: Run playbook parser
   ansible.builtin.command:
     cmd: >
