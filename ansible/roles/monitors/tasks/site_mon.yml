@@ -41,27 +41,33 @@
         <script>
           async function loadTasks() {
             try {
-              const response = await fetch('tasks.json');   // tasks.json must be in same directory
+              const response = await fetch('tasks.json');
               if (!response.ok) throw new Error(`HTTP ${response.status}`);
               const data = await response.json();
 
-              // Group tasks by role, adding default status/error
-              const roleMap = {};
+              // Ensure each task has status/error fields
               data.plays.forEach(play => {
                 play.tasks.forEach(task => {
-                  // Add defaults
-                  if (!task.status) {
+                  if (typeof task.status === 'undefined' || task.status === '') {
                     task.status = "pending";
                   }
-                  if (!task.error) {
-                    task.error = null;
+                  if (typeof task.error === 'undefined') {
+                    task.error = "";
                   }
-
-                  if (!roleMap[task.role]) {
-                    roleMap[task.role] = [];
-                  }
-                  roleMap[task.role].push(task);
                 });
+              });
+
+              // Group tasks by role, but skip "Update status"
+              const roleMap = {};
+              data.plays.forEach(play => {
+                play.tasks
+                  .filter(task => task.name !== "Update status")   // <-- filter here
+                  .forEach(task => {
+                    if (!roleMap[task.role]) {
+                      roleMap[task.role] = [];
+                    }
+                    roleMap[task.role].push(task);
+                  });
               });
 
               // Render tables
@@ -79,17 +85,17 @@
 
                 tasks.forEach((task, idx) => {
                   const row = document.createElement('tr');
-                  // choose CSS class based on status
                   let statusClass = '';
                   if (task.status === 'pending') statusClass = 'status-pending';
                   else if (task.status === 'success') statusClass = 'status-success';
-                  else if (task.status === 'error') statusClass = 'status-error';
+                  else if (task.status === 'failed') statusClass = 'status-failed';
+                  else if (task.status === 'complete') statusClass = 'status-complete';
 
                   row.innerHTML = `
                     <td>${idx + 1}</td>
                     <td>${task.name}</td>
                     <td class="${statusClass}">${task.status}</td>
-                    <td>${task.error !== null ? task.error : ''}</td>
+                    <td>${task.error}</td>
                   `;
                   table.appendChild(row);
                 });
@@ -103,7 +109,6 @@
           }
 
           loadTasks();
-        </script>
       </body>
       </html>
 
