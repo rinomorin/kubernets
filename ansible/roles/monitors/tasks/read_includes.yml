@@ -21,7 +21,6 @@
   vars:
     role_to_read: "monitors"
     task_name: "Run playbook parser"
-    status: "complete"
     result: "{{ parse_output }}"
 
 - name: Read tasks.json
@@ -38,7 +37,7 @@
     role_to_read: "monitors"
     task_name: "Read tasks.json"
     status: "complete"
-    result: "{{ tasks_file }}"
+    serror: ""
 
 - name: Parse tasks.json
   set_fact:
@@ -50,7 +49,7 @@
     role_to_read: "monitors"
     task_name: "Parse tasks.json"
     status: "complete"
-    result: ""
+    serror: ""
 
 - name: Show ordered task list
   debug:
