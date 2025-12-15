@@ -5,6 +5,28 @@
   roles:
     - role: monitors
 
+- name: break here
+  hosts: all
+  gather_facts: false
+  tasks:
+    - debug: msg="break {{ here }}"
+    
+- name: Provision VMs from KVM host
+  hosts: all
+  vars:
+    ipa_domain: "{{ lookup('env', 'ipa_domain') }}"
+    dns_zone: "{{ lookup('env', 'dns_zone') }}"
+    account_name: "{{ lookup('env', 'account_name') }}"
+    admin_id: "{{ lookup('env', 'admin_id') }}"
+    admin_set: "{{ lookup('env', 'admin_set') }}"
+    secops_id: "{{ lookup('env', 'secops_id') }}"
+    secops_pwd: "{{ lookup('env', 'secops_pwd') }}"
+  become: true
+  gather_facts: no
+  roles:
+    - role: kvm_provision 
+
+
 # - hosts: all
 #   gather_facts: false
 #   vars:
@@ -17,3 +39,8 @@
 #   gather_facts: false
 #   roles:
 #     - role: ipa_dns
+
+# - hosts: all
+#   gather_facts: false
+#   roles:
+#     - role: ipa_setup

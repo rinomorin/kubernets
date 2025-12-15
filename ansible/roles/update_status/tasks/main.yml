@@ -1,0 +1,24 @@
+---
+# Usage: include_role with vars:
+#   role_to_read: name of the role being processed
+#   task_role: logical sub-role (e.g. certs)
+#   task_name: descriptive task name
+#   result: registered result from the task
+
+- name: Update roles_dict for {{ task_name }}
+  set_fact:
+    roles_dict: >-
+      {{
+        roles_dict | combine({
+          role_to_read: {
+            'role_name': role_to_read,
+            'tasks': (
+              roles_dict[role_to_read].tasks | map('combine', {
+                'status': (result is succeeded) | ternary('success','failed'),
+                'rc': result.rc | default('none')
+              }) | list
+            )
+          }
+        }, recursive=True)
+      }}
+  delegate_to: localhost

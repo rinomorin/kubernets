@@ -1,0 +1,4 @@
+{
+    "playbook": "home_cloud.yml",
+    "roles": {}
+}

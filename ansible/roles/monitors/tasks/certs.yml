@@ -5,7 +5,14 @@
     path: "{{ monitor_target_dir }}"
     state: directory
     mode: '0755'
-  
+  register: result
+
+- include_tasks: update_status.yml
+  vars:
+    role_to_read: monitors
+    task_name: "Ensure monitor site directory exists"
+    result: "{{ result }}"
+
 - name: Generate private key and self-signed certificate
   command: >
     openssl req -new -x509 -nodes -days 365
@@ -13,23 +20,27 @@
     -keyout {{ monitor_target_dir }}/server.key
     -subj "/CN={{ ansible_fqdn | default(inventory_hostname) }}"
   delegate_to: localhost
+  become: false
+  args:
+    creates: "{{ monitor_target_dir }}/server.crt"
+  register: result
 
-
-# - name: Generate private key and self-signed certificate
-#   delegate_to: localhost
-#   become: false
-#   run_once: true
-#   shell: |
-#     openssl req -new -x509 -nodes -days 365 \
-#       -out {{ monitor_target_dir }}/server.crt \
-#       -keyout {{ monitor_target_dir }}/server.key
-#   # args:
-#   #   creates: "{{ monitor_target_dir }}/server.crt"
+- include_tasks: update_status.yml
+  vars:
+    role_to_read: monitors
+    task_name: "Generate private key and self-signed certificate"
+    result: "{{ result }}"
 
 - name: Combine key and cert into PEM bundle
+  shell: cat {{ monitor_target_dir }}/server.key {{ monitor_target_dir }}/server.crt > {{ monitor_target_dir }}/server.pem
   delegate_to: localhost
   become: false
-  shell: cat {{ monitor_target_dir }}/server.key {{ monitor_target_dir }}/server.crt > {{ monitor_target_dir }}/server.pem
-  # args:
-  #   creates: "{{ monitor_target_dir }}/server.pem"
+  args:
+    creates: "{{ monitor_target_dir }}/server.pem"
+  register: result
 
+- include_tasks: update_status.yml
+  vars:
+    role_to_read: monitors
+    task_name: "Combine key and cert into PEM bundle"
+    result: "{{ result }}"

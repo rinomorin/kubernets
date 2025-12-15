@@ -1,0 +1,57 @@
+- name: get roles variable list
+  delegate_to: localhost
+  become: false
+  block:
+    # --- Resolve defaults file path ---
+    - name: get real path
+      set_fact:
+        role_defaults_file: "{{ (role_file ~ '/defaults/main.yml') | realpath }}"
+
+    # --- Load defaults as raw YAML (no Jinja evaluation) ---
+    - name: slurp defaults file
+      slurp:
+        path: "{{ role_defaults_file }}"
+      register: defaults_raw
+
+    - name: parse defaults
+      set_fact:
+        role_defaults: "{{ defaults_raw.content | b64decode | from_yaml }}"
+
+    - name: flatten role defaults
+      set_fact:
+        var_list: "{{ role_defaults | dict2items }}"
+
+    - name: show parsed variables
+      debug:
+        var: var_list
+
+    # --- Read tasks/main.yml ---
+    - name: read tasks/main.yml
+      slurp:
+        path: "{{ role_file }}/tasks/main.yml"
+      register: main_yml
+
+    - name: parse tasks
+      set_fact:
+        parsed_tasks: "{{ main_yml.content | b64decode | from_yaml }}"
+
+    # --- Build ordered list of includes/imports/roles ---
+    - name: build ordered list of includes/imports/roles
+      set_fact:
+        task_list: "{{ task_list | default([]) + [ {
+          'type': (item.include_tasks is defined) | ternary('include_tasks',
+                   (item.import_tasks is defined) | ternary('import_tasks',
+                   (item.role is defined) | ternary('role','unknown'))),
+          'value': item.include_tasks | default(item.import_tasks) | default(item.role)
+        } ] }}"
+      loop: "{{ parsed_tasks }}"
+      loop_control:
+        label: "{{ item.name | default('unnamed task') }}"
+      when: item.include_tasks is defined or item.import_tasks is defined or item.role is defined
+
+    - name: show ordered task list
+      debug:
+        var: task_list
+
+  when: type == "role"
+  # run_once: yes

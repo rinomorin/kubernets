@@ -1,0 +1,35 @@
+- name: Load playbook YAML
+  set_fact:
+    playbook_content: "{{ (lookup('file', playbook_dir ~ '/' ~ playbook_name) | from_yaml_all | list) | flatten }}"
+  delegate_to: localhost
+  run_once: true
+
+- name: Collect roles from playbook
+  set_fact:
+    playbook_roles: "{{ playbook_roles | default([]) + (item.roles | map(attribute='role') | list) }}"
+  loop: "{{ playbook_content }}"
+  when: item.roles is defined
+  delegate_to: localhost
+  run_once: true
+
+- name: Initialize roles_dict
+  set_fact:
+    roles_dict: {}
+  run_once: true
+
+- name: Process each role
+  include_tasks: readrole.yml
+  loop: "{{ playbook_roles }}"
+  loop_control:
+    loop_var: role_to_read
+  
+# ⬇️ Final write happens once, after all roles are processed
+- name: Write roles_dict to JSON file
+  copy:
+    dest: "{{ monitor_target_dir }}/roles_summary.json"
+    mode: '0644'
+    content: "{{ {'playbook': playbook_name, 'roles': roles_dict | default({})} | to_nice_json }}"
+  delegate_to: localhost
+  run_once: true
+  become: false
+  when: roles_dict is defined
