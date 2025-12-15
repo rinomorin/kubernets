@@ -19,7 +19,6 @@
                       )
                   ),
                   'rc': result.rc | default('none'),
-                  'error': serror | default('')
                 }
               ]
             )
@@ -33,7 +32,7 @@
 - name: Update tasks.json for {{ task_name }}
   command: >
     jq '(.plays[].tasks[] | select(.name=="{{ task_name }}" and .role=="{{ role_to_read }}"))
-        |= . + {status:"{{ status | default("pending") }}", error:"{{ serror | default("") }}"}'
+        |= . + {status:"{{ status | default("pending") }}", rc:"{{ rc | default("") }}"}'
     {{ workDir }}/buildMon/tasks.json
   register: updated_json
   delegate_to: localhost

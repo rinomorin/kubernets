@@ -22,6 +22,7 @@
     role_to_read: "monitors"
     task_name: "Run playbook parser"
     result: "{{ parse_output }}"
+    rc: "{{ parse_output.stderr }}"
 
 - name: Read tasks.json
   ansible.builtin.slurp:
@@ -37,7 +38,7 @@
     role_to_read: "monitors"
     task_name: "Read tasks.json"
     status: "complete"
-    serror: ""
+    rc: ""
 
 - name: Parse tasks.json
   set_fact:
@@ -49,7 +50,7 @@
     role_to_read: "monitors"
     task_name: "Read tasks.json"
     status: "complete"
-    serror: ""
+    rc: ""
 
 - name: Show ordered task list
   debug:
