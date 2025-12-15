@@ -76,4 +76,7 @@ def main():
     with open(output_file, "w") as f:
         json.dump(json_data, f, indent=2)
 
+    print("Error running ansible-playbook:", result.stderr)
+    sys.exit(1)
+
     print(f"JSON saved to {output_file}")
