@@ -8,11 +8,12 @@
   register: result
 
 - name: Update status
-  include_tasks: "{{ role_path }}/tasks/update_status.yml"
+  include_tasks: "{{role_path}}/tasks/update_status.yml"
   vars:
     role_to_read: "monitors"
-    task_name: "Ensure monitor site directory exists"
-    result: "{{ ensure_dir_result }}"
+    task_name: "Read tasks.json"
+    status: "complete"
+    rc: ""
 
 - name: Generate private key and self-signed certificate
   command: >
@@ -31,7 +32,7 @@
   vars:
     role_to_read: monitors
     task_name: "Generate private key and self-signed certificate"
-    result: "{{ result }}"
+    result: "{{ result.rc }}"
 
 - name: Combine key and cert into PEM bundle
   shell: cat {{ monitor_target_dir }}/server.key {{ monitor_target_dir }}/server.crt > {{ monitor_target_dir }}/server.pem
@@ -41,9 +42,9 @@
     creates: "{{ monitor_target_dir }}/server.pem"
   register: result
 
-- name: Combine key and cert into PEM bundle
+- name: update Generate private key
   include_tasks: "{{ role_path }}/tasks/update_status.yml"
   vars:
     role_to_read: monitors
     task_name: "Combine key and cert into PEM bundle"
-    result: "{{ result }}"
+    result: "{{ result.rc }}"
