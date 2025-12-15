@@ -38,72 +38,77 @@
 
         <div id="tables"></div>
 
-        <script>
-          async function loadTasks() {
-            try {
-              const response = await fetch('tasks.json');   // tasks.json must be in same directory
-              if (!response.ok) throw new Error(`HTTP ${response.status}`);
-              const data = await response.json();
+       <script>
+        async function loadTasks() {
+          try {
+            const response = await fetch('tasks.json');   // tasks.json must be in same directory
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
 
-              // Group tasks by role, adding default status/error
-              const roleMap = {};
-              data.plays.forEach(play => {
-                play.tasks.forEach(task => {
-                  // Add defaults
-                  if (!task.status) {
-                    task.status = "pending";
-                  }
-                  if (!task.error) {
-                    task.error = null;
-                  }
+            // Group tasks by role, adding default status/error
+            const roleMap = {};
+            data.plays.forEach(play => {
+              play.tasks.forEach(task => {
+                // Skip bookkeeping tasks
+                if (task.name === "Update status") {
+                  return;   // continue to next task
+                }
 
-                  if (!roleMap[task.role]) {
-                    roleMap[task.role] = [];
-                  }
-                  roleMap[task.role].push(task);
-                });
+                // Add defaults
+                if (!task.status) {
+                  task.status = "pending";
+                }
+                if (!task.error) {
+                  task.error = null;
+                }
+
+                if (!roleMap[task.role]) {
+                  roleMap[task.role] = [];
+                }
+                roleMap[task.role].push(task);
+              });
+            });
+
+            // Render tables
+            const container = document.getElementById('tables');
+            container.innerHTML = '';
+            for (const [role, tasks] of Object.entries(roleMap)) {
+              const caption = document.createElement('h2');
+              caption.textContent = `Role: ${role} (${tasks.length} tasks)`;
+              container.appendChild(caption);
+
+              const table = document.createElement('table');
+              const headerRow = document.createElement('tr');
+              headerRow.innerHTML = '<th>#</th><th>Task Name</th><th>Status</th><th>Error</th>';
+              table.appendChild(headerRow);
+
+              tasks.forEach((task, idx) => {
+                const row = document.createElement('tr');
+                let statusClass = '';
+                if (task.status === 'pending') statusClass = 'status-pending';
+                else if (task.status === 'success') statusClass = 'status-success';
+                else if (task.status === 'error') statusClass = 'status-error';
+
+                row.innerHTML = `
+                  <td>${idx + 1}</td>
+                  <td>${task.name}</td>
+                  <td class="${statusClass}">${task.status}</td>
+                  <td>${task.error !== null ? task.error : ''}</td>
+                `;
+                table.appendChild(row);
               });
 
-              // Render tables
-              const container = document.getElementById('tables');
-              container.innerHTML = '';
-              for (const [role, tasks] of Object.entries(roleMap)) {
-                const caption = document.createElement('h2');
-                caption.textContent = `Role: ${role} (${tasks.length} tasks)`;
-                container.appendChild(caption);
-
-                const table = document.createElement('table');
-                const headerRow = document.createElement('tr');
-                headerRow.innerHTML = '<th>#</th><th>Task Name</th><th>Status</th><th>Error</th>';
-                table.appendChild(headerRow);
-
-                tasks.forEach((task, idx) => {
-                  const row = document.createElement('tr');
-                  // choose CSS class based on status
-                  let statusClass = '';
-                  if (task.status === 'pending') statusClass = 'status-pending';
-                  else if (task.status === 'success') statusClass = 'status-success';
-                  else if (task.status === 'error') statusClass = 'status-error';
-
-                  row.innerHTML = `
-                    <td>${idx + 1}</td>
-                    <td>${task.name}</td>
-                    <td class="${statusClass}">${task.status}</td>
-                    <td>${task.error !== null ? task.error : ''}</td>
-                  `;
-                  table.appendChild(row);
-                });
-
-                container.appendChild(table);
-              }
-            } catch (err) {
-              document.getElementById('tables').innerHTML =
-                `<p style="color:red;">Failed to load tasks.json: ${err.message}</p>`;
+              container.appendChild(table);
             }
+          } catch (err) {
+            document.getElementById('tables').innerHTML =
+              `<p style="color:red;">Failed to load tasks.json: ${err.message}</p>`;
           }
+        }
 
-          loadTasks();
-        </script>
+        loadTasks();
+      </script>
+
       </body>
       </html>
 
