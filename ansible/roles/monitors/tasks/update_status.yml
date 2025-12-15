@@ -4,6 +4,9 @@
 #   role_to_read: logical role name (e.g. monitors)
 #   task_name: descriptive task name
 #   result: registered result from the task
+- name: get work dir
+  set_fact: 
+    workDir: "{{ playbook_dir | dirname }}"
 
 # roles/monitors/tasks/update_status.yml
 # roles/monitors/tasks/update_status.yml
@@ -36,7 +39,7 @@
   delegate_to: localhost
   run_once: true
   become: false
-  
+
 - name: Update tasks.json for {{ task_name }}
   command: >
     jq '(.plays[].tasks[] | select(.name=="{{ task_name }}" and .role=="{{ role_to_read }}"))
