@@ -1,6 +1,7 @@
 - name: Run playbook parser
   ansible.builtin.command:
     cmd: "python3 {{ role_path }}/scripts/build_json_list.py -d {{ playbook_dir }} -p {{ playbook_name }}"
+    chdir: "{{ playbook_dir }}/.."
   register: parse_output
   delegate_to: localhost
   run_once: yes
