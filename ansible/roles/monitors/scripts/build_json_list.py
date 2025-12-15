@@ -1,7 +1,15 @@
 import json
 import re
+import subprocess, json, re
 
-tasks_output = open("tasks.txt").read().splitlines()
+# Run ansible-playbook and capture output
+result = subprocess.run(
+    ["ansible-playbook", "playbooks/home_cloud.yml", "--list-tasks"],
+    capture_output=True, text=True
+)
+
+tasks_output = result.stdout.splitlines()
+# tasks_output = open("tasks.txt").read().splitlines()
 plays = []
 current_play = None
 
