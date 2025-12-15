@@ -24,6 +24,9 @@
   ansible.builtin.slurp:
     src: "{{ workDir }}/buildMon/tasks.json"
   register: tasks_file
+  delegate_to: localhost
+  run_once: yes
+  become: false
 
 - name: Parse tasks.json
   set_fact:
