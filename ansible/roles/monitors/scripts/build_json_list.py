@@ -25,7 +25,9 @@ def parse_tasks(output_lines, playbook_path):
                 role, name = role_task.split(" : ", 1)
             else:
                 role, name = None, role_task
-            current_play["tasks"].append({"role": role, "name": name, "tags": []})
+            # Skip tasks with null role
+            if role is not None:
+                current_play["tasks"].append({"role": role, "name": name, "tags": []})
     if current_play:
         plays.append(current_play)
     return {"playbook": playbook_path, "plays": plays}
@@ -54,9 +56,11 @@ def main():
     json_data = parse_tasks(tasks_output, playbook_path)
 
     # Ensure the buildMon directory exists
-    os.makedirs(os.path.join(workdir, "buildMon"), exist_ok=True)
+    buildmon_dir = os.path.join(workdir, "buildMon")
+    os.makedirs(buildmon_dir, exist_ok=True)
+
     # Save JSON into buildMon/tasks.json
-    output_file = os.path.join(workdir, "buildMon", "tasks.json")    
+    output_file = os.path.join(buildmon_dir, "tasks.json")
     with open(output_file, "w") as f:
         json.dump(json_data, f, indent=2)
 
