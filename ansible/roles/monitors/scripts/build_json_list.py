@@ -53,7 +53,10 @@ def main():
     tasks_output = result.stdout.splitlines()
     json_data = parse_tasks(tasks_output, playbook_path)
 
-    output_file = os.path.join(workdir, "tasks.json")
+    # Ensure the buildMon directory exists
+    os.makedirs(os.path.join(workdir, "buildMon"), exist_ok=True)
+    # Save JSON into buildMon/tasks.json
+    output_file = os.path.join(workdir, "buildMon", "tasks.json")    
     with open(output_file, "w") as f:
         json.dump(json_data, f, indent=2)
 
