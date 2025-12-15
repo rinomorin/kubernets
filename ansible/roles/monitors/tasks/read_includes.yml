@@ -22,7 +22,7 @@
 
 - name: Read tasks.json
   ansible.builtin.slurp:
-    src: "{{ playbook_dir }}/../buildMon/tasks.json"
+    src: "{{ workDir }}/buildMon/tasks.json"
   register: tasks_file
 
 - name: Parse tasks.json
