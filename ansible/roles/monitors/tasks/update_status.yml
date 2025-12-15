@@ -23,13 +23,13 @@
                 {
                   'name': task_name,
                   'status': (
-                    (result is defined)
-                    | ternary(
-                        (result is succeeded) | ternary('success','failed'),
-                        'complete'
-                      )
-                  ),
-                  'rc': (result.rc | default('none'))
+                      result is defined
+                      | ternary(
+                          (result is succeeded) | ternary('success','failed'),
+                          'complete'
+                        )
+                    ),
+                    'rc': (result is defined and result.rc is defined) | ternary(result.rc, 'none')
                 }
               ]
             )
