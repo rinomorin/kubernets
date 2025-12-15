@@ -8,7 +8,7 @@
   run_once: yes
   become: false
 
-  debug: msg="python3 {{ role_path }}/scripts/build_json_list.py -d {{ playbook_dir }} -p {{ playbook_name }} -i {{ playbook_dir }}/../inventory.yml"
+- debug: msg="{{parse_output}}"
 
 - name: Read tasks.json
   ansible.builtin.slurp:
@@ -25,7 +25,7 @@
 
 # - name: Extract raw task names from each file into temp file
 #   ansible.builtin.shell: |
-#     role="{{ item | regex_search('roles/([^/]+)') }}"
+#     role="{{ item | regex_search('roles/([^/]+)') }}"/
 #     tmpfile="/tmp/tasks_$(basename {{ item }})"
 #     grep -a1 'name:' "{{ item }}" \
 #       | grep -vE '#|debug' \
