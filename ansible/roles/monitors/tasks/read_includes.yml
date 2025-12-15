@@ -8,11 +8,19 @@
   run_once: yes
   become: false
 
+- name: Read tasks.json
+  ansible.builtin.slurp:
+    src: "{{ playbook_dir }}/../buildMon/tasks.json"
+  register: tasks_file
+
+- name: Parse tasks.json
+  set_fact:
+    tasks_data: "{{ tasks_file.content | b64decode | from_json }}"
+
 - name: Show ordered task list
   debug:
-    msg: "{{ parse_output.stdout_lines }}"
-  run_once: yes
-
+    var: tasks_data
+    
 # - name: Extract raw task names from each file into temp file
 #   ansible.builtin.shell: |
 #     role="{{ item | regex_search('roles/([^/]+)') }}"
