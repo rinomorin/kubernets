@@ -5,16 +5,15 @@
     path: "{{ monitor_target_dir }}"
     state: directory
     mode: '0755'
-  status: "{{ result.stdout }}"
-  rc: "{{ parse_output.stderr }}"
+  register: result
 
 - name: Update status
   include_tasks: "{{role_path}}/tasks/update_status.yml"
   vars:
     role_to_read: "monitors"
     task_name: "Read tasks.json"
-    status: "complete"
-    rc: ""
+    status: "{{ result.stdout }}"
+    rc: "{{ parse_output.stderr }}"
 
 - name: Generate private key and self-signed certificate
   command: >
