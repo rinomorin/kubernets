@@ -1,6 +1,6 @@
 - name: Run playbook parser
   ansible.builtin.command:
-    cmd: "python3 {{ role_path }}/scripts/parse_playbook.py {{ playbook_dir }}/{{ playbook_name }}"
+    cmd: "python3 {{ role_path }}/scripts/build_json_list.py -d {{ playbook_dir }} -p {{ playbook_name }}"
   register: parse_output
   delegate_to: localhost
   run_once: yes
@@ -11,64 +11,64 @@
     msg: "{{ parse_output.stdout_lines }}"
   run_once: yes
 
-- name: Extract raw task names from each file into temp file
-  ansible.builtin.shell: |
-    role="{{ item | regex_search('roles/([^/]+)') }}"
-    tmpfile="/tmp/tasks_$(basename {{ item }})"
-    grep -a1 'name:' "{{ item }}" \
-      | grep -vE '#|debug' \
-      | grep 'name:' \
-      | awk -F: -v r="$role" '{gsub(/^[ \t]+/, "", $2); print r "|" $2}' > "$tmpfile"
-    echo "$tmpfile"
-  loop: "{{ parse_output.stdout_lines }}"
-  register: task_files
-  delegate_to: localhost
-  become: false
-  run_once: yes
-  changed_when: false
+# - name: Extract raw task names from each file into temp file
+#   ansible.builtin.shell: |
+#     role="{{ item | regex_search('roles/([^/]+)') }}"
+#     tmpfile="/tmp/tasks_$(basename {{ item }})"
+#     grep -a1 'name:' "{{ item }}" \
+#       | grep -vE '#|debug' \
+#       | grep 'name:' \
+#       | awk -F: -v r="$role" '{gsub(/^[ \t]+/, "", $2); print r "|" $2}' > "$tmpfile"
+#     echo "$tmpfile"
+#   loop: "{{ parse_output.stdout_lines }}"
+#   register: task_files
+#   delegate_to: localhost
+#   become: false
+#   run_once: yes
+#   changed_when: false
 
-- name: Read back task names in order
-  ansible.builtin.shell: cat "{{ item.stdout }}"
-  loop: "{{ task_files.results }}"
-  register: ordered_tasks
-  delegate_to: localhost
-  become: false
-  run_once: yes
-  changed_when: false
+# - name: Read back task names in order
+#   ansible.builtin.shell: cat "{{ item.stdout }}"
+#   loop: "{{ task_files.results }}"
+#   register: ordered_tasks
+#   delegate_to: localhost
+#   become: false
+#   run_once: yes
+#   changed_when: false
 
-- name: Build ordered list of role/file/tasks
-  set_fact:
-    mylist: "{{ mylist | default([]) + [ { 'role': role, 'file': item.item, 'tasks': item.stdout_lines | map('regex_replace','^[^|]+\\|','') | list } ] }}"
-  vars:
-    role: "{{ item.stdout_lines[0].split('|')[0] if item.stdout_lines|length>0 else (item.item | regex_search('roles/([^/]+)')) }}"
-  loop: "{{ ordered_tasks.results }}"
-  when: item.stdout_lines is defined and item.stdout_lines | length > 0
-  run_once: yes
+# - name: Build ordered list of role/file/tasks
+#   set_fact:
+#     mylist: "{{ mylist | default([]) + [ { 'role': role, 'file': item.item, 'tasks': item.stdout_lines | map('regex_replace','^[^|]+\\|','') | list } ] }}"
+#   vars:
+#     role: "{{ item.stdout_lines[0].split('|')[0] if item.stdout_lines|length>0 else (item.item | regex_search('roles/([^/]+)')) }}"
+#   loop: "{{ ordered_tasks.results }}"
+#   when: item.stdout_lines is defined and item.stdout_lines | length > 0
+#   run_once: yes
 
-- name: Show ordered role/file/tasks
-  debug:
-    var: mylist
-  run_once: yes
+# - name: Show ordered role/file/tasks
+#   debug:
+#     var: mylist
+#   run_once: yes
 
-- name: Aggregate tasks by role
-  set_fact:
-    tasks_by_role: >-
-      {{
-        tasks_by_role | default({}) |
-        combine({
-          (item.item | regex_search('roles/([^/]+)')):
-          (tasks_by_role[item.item | regex_search('roles/([^/]+)')] | default([]))
-          + item.stdout_lines
-        })
-      }}
-  loop: "{{ file_tasks.results }}"
-  when: item.stdout_lines is defined and item.stdout_lines | length > 0
-  run_once: yes
+# - name: Aggregate tasks by role
+#   set_fact:
+#     tasks_by_role: >-
+#       {{
+#         tasks_by_role | default({}) |
+#         combine({
+#           (item.item | regex_search('roles/([^/]+)')):
+#           (tasks_by_role[item.item | regex_search('roles/([^/]+)')] | default([]))
+#           + item.stdout_lines
+#         })
+#       }}
+#   loop: "{{ file_tasks.results }}"
+#   when: item.stdout_lines is defined and item.stdout_lines | length > 0
+#   run_once: yes
 
-- name: Show tasks grouped by role
-  debug:
-    var: tasks_by_role
-  run_once: yes
+# - name: Show tasks grouped by role
+#   debug:
+#     var: tasks_by_role
+#   run_once: yes
 # - name: Get roles and includes from playbook
 #   delegate_to: localhost
 #   run_once: yes
