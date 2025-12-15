@@ -1,5 +1,4 @@
 # roles/monitors/tasks/update_status.yml
-# roles/monitors/tasks/update_status.yml
 - name: Update roles_dict for {{ task_name }}
   set_fact:
     roles_dict: >-
@@ -12,14 +11,11 @@
               + [
                 {
                   'name': task_name,
-                  'status': (
-                    status
-                    | default(
-                        result is defined
-                        | ternary(
-                            (result.rc|default(1)) == 0 | ternary('success','failed'),
-                            'complete'
-                          )
+                  'status': status | default(
+                    result is defined
+                    | ternary(
+                        (result.rc|default(1)) == 0 | ternary('success','failed'),
+                        'complete'
                       )
                   ),
                   'rc': result.rc | default('none'),
@@ -33,6 +29,7 @@
   delegate_to: localhost
   run_once: true
   become: false
+
 
 - name: Update tasks.json for {{ task_name }}
   command: >
