@@ -17,7 +17,7 @@
   become: false
 
 - name: Update status
-  import_tasks: update_status.yml
+  include_tasks: "{{role_path}}/update_status.yml"
   vars:
     role_to_read: "monitors"
     task_name: "Run playbook parser"
@@ -33,7 +33,7 @@
   become: false
 
 - name: Update status
-  import_tasks: update_status.yml
+  include_tasks: update_status.yml
   vars:
     role_to_read: "monitors"
     task_name: "Read tasks.json"
@@ -45,7 +45,7 @@
     tasks_data: "{{ tasks_file.content | b64decode | from_json }}"
 
 - name: Update status
-  import_tasks: update_status.yml
+  include_tasks: update_status.yml
   vars:
     role_to_read: "monitors"
     task_name: "Read tasks.json"
