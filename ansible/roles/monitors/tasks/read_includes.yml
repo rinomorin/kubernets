@@ -1,18 +1,24 @@
+- name: get work dir
+  set_fact: 
+    workDir: "{{ playbook_dir | dirname }}"
+
 - name: Run playbook parser
   ansible.builtin.command:
-    cmd: |
-      python3 {{ role_path }}/scripts/build_json_list.py \
-        -d {{ playbook_dir }} -p playbooks/{{ playbook_name }} \
-        -i {{ playbook_dir }}/../inventory.yml \
-        -r {{ playbook_dir }}/../roles
-
-    chdir: "{{ playbook_dir }}/.."
+    cmd: >
+      python3 {{ role_path }}/scripts/build_json_list.py
+      -d {{ workDir }}
+      -p playbooks/{{ playbook_name }}
+      -i {{ workDir }}/inventory.yml
+      -r {{ workDir }}/roles
+    chdir: "{{ workDir }}"
   register: parse_output
   delegate_to: localhost
   run_once: yes
   become: false
 
-- debug: msg="{{parse_output}}"
+- name: Show parser output
+  debug:
+    var: parse_output
 
 - name: Read tasks.json
   ansible.builtin.slurp:
