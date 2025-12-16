@@ -21,9 +21,9 @@
   when: ca_exists.rc != 0
   changed_when: "'added' in ca_add_result.stdout"
 
-- name: Update CA description if needed
-  command: ipa ca-mod {{ ca_name }} --description="{{ ca_description }}"
-  when: ca_exists.rc == 0 and ca_show.stdout is search("{{ ca_description }}") == false
+# - name: Update CA description if needed
+#   command: ipa ca-mod {{ ca_name }} --description="{{ ca_description }}"
+#   when: ca_exists.rc == 0 and ca_show.stdout is search("{{ ca_description }}") == false
 
 - name: Verify all CAs
   command: ipa ca-find
