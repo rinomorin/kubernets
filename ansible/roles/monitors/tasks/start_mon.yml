@@ -1,3 +1,140 @@
+# roles/monitors/tasks/https_dispatch.yml
+---
+- name: Check if httpd service is running
+  ansible.builtin.shell: systemctl is-active httpd || true
+  register: httpd_status
+  changed_when: false
+  delegate_to: localhost
+  become: false
+
+- name: Check if port 443 is already in use
+  ansible.builtin.shell: ss -ltn '( sport = :443 )' | grep LISTEN || true
+  register: port443_status
+  changed_when: false
+  delegate_to: localhost
+  become: false
+
+# --- Apache path ---
+- name: Extract SSLCertificateFile from ssl.conf
+  ansible.builtin.shell: grep -i '^SSLCertificateFile' /etc/httpd/conf.d/ssl.conf | awk '{print $2}'
+  register: ssl_cert_file
+  changed_when: false
+  delegate_to: localhost
+  become: false
+  when: httpd_status.stdout == "active"
+
+- name: Extract SSLCertificateKeyFile from ssl.conf
+  ansible.builtin.shell: grep -i '^SSLCertificateKeyFile' /etc/httpd/conf.d/ssl.conf | awk '{print $2}'
+  register: ssl_key_file
+  changed_when: false
+  delegate_to: localhost
+  become: false
+  when: httpd_status.stdout == "active"
+
+- name: Generate Apache VirtualHost file for monitor site
+  ansible.builtin.copy:
+    dest: "/etc/httpd/conf.d/monitor.conf"
+    mode: '0644'
+    content: |
+      <VirtualHost *:443>
+          ServerName {{ ansible_fqdn | default(inventory_hostname) }}
+          DocumentRoot {{ monitor_target_dir }}
+
+          SSLEngine on
+          SSLCertificateFile {{ ssl_cert_file.stdout }}
+          SSLCertificateKeyFile {{ ssl_key_file.stdout }}
+
+          <Directory "{{ monitor_target_dir }}">
+              Options Indexes FollowSymLinks
+              AllowOverride None
+              Require all granted
+          </Directory>
+
+          ErrorLog logs/monitor_error.log
+          CustomLog logs/monitor_access.log combined
+      </VirtualHost>
+  delegate_to: localhost
+  become: false
+  notify: restart httpd
+  when: httpd_status.stdout == "active"
+
+# --- Python fallback path ---
+- name: Ensure monitor site directory exists
+  ansible.builtin.file:
+    path: "{{ monitor_target_dir }}"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  become: false
+  when: httpd_status.stdout != "active" and port443_status.stdout == ""
+
+- name: Generate private key and self-signed certificate
+  ansible.builtin.command: >
+    openssl req -new -x509 -nodes -days 365
+    -out {{ monitor_target_dir }}/server.crt
+    -keyout {{ monitor_target_dir }}/server.key
+    -subj "/CN={{ ansible_fqdn | default(inventory_hostname) }}"
+  args:
+    creates: "{{ monitor_target_dir }}/server.crt"
+  delegate_to: localhost
+  become: false
+  when: httpd_status.stdout != "active" and port443_status.stdout == ""
+
+- name: Combine key and cert into PEM bundle
+  ansible.builtin.shell: cat {{ monitor_target_dir }}/server.key {{ monitor_target_dir }}/server.crt > {{ monitor_target_dir }}/server.pem
+  args:
+    creates: "{{ monitor_target_dir }}/server.pem"
+  delegate_to: localhost
+  become: false
+  when: httpd_status.stdout != "active" and port443_status.stdout == ""
+
+- name: Write Python HTTPS server script
+  ansible.builtin.copy:
+    dest: "{{ monitor_target_dir }}/https_server.py"
+    mode: '0755'
+    content: |
+      #!/usr/bin/env python3
+      import http.server, ssl, socketserver, os
+
+      PORT = 443
+      handler = http.server.SimpleHTTPRequestHandler
+      httpd = socketserver.TCPServer(('0.0.0.0', PORT), handler)
+      httpd.socket = ssl.wrap_socket(httpd.socket,
+                                    certfile="server.pem",
+                                    server_side=True)
+      print(f"Serving HTTPS on port {PORT}")
+      with open("server.pid","w") as f:
+          f.write(str(os.getpid()))
+      httpd.serve_forever()
+  delegate_to: localhost
+  become: false
+  when: httpd_status.stdout != "active" and port443_status.stdout == ""
+
+- name: Start Python HTTPS server script in background
+  ansible.builtin.shell: |
+    cd {{ monitor_target_dir }}
+    if [ ! -f server.pid ]; then
+      nohup ./https_server.py > server.log 2>&1 &
+    fi
+  args:
+    chdir: "{{ monitor_target_dir }}"
+  delegate_to: localhost
+  become: false
+  when: httpd_status.stdout != "active" and port443_status.stdout == ""
+
+# roles/monitors/handlers/main.yml
+- name: restart httpd
+  ansible.builtin.service:
+    name: httpd
+    state: restarted
+  delegate_to: localhost
+  become: false
+
+
+
+
+
+
 # - name: Start Python HTTPS server on 443
 #   delegate_to: localhost
 #   become: false
@@ -17,24 +154,24 @@
 #     httpd.serve_forever()
 #     EOF
 
-- name: Start Python HTTPS server on 443
-  delegate_to: localhost
-  become: false
-  shell: |
-    cd {{ monitor_target_dir }}
-    if [ ! -f server.pid ]; then
-      nohup python3 - <<'EOF' > server.log 2>&1 &
-      import http.server, ssl, socketserver, os
-      PORT = 443
-      handler = http.server.SimpleHTTPRequestHandler
-      httpd = socketserver.TCPServer(('0.0.0.0', PORT), handler)
-      httpd.socket = ssl.wrap_socket(httpd.socket,
-                                    certfile="server.pem",
-                                    server_side=True)
-      print(f"Serving HTTPS on port {PORT}")
-      with open("server.pid","w") as f: f.write(str(os.getpid()))
-      httpd.serve_forever()
-      EOF
-    fi
-  args:
-    chdir: "{{ monitor_target_dir }}"
+# - name: Start Python HTTPS server on 443
+#   delegate_to: localhost
+#   become: false
+#   shell: |
+#     cd {{ monitor_target_dir }}
+#     if [ ! -f server.pid ]; then
+#       nohup python3 - <<'EOF' > server.log 2>&1 &
+#       import http.server, ssl, socketserver, os
+#       PORT = 443
+#       handler = http.server.SimpleHTTPRequestHandler
+#       httpd = socketserver.TCPServer(('0.0.0.0', PORT), handler)
+#       httpd.socket = ssl.wrap_socket(httpd.socket,
+#                                     certfile="server.pem",
+#                                     server_side=True)
+#       print(f"Serving HTTPS on port {PORT}")
+#       with open("server.pid","w") as f: f.write(str(os.getpid()))
+#       httpd.serve_forever()
+#       EOF
+#     fi
+#   args:
+#     chdir: "{{ monitor_target_dir }}"

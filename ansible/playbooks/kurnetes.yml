@@ -68,12 +68,12 @@
   roles:
     - ipa_setup
 
-# - hosts: all
-#   gather_facts: false
-#   vars:
-#     vm_build_state: "{{ global_vm_build_state | default('skipped') }}"
-#   roles:
-#     - helpers
+- hosts: all
+  gather_facts: false
+  vars:
+    vm_build_state: "{{ global_vm_build_state | default('skipped') }}"
+  roles:
+    - helpers
 
   # when: 
   #   - vm_build_state == "scanned" or vm_build_state == "non-compliant"

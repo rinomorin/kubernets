@@ -45,29 +45,43 @@ user --name=sysadmin --password={{ pwd_hash }} --iscrypted --gecos="System Admin
 user --name=secops --password={{ secops_hash }} --iscrypted --gecos="automation id" --groups=wheel
 
 %packages
+%end
+
+%packages
 --ignoremissing
-@core
+@^minimal-environment
+@standard
+@headless-management
+openscap-scanner
+scap-security-guide
+aide
+audit
+libpwquality
+policycoreutils
+policycoreutils-python-utils
+gnupg2
+lvm2
+iscsi-initiator-utils
+chrony
+openssl
+sssd
+rsyslog
+logrotate
+gnutls-utils
 vim
 tmux
 git
-sssd
-freeipa-client
-ipa-admintools
 krb5-workstation
 bind-utils
 jq
 curl
 wget
 python3
+python3-pexpect
 libvirt-client
 virt-install
 openssh-clients
-audit
-aide
-openscap-scanner
-scap-security-guide
 %end
-
 
 %post --interpreter=/bin/bash --log=/root/kickstart-post.log
 # Crypto policies

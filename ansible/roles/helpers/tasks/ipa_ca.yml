@@ -151,20 +151,13 @@
   changed_when: "'record already exists' not in add_host_record.stdout"
   failed_when: false
  
-- name: Ensure forward A record for ipa_ca_intermediate
+- name: Ensure {{ ipa_ca_intermediate }}cat ../each forward A record
   become: yes
   command: >
     ipa dnsrecord-add {{ ipa_domain }} {{ ipa_ca_intermediate }} --a-rec={{ ipa_ca_intermediate_ip }}
+    ipa dnsrecord-add {{ ipa_domain }} {{ ipa_helper }} --a-rec={{ ipa_helper_ip }}
   register: add_a_intermediate
   changed_when: "'already exists' not in add_a_intermediate.stdout"
-  failed_when: false
-
-- name: Ensure forward A record for ipa_helper
-  become: yes
-  command: >
-    ipa dnsrecord-add {{ ipa_domain }} {{ ipa_helper }} --a-rec={{ ipa_helper_ip }}
-  register: add_a_helper
-  changed_when: "'already exists' not in add_a_helper.stdout"
   failed_when: false
 
 - debug:

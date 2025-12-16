@@ -1,50 +1,62 @@
-# roles/monitors/tasks/update_status.yml
-- name: Update roles_dict for {{ task_name }}
-  set_fact:
-    roles_dict: >-
-      {{
-        (roles_dict | default({})) | combine({
-          role_to_read: {
-            'role_name': role_to_read,
-            'tasks': (
-              (roles_dict[role_to_read].tasks | default([]))
-              + [
-                {
-                  'name': task_name,
-                  'status': status | default(
-                    result is defined
-                    | ternary(
-                        (result.rc|default(1)) == 0 | ternary('success','failed'),
-                        'complete'
-                      )
-                  ),
-                  'rc': result.rc | default('none'),
-                }
-              ]
+- name: Update tasks.json for multiple tasks
+  command: >
+    sh -c 'jq ".plays[].tasks |= map(
+      if .name == \"{{ task_finish }}\" then
+        .tags |= (
+          if (.tags|length)==0 then
+            [{\"status\":\"{{ tast_status }}\",\"rc\":\"{{ rc | default("") }}\"}]
+          else
+            map(
+              if has(\"status\") then .status=\"{{ tast_status }}\" | .rc=\"{{ rc | default("") }}\" | .
+              else . end
             )
-          }
-        }, recursive=True)
-      }}
+          end
+        )
+      elif .name == \"{{ task_start }}\" then
+        .tags |= (
+          if (.tags|length)==0 then
+            [{\"status\":\"starting\",\"rc\":\"\"}]
+          else
+            map(if has(\"status\") then .status=\"starting\" | . else . end)
+          end
+        )
+      else . end
+    )" {{ workDir }}/buildMon/tasks.json > {{ workDir }}/buildMon/tasks.tmp && mv {{ workDir }}/buildMon/tasks.tmp {{ workDir }}/buildMon/tasks.json'
   delegate_to: localhost
   run_once: true
   become: false
+  when: task_finish is defined
 
 - name: Update tasks.json for {{ task_name }}
   command: >
-    jq '(.plays[].tasks[] | select(.name=="{{ task_name }}" and .role=="{{ role_to_read }}"))
-        |= . + {status:"{{ status | default("pending") }}", rc:"{{ rc | default("") }}"}'
-    {{ workDir }}/buildMon/tasks.json
-  register: updated_json
+    sh -c 'jq "(.plays[].tasks[]
+             | select(.name==\"{{ task_name }}\" and .role==\"{{ role_to_read }}\"))
+           |= (.tags |=
+                (if (.tags|length)==0
+                 then [{\"status\":\"{{ tast_status }}\",\"rc\":\"{{ rc | default("") }}\"}]
+                 else map(
+                   if has(\"status\") then .status=\"{{ tast_status }}\" | .rc=\"{{ rc | default("") }}\" | .
+                   else . end
+                 )
+                 end))" {{ workDir }}/buildMon/tasks.json > {{ workDir }}/buildMon/tasks.tmp && mv {{ workDir }}/buildMon/tasks.tmp {{ workDir }}/buildMon/tasks.json'
   delegate_to: localhost
   run_once: true
   become: false
+  when: task_finish is not defined
 
-- name: Save updated tasks.json
-  copy:
-    dest: "{{ workDir }}/buildMon/tasks.json"
-    content: "{{ updated_json.stdout }}"
-    mode: '0644'
+- name: Mark task as failed in tasks.json
+  command: >
+    sh -c 'jq "(.plays[].tasks[]
+             | select(.name==\"{{ task_name }}\" and .role==\"{{ role_to_read }}\"))
+           |= (.tags |=
+                (if (.tags|length)==0
+                 then [{\"status\":\"failed\",\"rc\":\"{{ rc | default("1") }}\"}]
+                 else map(
+                   if has(\"status\") then .status=\"failed\" | .rc=\"{{ rc | default("1") }}\" | .
+                   else . end
+                 )
+                 end))" {{ workDir }}/buildMon/tasks.json > {{ workDir }}/buildMon/tasks.tmp && mv {{ workDir }}/buildMon/tasks.tmp {{ workDir }}/buildMon/tasks.json'
   delegate_to: localhost
   run_once: true
   become: false
-
+  when: rc is defined and rc|int != 0

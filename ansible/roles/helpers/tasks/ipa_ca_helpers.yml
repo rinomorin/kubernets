@@ -73,16 +73,16 @@
 
 - name: Fail if {{ ipa_master }} not resolvable
   fail:
-    msg: "{{ ipa_master}}.{{ipa_domain }} not resolvable from {{ ipa_ca_intermediate }}"
+    msg: "{{ ipa_master}}.{{ipa_domain }} not resolvable from {{ ipa_helper }}"
   when: forward_check.stdout == ""
 
-- name: Verify LDAP connectivity from {{ ipa_ca_intermediate }}
+- name: Verify LDAP connectivity from {{ ipa_helper }}
   command: ldapsearch -H ldap://{{ ipa_master }}.{{ ipa_domain }} -x -b "" -s base "(objectclass=*)"
   register: ldap_check
 
-- name: Fail if LDAP not reachable{{ ipa_ca_intermediate }}
+- name: Fail if LDAP not reachable{{ ipa_helper }}
   fail:
-    msg: "{{ ipa_master}}.{{ipa_domain }} LDAP not reachable from {{ ipa_ca_intermediate }}"
+    msg: "{{ ipa_master}}.{{ipa_domain }} LDAP not reachable from {{ ipa_helper }}"
   when: ldap_check.rc != 0
 
 - name: Verify Kerberos kinit with admin password
@@ -96,9 +96,8 @@
 
 - name: Fail if Kerberos not working
   fail:
-    msg: "Kerberos kinit failed on {{ ipa_ca_intermediate }}"
+    msg: "Kerberos kinit failed on {{ ipa_helper }}"
   when: kinit_check.rc != 0
-
 
 # --- Pre-flight validation before replica install ---
 
@@ -110,13 +109,13 @@
   failed_when: ca_service.stdout != "active"
 
 - name: Verify  forward DNS
-  command: dig +short {{ ipa_ca_intermediate }}.{{ ipa_domain }} @{{ ipa_master_ip }}
+  command: dig +short {{ ipa_helper}}.{{ ipa_domain }} @{{ ipa_master_ip }}
   register: forward_check
   changed_when: false
   failed_when: forward_check.stdout == ""
 
-- name: Verify {{ ipa_ca_intermediate }} reverse DNS
-  command: dig +short -x {{ ipa_ca_intermediate_ip }} @{{ ipa_master_ip }}
+- name: Verify {{ ipa_helper }} reverse DNS
+  command: dig +short -x {{ ipa_helper_ip }} @{{ ipa_master_ip }}
   register: reverse_check
   changed_when: false
   failed_when: reverse_check.stdout == ""
@@ -125,8 +124,8 @@
   debug:
     msg:
       - "Dogtag CA service on {{ ipa_master }}: {{ ca_service.stdout }}"
-      - "Forward lookup {{ ipa_ca_intermediate }}: {{ forward_check.stdout }}"
-      - "Reverse lookup {{ ipa_ca_intermediate }}: {{ reverse_check.stdout }}"
+      - "Forward lookup {{ ipa_helper }}: {{ forward_check.stdout }}"
+      - "Reverse lookup {{ ipa_helper }}: {{ reverse_check.stdout }}"
 
 - name: Configure resolv.conf to use IPA DNS
   become: yes
@@ -186,7 +185,7 @@
   no_log: true
 
 # --- Service checks ---
-- name: Check IPA related services on {{ ipa_ca_intermediate }}
+- name: Check IPA related services on {{ ipa_helper }}
   ansible.builtin.systemd:
     name: "{{ item }}"
   loop:
@@ -212,11 +211,11 @@
 
 - name: Fail if Kerberos host kinit failed
   fail:
-    msg: "Kerberos kinit with host keytab failed on {{ ipa_ca_intermediate }}"
+    msg: "Kerberos kinit with host keytab failed on {{ ipa_helper }}"
   when: kinit_host.rc != 0
 
 # --- DNS zone check ---
-- name: Verify DNS zones on {{ ipa_ca_intermediate }}
+- name: Verify DNS zones on {{ ipa_helper }}
   command: ipa dnszone-find
   register: dns_zones
   changed_when: false
@@ -251,4 +250,3 @@
 
 - debug:
     msg: "{{ ldaps_check.stdout }}"
-
