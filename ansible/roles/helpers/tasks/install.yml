@@ -67,3 +67,4 @@
   when: 
     - "'helpers' in group_names"
     - ipa_install_result.changed
+

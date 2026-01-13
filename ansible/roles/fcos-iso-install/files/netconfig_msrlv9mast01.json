@@ -1,0 +1,7 @@
+{
+  "hostname": "msrlv9mast01.cloud.home.morinsoft.ca",
+  "interfaces": {
+        "52:54:00:12:4d:95": "192.168.100.31",
+    "52:54:00:13:c5:8a": "10.0.0.31"
+      }
+}

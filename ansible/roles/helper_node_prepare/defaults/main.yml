@@ -1,0 +1,42 @@
+---
+# butane_version: "0.25.1"
+# butane_url: "https://github.com/coreos/butane/releases/download/v{{ butane_version }}/butane-x86_64-unknown-linux-gnu"
+#     #  url: "https://github.com/coreos/butane/releases/download/v0.25.1              /butane-x86_64-unknown-linux-gnu"
+  
+# helper_ip: "{{ hostvars[groups['helpers'][0]].ansible_host }}"
+# nat_ip: "{{ lookup('env', 'nat_ip_device') | default('172.16.0.20')}}"
+
+# fcos_dirs:
+#   - /srv/fcos
+#   - /srv/fcos/butane
+#   - /srv/fcos/ignition
+#   - /srv/fcos/http
+#   - /srv/fcos/pxe
+#   - /srv/fcos/ipxe
+#   - /srv/fcos/ansible
+
+# Base directory for FCOS provisioning assets
+fcos_root: /srv/fcos
+
+# Subdirectories under fcos_root
+fcos_dirs:
+  - http       # kernel, initramfs, rootfs
+  - ignition   # rendered ignition
+  - butane     # source butane
+  - ipxe       # iPXE scripts
+  - pxe        # PXE scripts
+  - ansible    # optional, for playbook-exported helpers
+
+# Where Apache serves static content by default
+web_root: /var/www/html
+
+# NAT IP the VMs see for HTTP/iPXE/ignition
+nat_ip_device: "{{ lookup('env', 'nat_ip_device') | default('172.16.0.20', true) }}"
+nat_ip: "{{ lookup('env', 'nat_ip_device') | default('172.16.0.20', true) }}"
+
+
+# Butane binary configuration
+butane_version: "v0.25.1"
+butane_binary: "butane-x86_64-unknown-linux-gnu"
+butane_url: "https://github.com/coreos/butane/releases/download/{{ butane_version }}/{{ butane_binary }}"
+butane_dest: /usr/local/bin/butane

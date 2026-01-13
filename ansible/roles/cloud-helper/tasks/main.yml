@@ -1,0 +1,29 @@
+---
+# Orchestrator: include focused task files in order
+- import_tasks: preflight.yml
+- import_tasks: helper_space.yml
+- import_tasks: users.yml
+- import_tasks: keys.yml
+- import_tasks: https_certs.yml
+- import_tasks: nginx.yml
+- import_tasks: repo.yml
+- import_tasks: packages.yml
+- import_tasks: podman.yml
+- import_tasks: kubernetes.yml
+- import_tasks: ignition.yml
+- import_tasks: nodes.yml
+# - import_tasks: coreos_installer.yml
+# - import_tasks: wrapper.yml
+# - import_tasks: kvm_host_prep.yml
+# - import_tasks: polkit.yml
+# - import_tasks: ansible_ready.yml
+# - import_tasks: test_connections.yml
+# - import_tasks: test_results.yml
+
+- name: Show summary
+  debug:
+    msg:
+      - "cloud_helper user created on helper and KVM host (if requested)."
+      - "Public key installed on KVM host for SSH access."
+      - "Wrapper script installed at {{ helper_bin_dir }}/{{ virsh_wrapper_name }} (run as cloud_helper)."
+      - "To use: export KVM_HOST=<kvm_host> ; {{ helper_bin_dir }}/{{ virsh_wrapper_name }} list --all"

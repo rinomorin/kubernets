@@ -1,0 +1,64 @@
+variant: fcos
+version: 1.6.0
+passwd:
+  users:
+    - name: core
+      ssh_authorized_keys:
+        - {{ helper_ssh_key }}
+storage:
+  files:
+    - path: /etc/hostname
+      mode: 0644
+      contents:
+        inline: {{ hostname }}
+    - path: /home/core/.ssh/config
+      mode: 0600
+      user:
+        name: core
+      group:
+        name: core
+      contents:
+        inline: |
+          Host *
+              StrictHostKeyChecking accept-new
+              UserKnownHostsFile ~/.ssh/known_hosts
+
+    # NIC 1 (enp1s0) - DHCP
+    - path: /etc/NetworkManager/system-connections/enp1s0.nmconnection
+      mode: 0600
+      contents:
+        inline: |
+          [connection]
+          id=enp1s0
+          type=ethernet
+          interface-name=enp1s0
+          [ipv4]
+          method=auto
+
+    # NIC 2 (enp2s0) - Static Cluster IP
+    - path: /etc/NetworkManager/system-connections/enp2s0.nmconnection
+      mode: 0600
+      contents:
+        inline: |
+          [connection]
+          id=enp2s0
+          type=ethernet
+          interface-name=enp2s0
+          [ipv4]
+          address1={{ cluster_ip }}/24
+          method=manual
+
+{% if provider_ip is defined %}
+    # NIC 3 (enp3s0) - Static Default/Bridge IP
+    - path: /etc/NetworkManager/system-connections/enp3s0.nmconnection
+      mode: 0600
+      contents:
+        inline: |
+          [connection]
+          id=enp3s0
+          type=ethernet
+          interface-name=enp3s0
+          [ipv4]
+          address1={{ provider_ip }}/24
+          method=manual
+{% endif %}

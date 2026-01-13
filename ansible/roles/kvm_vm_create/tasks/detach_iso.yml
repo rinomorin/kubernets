@@ -1,0 +1,19 @@
+---
+# detach_iso.yml
+# Remove ISO CDROM device from VM XML and redefine domain
+
+- name: Remove ISO from VM definition
+  ansible.builtin.shell: |
+    virsh detach-disk {{ item }} /var/lib/libvirt/boot/fcos-live.iso --config
+  loop: "{{ groups['cluster_nodes'] }}"
+  delegate_to: "{{ VM_HOST }}"
+  ignore_errors: true
+  tags: [iso_cleanup]
+
+- name: Ensure VM is defined without ISO
+  virt:
+    name: "{{ item }}"
+    state: defined
+  loop: "{{ groups['cluster_nodes'] }}"
+  delegate_to: "{{ VM_HOST }}"
+  tags: [iso_cleanup]

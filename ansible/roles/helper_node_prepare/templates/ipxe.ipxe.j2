@@ -1,0 +1,10 @@
+kernel http://{{ nat_ip_device }}/boot/vmlinuz \
+  coreos.inst.ignition_url=http://{{ nat_ip_device }}/ignition/{{ item }}.ign \
+  coreos.live.rootfs_url=http://{{ nat_ip_device }}/boot/rootfs.img \
+  console=ttyS0 \
+  coreos.inst.poweroff
+
+initrd http://{{ nat_ip_device }}/boot/initramfs.img
+
+boot
+

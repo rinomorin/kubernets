@@ -1,0 +1,6 @@
+- name: Install IPA CA chain
+  copy:
+    src: /etc/ipa/ca.crt
+    dest: "{{ cert_ca_chain_path }}"
+    remote_src: yes
+  delegate_to: helper

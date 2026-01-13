@@ -1,0 +1,70 @@
+# ---------------------------------------------------------
+# Download FCOS boot artifacts (kernel + initramfs)
+# ---------------------------------------------------------
+
+- name: Ensure FCOS HTTP boot directory exists
+  file:
+    path: /srv/fcos/http
+    state: directory
+    mode: '0755'
+
+- name: Fetch FCOS stable stream metadata
+  uri:
+    url: "https://builds.coreos.fedoraproject.org/streams/stable.json"
+    return_content: yes
+  register: fcos_stream_json
+
+- name: Set FCOS boot URLs (x86_64)
+  set_fact:
+    fcos_kernel_url: "{{ fcos_stream_json.json.architectures.x86_64.artifacts.metal.formats.pxe.kernel.location }}"
+    fcos_initramfs_url: "{{ fcos_stream_json.json.architectures.x86_64.artifacts.metal.formats.pxe.initramfs.location }}"
+    fcos_rootfs_url: "{{ fcos_stream_json.json.architectures.x86_64.artifacts.metal.formats.pxe.rootfs.location }}"
+
+- name: Download FCOS rootfs
+  get_url:
+    url: "{{ fcos_rootfs_url }}"
+    dest: /srv/fcos/http/rootfs.img
+    mode: '0644'
+
+# Download FCOS rootfs
+- name: Download FCOS rootfs
+  get_url:
+    url: "{{ fcos_rootfs_url }}"
+    dest: /var/lib/libvirt/boot/rootfs.img
+    mode: '0644'
+  delegate_to: "{{ helper_node }}"
+
+
+- name: Download FCOS kernel
+  get_url:
+    url: "{{ fcos_kernel_url }}"
+    dest: /srv/fcos/http/vmlinuz
+    mode: '0644'
+
+- name: Download FCOS initramfs
+  get_url:
+    url: "{{ fcos_initramfs_url }}"
+    dest: /srv/fcos/http/initramfs.img
+    mode: '0644'
+
+- name: Download FCOS kernel
+  get_url:
+    url: "{{ fcos_kernel_url }}"
+    dest: /var/lib/libvirt/boot/fcos-vmlinuz
+    mode: '0644'
+  delegate_to: "{{ helper_node }}"
+
+- name: Download FCOS initramfs
+  get_url:  
+    url: "{{ fcos_initramfs_url }}"
+    dest: /var/lib/libvirt/boot/fcos-initramfs.img
+    mode: '0644'
+  delegate_to: "{{ helper_node }}"
+
+# Download FCOS rootfs
+- name: Download FCOS rootfs
+  get_url:
+    url: "{{ fcos_rootfs_url }}"
+    dest: /var/lib/libvirt/boot/rootfs.img
+    mode: '0644'
+  delegate_to: "{{ helper_node }}"

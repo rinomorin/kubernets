@@ -1,0 +1,165 @@
+
+- name: Download FCOS image using podman-based coreos_installer
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  shell: |
+    source ~/.bashrc-awx
+    coreos_installer download -p qemu -f qcow2.xz --decompress
+  args:
+    chdir: "{{ cloud_helper_workdir }}"
+
+- set_fact:
+    staging_dir: "/tmp/fcos_artifacts"
+    dest_dir: "/var/lib/libvirt/images/ignition"
+    ignition_src: "{{ cloud_helper_workdir }}/ignition"
+
+# 1. DYNAMIC FILE DETECTION ON HELPER
+- name: Identify latest FCOS image on Helper
+  ansible.builtin.find:
+    paths: "{{ cloud_helper_workdir }}"
+    patterns: "fedora-coreos-*-qemu.x86_64.qcow2"
+  register: fcos_find
+
+- name: Set dynamic image fact
+  ansible.builtin.set_fact:
+    latest_fcos_img: "{{ fcos_find.files | sort(attribute='mtime') | last }}"
+  when: fcos_find.matched > 0
+
+# 2. BRIDGE ARTIFACTS THROUGH CONTROLLER
+- name: Send base image to KVM host
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  shell: |
+    ssh {{ kvm_host }} "mkdir -p {{ staging_dir }}"
+    scp {{ latest_fcos_img.path }} {{ kvm_host }}:{{ staging_dir }}/fcos-base.qcow2
+  run_once: true
+
+- name: Send Ignition files for all cluster nodes
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  shell: |
+    scp {{ cloud_helper_workdir }}/ignition/{{ item }}.ign {{ kvm_host }}:{{ staging_dir }}/{{ item }}.ign
+  loop: "{{ groups['control_nodes'] + groups['worker_nodes'] }}"
+
+# 3. PREPARE KVM HOST (DELEGATED TO VM_HOST)
+- name: Prepare KVM host storage
+  delegate_to: "{{ VM_HOST }}"
+  become: yes
+  shell: |
+    mkdir -p {{ dest_dir }}
+    mv {{ staging_dir }}/fcos-base.qcow2 {{ dest_dir }}/fcos-base.qcow2
+    mv {{ staging_dir }}/*.ign {{ dest_dir }}/
+    chown -R qemu:qemu {{ dest_dir }}
+    chmod 755 {{ dest_dir }}
+    chmod 644 {{ dest_dir }}/*
+
+- name: Apply SELinux labels for Libvirt
+  delegate_to: "{{ VM_HOST }}"
+  become: true
+  community.general.sefcontext:
+    target: "{{ dest_dir }}(/.*)?"
+    setype: virt_content_t
+    state: present
+- name: Restorecon on destination
+  delegate_to: "{{ VM_HOST }}"
+  become: true
+  ansible.builtin.command: "restorecon -Rv {{ dest_dir }}"
+  changed_when: false
+
+# 4. VM PROVISIONING (LOOPING OVER CLUSTER NODES)
+# Provision Control Nodes (Masters)
+- name: Provision Control Nodes
+  include_tasks: deploy.yml
+  loop: "{{ groups['control_nodes'] }}"
+  loop_control:
+    loop_var: cluster_node
+  vars:
+    # Set Master specific specs
+    node_ram: "{{ ram | default('8192') }}"
+    node_vcpu: "{{ vcpu | default('4') }}"
+    # Masters get all three networks
+    node_networks:
+      - "{{ br_maint }}"
+      - "{{ br_provision }}"
+      - "{{ br_provider }}"
+
+# Provision Worker Nodes
+- name: Provision Worker Nodes
+  include_tasks: deploy.yml
+  loop: "{{ groups['worker_nodes'] }}"
+  loop_control:
+    loop_var: cluster_node
+  vars:
+    # Set Worker specific specs
+    node_ram: "{{ ram | default('4096') }}"
+    node_vcpu: "{{ vcpu | default('2') }}"
+    # Workers only get two networks
+    node_networks:
+      - "{{ br_maint }}"
+      - "{{ br_provision }}"
+
+# 5. Cleanup on aisle one
+- name: Cleanup controller temporary files
+  delegate_to: localhost
+  become: false
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  run_once: true
+  loop:
+    - "{{ latest_fcos_img }}"
+    - "/tmp/fcos-base.qcow2"
+    - "{{ staging_dir }}"
+
+- name: Find temporary files on KVM host
+  delegate_to: "{{ kvm_host }}"
+  become: true
+  ansible.builtin.find:
+    paths: "/tmp"
+    patterns:
+      - "fcos*"
+      - "*.ign"
+      - "*.qcow2"
+  register: kvm_tmp_files
+  run_once: true
+
+- name: Remove temporary files on KVM host
+  delegate_to: "{{ kvm_host }}"
+  become: true
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ kvm_tmp_files.files }}"
+  run_once: true
+
+- name: Remove staging and dest dirs on KVM host
+  delegate_to: "{{ kvm_host }}"
+  become: true
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ staging_dir }}"
+    - "{{ dest_dir }}"
+  run_once: true
+
+- name: Find helper temporary files
+  become: true
+  ansible.builtin.find:
+    paths: "/tmp"
+    patterns:
+      - "ngin*"
+      - "*.tar.gz"
+      - "*-san*"
+      - "*.p12"
+  register: helper_tmp_files
+  run_once: true
+
+- name: Remove helper temporary files
+  become: true
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ helper_tmp_files.files }}"
+  run_once: true
+

@@ -1,15 +1,43 @@
-# Run this to monitor build
-- hosts: all
-  gather_facts: false
-  roles:
-    - role: monitors
-
-- name: break here
+- name: load environment
   hosts: all
   gather_facts: false
   tasks:
-    - debug: msg="break {{ here }}"
-    
+    - name: load environment
+      set_fact:
+        ipa_domain: "{{ lookup('env', 'ipa_domain') }}"
+        dns_zone: "{{ lookup('env', 'dns_zone') }}"
+        admin_id: "{{ lookup('env', 'admin_id') }}"
+        admin_set: "{{ lookup('env', 'admin_set') }}"
+        secops_id: "{{ lookup('env', 'secops_id') }}"
+        secops_pwd: "{{ lookup('env', 'secops_pwd') }}"
+        kubetnet_version: "{{ lookup('env', 'kubetnet_version') }}"
+        cluster_ip_addr: "{{ lookup('env', 'cluster_ip_addr') }}"
+        cluster_netmask: "{{ lookup('env', 'cluster_netmask') }}"
+        cluster_gateway: "{{ lookup('env', 'cluster_gateway') }}"
+        default_netmask: "{{ lookup('env', 'default_netmask') }}"
+        default_net_device: "{{ lookup('env', 'default_net_device') }}"
+        cluster_net_device: "{{ lookup('env', 'cluster_net_device') }}"
+        nat_net_device: "{{ lookup('env', 'nat_net_device') }}"
+        nat_mac_device: "{{ lookup('env', 'nat_mac_device') }}"
+        default_ansible_pwd: "{{ lookup('env', 'secops_pwd') }}"
+        secops_key: "{{ lookup('env','secops_key') }}"
+        secops_edkey: "{{ lookup('env','secops_edkey') }}"
+        ssh_key_path: "{{ lookup('env', 'ssh_key_path') }}"
+        account_name: "{{ lookup('env', 'account_name') }}"
+        vm_host: "{{ inventory_hostname }}"
+        vm_fqdn: >-
+          {{ hostvars[inventory_hostname].hostname
+            | default(inventory_hostname_short + '.' + (ansible_domain | default(lookup('env', 'ipa_domain')|lower)) ) }}
+
+# display which sys being processed
+- name: Info VMs from KVM host
+  hosts: all
+  gather_facts: no
+  become: no
+  tasks:
+    - name: processing systems
+      debug: msg="{{ inventory_hostname }} being processed"
+
 - name: Provision VMs from KVM host
   hosts: all
   vars:
@@ -25,20 +53,33 @@
   roles:
     - role: kvm_provision 
 
-# - hosts: all
-#   gather_facts: false
-#   vars:
-#     vm_build_state: "{{ global_vm_build_state | default('skipped') }}"
-#   roles:
-#     - helpers
-
-# ---
-# - hosts: all
-#   gather_facts: false
-#   roles:
-#     - role: ipa_dns
+- name: Build Stage
+  hosts: all
+  tasks:
+    - name: show vm_stage_map
+      debug: msg="{{ inventory_hostname }} is in {{ global_vm_build_state }} state"
+      when: 
+        - "'kvm' not in group_names"
+    
+    - name: set global state
+      set_fact: 
+         vm_build_state: '{{ global_vm_build_state | default("skipped") }}'
 
 - hosts: all
   gather_facts: false
+  vars:
+    vm_build_state: "{{ global_vm_build_state | default('skipped') }}"
   roles:
-    - role: ipa_setup
+    - ipa_setup
+
+- hosts: all
+  gather_facts: false
+  vars:
+    vm_build_state: "{{ global_vm_build_state | default('skipped') }}"
+  roles:
+    - helpers
+
+# - hosts: helpers
+#   gather_facts: false
+#   roles:
+#     - helper_node_prepare

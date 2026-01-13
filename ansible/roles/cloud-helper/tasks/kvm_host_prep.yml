@@ -1,0 +1,37 @@
+---
+# Minimal KVM host preparation: groups, add user to groups, ensure dirs
+- name: Ensure groups exist on KVM host
+  group:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ kvm_host_groups }}"
+  delegate_to: "{{ kvm_host }}"
+  become: true
+
+- name: Add cloud_helper to groups on KVM host
+  user:
+    name: "{{ cloud_helper_user }}"
+    groups: "{{ kvm_host_groups | join(',') }}"
+    append: true
+  delegate_to: "{{ kvm_host }}"
+  become: true
+
+# - name: Ensure images dir exists on KVM host
+#   file:
+#     path: /var/lib/libvirt/images
+#     state: directory
+#     owner: root
+#     group: root
+#     mode: "0755"
+#   delegate_to: "{{ kvm_host }}"
+#   become: true
+
+- name: Ensure tmp xml dir exists on KVM host
+  file:
+    path: /tmp/fcos-vm-xml
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  delegate_to: "{{ kvm_host }}"
+  become: true

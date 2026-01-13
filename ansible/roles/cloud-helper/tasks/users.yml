@@ -1,0 +1,90 @@
+---
+# Create cloud_helper user on helper and optionally on KVM host
+
+###############################################################
+# 1. Ensure helper user exists
+###############################################################
+
+- name: Ensure cloud_helper user exists on helper
+  user:
+    name: "{{ cloud_helper_user }}"
+    system: false
+    create_home: true
+    shell: /bin/bash
+    state: present
+
+- name: Pre-create Ansible temporary directory for cloud_helper
+  become: true
+  file:
+    path: "/home/cloud_helper/.ansible/tmp"
+    state: directory
+    owner: "cloud_helper"
+    group: "cloud_helper"
+    mode: '0700'
+
+- name: Ensure groups exist on KVM host
+  group:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ kvm_host_groups }}"
+  delegate_to: "{{ kvm_host }}"
+  become: true
+
+# - name: Ensure ignition dir exists on KVM host
+#   file:
+#     path: /var/lib/libvirt/images/ignition/
+#     state: directory
+#     owner: qemu
+#     group: qemu
+#     mode: "0755"
+#   delegate_to: "{{ kvm_host }}"
+#   become: true
+
+- name: Ensure cloud_helper user exists on KVM host (optional)
+  user:
+    name: "{{ cloud_helper_user }}"
+    system: false
+    create_home: true
+    shell: /bin/bash
+    state: present
+  delegate_to: "{{ kvm_host }}"
+  become: true
+  when: create_cloud_helper_on_kvm
+
+- name: Add cloud_helper to groups on KVM host
+  user:
+    name: "{{ cloud_helper_user }}"
+    groups: "{{ kvm_host_groups | join(',') }}"
+    append: true
+  delegate_to: "{{ kvm_host }}"
+  become: true
+
+
+# ---
+#
+# cloud_helper_prep — Helper Node Preparation
+# Prepares the helper node environment, user, SSH keys, venv, and packages.
+#
+
+
+###############################################################
+# 2. Ensure helper working directories exist
+###############################################################
+- name: Ensure helper working directory exists
+  file:
+    path: "{{ cloud_helper_workdir }}"
+    state: directory
+    owner: "{{ cloud_helper_user }}"
+    group: "{{ cloud_helper_user }}"
+    mode: '0755'
+  become: true
+
+- name: Ensure helper bin directory exists
+  file:
+    path: "{{ cloud_helper_bin_dir }}"
+    state: directory
+    owner: "{{ cloud_helper_user }}"
+    group: "{{ cloud_helper_user }}"
+    mode: '0755'
+  become: true
+

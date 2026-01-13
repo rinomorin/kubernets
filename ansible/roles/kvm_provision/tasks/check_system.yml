@@ -1,17 +1,38 @@
-- name: Run a ping module (fast SSH test)
-  ansible.builtin.ping:
+- name: Probe reachability of master via TCP 22
+  wait_for:
+    host: "{{ ansible_host }}"
+    port: 22
+    timeout: 5
+  delegate_to: localhost
+  become: false
+  register: probe_result
+  failed_when: false
+  changed_when: false
 
 - name: Check whoami over SSH
   ansible.builtin.command: whoami
   register: ssh_check
+  ignore_unreachable: true   # don’t mark unreachable hosts red
+  failed_when: false         # never fail the task
   changed_when: false
+
+- name: set status to nosystem if SSH unreachable
+  set_fact:
+    vm_build_stage: "nosystem"
+  when:
+    - ssh_check is defined
+    - ssh_check.stdout is not defined or ssh_check.stdout == ''
 
 - name: Check if oscap log exists
   become: true
   shell: ls /var/log/oscap.log
   register: cis_check2
+  ignore_unreachable: true   # don’t mark unreachable hosts red
   changed_when: false
   failed_when: false
+  when:
+    - vm_build_stage is defined
+    - vm_build_stage != 'nosystem'
 
 - name: Verify CA trust list contains IPA CA
   become: yes
@@ -19,11 +40,18 @@
   register: trust_list
   changed_when: false
   failed_when: false
+  when:
+    - vm_build_stage is defined
+    - vm_build_stage != 'nosystem'
 
 - name: set status
   set_fact:
     vm_build_stage: "compliant"
   when:
+    - vm_build_stage is defined
+    - vm_build_stage != 'nosystem'
+    - ssh_check is defined
+    - ssh_check.stdout is defined
     - "'root' in ssh_check.stdout"
     - "'/var/log/oscap.log' in cis_check2.stdout"
 
@@ -31,10 +59,15 @@
   set_fact:
     vm_build_stage: "scanned"
   when:
+    - vm_build_stage is defined
+    - vm_build_stage != 'nosystem'
+    - ssh_check is defined
+    - ssh_check.stdout is defined
     - "'root' in ssh_check.stdout"
     - "'/var/log/oscap.log' in cis_check2.stdout"
     - ipa_domain | upper in (trust_list.stdout | default(''))
 
 - name: update global_vm_build_state
   set_fact:
-    global_vm_build_state: "{{ vm_build_stage }}" 
+    global_vm_build_state: "{{ vm_build_stage }}"
+

@@ -1,0 +1,68 @@
+---
+# Define VMs on the KVM host using the updated NAT‑first XML templates
+
+- name: Check existing VMs (guide://action?prefill=Tell%20me%20more%20about%3A%20Check%20existing%20VMs)
+  virt:
+    command: list_vms
+  register: existing_vms
+  delegate_to: "{{ VM_HOST }}"
+  run_once: true
+
+# ---------------------------------------------------------
+# Masters
+# ---------------------------------------------------------
+
+- name: Render master XML templates (guide://action?prefill=Tell%20me%20more%20about%3A%20Render%20master%20XML%20templates)
+  become: false
+  template:
+    src: master.xml.j2
+    dest: "/tmp/{{ item }}.xml"
+  loop: "{{ masters }}"
+  delegate_to: localhost
+
+- name: Define master VMs (guide://action?prefill=Tell%20me%20more%20about%3A%20Define%20master%20VMs)
+  virt:
+    command: define
+    xml: "{{ lookup('file', '/tmp/' ~ item ~ '.xml') }}"
+  loop: "{{ masters }}"
+  delegate_to: "{{ VM_HOST }}"
+  when:
+    - inventory_hostname == helper_node
+    - item not in existing_vms.list_vms
+
+# ---------------------------------------------------------
+# Workers
+# ---------------------------------------------------------
+
+- name: Render worker XML templates (guide://action?prefill=Tell%20me%20more%20about%3A%20Render%20worker%20XML%20templates)
+  become: false
+  template:
+    src: worker.xml.j2
+    dest: "/tmp/{{ item }}.xml"
+  loop: "{{ workers }}"
+  delegate_to: localhost
+
+- name: Define worker VMs (guide://action?prefill=Tell%20me%20more%20about%3A%20Define%20worker%20VMs)
+  virt:
+    command: define
+    xml: "{{ lookup('file', '/tmp/' ~ item ~ '.xml') }}"
+  loop: "{{ workers }}"
+  delegate_to: "{{ VM_HOST }}"
+  when:
+    - inventory_hostname == helper_node
+    - item not in existing_vms.list_vms
+
+# ---------------------------------------------------------
+# Disk creation
+# ---------------------------------------------------------
+
+- name: Create VM disks (guide://action?prefill=Tell%20me%20more%20about%3A%20Create%20VM%20disks)
+  become: yes
+  command: >
+    qemu-img create -f qcow2 /var/lib/libvirt/images/{{ item }}.qcow2 {{ vm_disk_size }}
+  args:
+    creates: "/var/lib/libvirt/images/{{ item }}.qcow2"
+  delegate_to: "{{ VM_HOST }}"
+  loop: "{{ masters + workers }}"
+  when:
+    - inventory_hostname == helper_node

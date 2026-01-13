@@ -1,0 +1,61 @@
+---
+
+- name: Ensure ssh-users group exists
+  delegate_to: helper
+  group:
+    name: ssh-users
+    state: present
+
+- name: Ensure {{cloud_id}} user exists on helper
+  delegate_to: helper
+  user:
+    name: "{{cloud_id}}"
+    shell: /bin/bash
+    create_home: yes
+    groups: ""          # explicitly no groups
+    append: no
+
+- name: Lock "{{cloud_id}}" password (no password login)
+  delegate_to: helper
+  command: passwd -l "{{cloud_id}}"
+
+- name: Ensure "{{cloud_id}}" SSH keypair exists
+  delegate_to: helper
+  become: yes
+  become_user: "{{cloud_id}}"
+  shell: |
+    test -f ~/.ssh/cluster_automation || \
+    ssh-keygen -t ed25519 -f ~/.ssh/cluster_automation -N ""
+  args:
+    executable: /bin/bash
+
+- name: Add SSH config entry for cluster automation
+  delegate_to: helper
+  become: yes
+  become_user: "{{ cloud_id }}"
+  blockinfile:
+    path: "~/.ssh/config"
+    mode: "0600"
+    create: yes
+    marker: "# {mark} ANSIBLE MANAGED BLOCK cluster automation"
+    block: |
+      Host cluster-nodes
+        Host {{ cloud_zone.split('.')[0] }}.* {{ ingress_ip.split('.')[0] }}.{{ ingress_ip.split('.')[1] }}.*  10.* msrlv9*
+        IdentityFile ~/.ssh/cluster_automation
+        StrictHostKeyChecking no
+        StrictHostKeyChecking=accept-new
+        User core
+
+- name: Read "{{cloud_id}}" public key
+  delegate_to: helper
+  become: yes
+  become_user: "{{cloud_id}}"
+  slurp:
+    src: ~/.ssh/cluster_automation.pub
+  register: "cloud_id_pubkey"
+
+- debug: msg="{{ cloud_id_pubkey }}"
+- name: Set fact for Ignition embedding
+  set_fact:
+    fcos_cloud_support_pubkey: "{{ cloud_id_pubkey.content | b64decode }}"
+- debug: msg="fcos key {{ fcos_cloud_support_pubkey }}"

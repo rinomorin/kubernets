@@ -1,0 +1,18 @@
+---
+# - debug: msg="passwd {{ipa_admin_password }}"
+# - name: Verify Kerberos kinit with admin password
+#   expect:
+#     command: kinit admin@{{ ipa_domain | upper }}
+#     responses:
+#       '(?i)Password for admin.*': "{{ ipa_admin_password }}"
+#   register: kinit_check
+#   changed_when: false
+  # no_log: true
+
+- name: Run DNS updates only on primary IPA master
+  block:
+    - import_tasks: zone.yml
+    - import_tasks: masters.yml
+    - import_tasks: workers.yml
+    - import_tasks: endpoints.yml
+  when: inventory_hostname == groups['ipa'][0]

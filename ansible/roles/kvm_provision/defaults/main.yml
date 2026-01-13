@@ -28,6 +28,7 @@ secops_edkey: "{{ lookup('env','secops_edkey') }}"
 admin_id: "{{ lookup('env', 'admin_id') }}"
 admin_set: "{{ lookup('env', 'admin_set') }}"
 ssh_key_path: "{{ lookup('env', 'ssh_key_path') }}"
+nat_mac: "{{ ',mac=' ~ lookup('env', 'nat_net_device') if lookup('env', 'nat_net_device') is defined else '' }}"
 default_user_passwords: >-
   {{
     {

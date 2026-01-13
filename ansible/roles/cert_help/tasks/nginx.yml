@@ -1,0 +1,73 @@
+---
+- name: insure http as been restarted
+  command: ipactl restart
+  delegate_to: helper
+    
+- name: Install nginx
+  package:
+    name: nginx
+    state: present
+
+- name: Allow nginx to read IPA TLS private key
+  file:
+    path: /etc/pki/tls/private/{{ inventory_hostname_short }}.key
+    mode: '0640'
+    owner: root
+    group: nginx
+
+- name: Ensure nginx conf.d exists
+  file:
+    path: /etc/nginx/conf.d
+    state: directory
+
+- name: Install minimal nginx.conf
+  run_once: true
+  template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    mode: '0644'
+    force: true
+  notify: restart nginx
+
+- name: Disable ALL listeners in nginx.conf.default
+  replace:
+    path: /etc/nginx/nginx.conf.default
+    regexp: '^\s*listen\s+.*;'
+    replace: '# listen disabled by helper_node_prepare'
+  notify: restart nginx
+
+# Install HTTPS listener
+- name: Install nginx HTTPS listener for FCOS assets
+  template:
+    src: ssl.conf.j2
+    dest: /etc/nginx/conf.d/ssl.conf
+    mode: '0644'
+    force: true
+  notify: restart nginx
+
+# Install HTTP listener
+- name: Install nginx HTTP listener for FCOS assets
+  copy:
+    dest: /etc/nginx/conf.d/fcos.conf
+    mode: '0644'
+    content: |
+      server {
+          listen {{ nat_ip_device }}:80;
+          server_name {{ inventory_hostname }};
+
+          disable_symlinks off;
+          autoindex on;
+
+          location /boot/     { alias /srv/fcos/http/; }
+          location /ignition/ { alias /srv/fcos/ignition/; }
+          location /butane/   { alias /srv/fcos/butane/; }
+          location /ipxe/     { alias /srv/fcos/ipxe/; }
+      }
+  notify: restart nginx
+
+# Validate configuration
+- name: Validate Nginx configuration
+  command: nginx -t
+  register: nginx_test
+  changed_when: false
+  failed_when: nginx_test.rc != 0

@@ -1,0 +1,37 @@
+---
+# ============================================================
+# cloud_prechecks: Detect-only — network layout
+# ============================================================
+
+# 1. Detect provision network reachability
+- name: Detect provision network reachability
+  shell: "ping -c1 -W1 {{ hostvars[item].provision_ip }} >/dev/null 2>&1 || true"
+  register: provision_ping
+  ignore_errors: true
+  changed_when: false
+  loop: "{{ groups['cluster_nodes'] }}"
+
+# 2. Detect VIP usage
+- name: Detect if cluster_vip is already in use
+  shell: "ping -c1 -W1 {{ cluster_vip }} >/dev/null 2>&1 || true"
+  register: vip_ping
+  ignore_errors: true
+  changed_when: false
+
+# 3. Build network precheck dictionary
+- name: Build network precheck results
+  set_fact:
+    precheck_network:
+      provision_reachability: >-
+        {{
+          dict(
+            groups['cluster_nodes'] |
+            zip(
+              provision_ping.results |
+              map(attribute='rc', default=1) |
+              map('int') |
+              map('ternary', 0, 1)
+            )
+          )
+        }}
+      vip_in_use: "{{ 1 if vip_ping.rc == 0 else 0 }}"

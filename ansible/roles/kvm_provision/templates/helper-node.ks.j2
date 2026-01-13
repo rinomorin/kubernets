@@ -36,7 +36,7 @@ logvol /var/log             --fstype="xfs" --size=2048   --name=varloglv   --vgn
 logvol /var/log/audit       --fstype="xfs" --size=2048   --name=auditlv    --vgname={{ vg_name }}
 logvol /var/tmp             --fstype="xfs" --size=1024   --name=vartmplv   --vgname={{ vg_name }} --fsoptions="nodev,nosuid,noexec"
 logvol /dev/shm             --fstype="xfs" --size=1024   --name=shmlv      --vgname={{ vg_name }} --fsoptions="nodev,nosuid,noexec"
-logvol /home                --fstype="xfs" --size=1024   --name=homelv     --vgname={{ vg_name }}
+logvol /home                --fstype="xfs" --size=3072   --name=homelv     --vgname={{ vg_name }}
 logvol /                    --fstype="xfs" --size=6144   --name=rootlv     --vgname={{ vg_name }}
 logvol swap                 --fstype="swap" --size=2048   --name=swap       --vgname={{ vg_name }}
 

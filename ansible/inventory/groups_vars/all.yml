@@ -1,0 +1,24 @@
+# Authentication defaults
+secops_id: "secops"
+secops_pw: "{{ lookup('env', 'secops_pwd') }}"
+
+# Network layout
+cloud_networks:
+  house: "192.168.100.0/24"
+  private: "10.0.0.0/24"
+  nat: "172.16.0.0/24"
+
+# Interface mapping
+cloud_interfaces:
+  house: "enp1s0"
+  private: "enp2s0"
+  nat: "enp3s0"
+
+# Cluster identity
+cluster_name: "cloud"
+base_domain: "home.morinsoft.ca"
+
+# SSH access for FCOS nodes
+ssh_authorized_keys:
+  - "{{ lookup('env', 'secops_edkey') }}"
+

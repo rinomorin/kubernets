@@ -1,0 +1,6 @@
+---
+- delegate_to: helper
+  file: { path: "/tmp/{{ item }}", state: absent }
+  loop: ["{{ fcos_image_name }}", "{{ node_name }}.bu", "{{ node_name }}.ign"]
+- delegate_to: "{{ vm_host }}"
+  shell: "sudo /bin/sh -c 'rm -f /tmp/*.ign /tmp/{{ fcos_image_name }}'"

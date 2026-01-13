@@ -1,0 +1,32 @@
+---
+- name: "Provisioning FCOS VM: {{ cluster_node }}"
+  delegate_to:
+   "{{ VM_HOST }}"
+  become: true
+  block:
+    - name: Create CoW Overlay Disk for {{ cluster_node }}
+      ansible.builtin.command:
+        cmd: >
+          qemu-img create -f qcow2 
+          -b {{ dest_dir }}/fcos-base.qcow2 
+          -F qcow2 
+          /var/lib/libvirt/images/{{ cluster_node }}.qcow2 40G
+        creates: "/var/lib/libvirt/images/{{ cluster_node }}.qcow2"
+    
+    - name: Define and Install FCOS VM for {{ cluster_node }}
+      ansible.builtin.command:
+        cmd: >
+          virt-install
+          --name {{ cluster_node }}
+          --ram {{ node_ram }}
+          --vcpus {{ node_vcpu }}
+          --os-variant fedora-coreos-stable
+          --import
+          --disk path=/var/lib/libvirt/images/{{ cluster_node }}.qcow2,format=qcow2
+          --qemu-commandline="-fw_cfg name=opt/com.coreos/config,file={{ dest_dir }}/{{ cluster_node }}.ign"
+          {% for net in node_networks %}
+          --network   network={{ net }}
+          {% endfor %}
+          --graphics none
+          --noautoconsole
+        creates: "/etc/libvirt/qemu/{{ cluster_node }}.xml"

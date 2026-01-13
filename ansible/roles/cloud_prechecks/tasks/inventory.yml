@@ -1,0 +1,17 @@
+- name: Ensure all cluster nodes have provision_ip
+  assert:
+    that: hostvars[item].provision_ip is defined
+    fail_msg: "Node {{ item }} missing provision_ip"
+  loop: "{{ groups['cluster_nodes'] }}"
+
+- name: Ensure masters have provider_ip
+  assert:
+    that: hostvars[item].provider_ip is defined
+    fail_msg: "Master {{ item }} missing provider_ip"
+  loop: "{{ groups['control_nodes'] }}"
+
+- name: Ensure hostnames are defined
+  assert:
+    that: hostvars[item].hostname is defined
+    fail_msg: "Node {{ item }} missing hostname"
+  loop: "{{ groups['cluster_nodes'] }}"

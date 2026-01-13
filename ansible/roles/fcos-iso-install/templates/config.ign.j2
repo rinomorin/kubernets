@@ -1,0 +1,45 @@
+{
+  "ignition": {
+    "version": "3.2.0"
+  },
+
+  "storage": {
+    "files": [
+      {
+        "path": "/usr/local/bin/fcos-firstboot-net.sh",
+        "mode": 493,
+        "contents": {
+          "local": "fcos-firstboot-net.sh"
+        }
+      },
+      {
+        "path": "/etc/systemd/system/fcos-firstboot-net.service",
+        "mode": 420,
+        "contents": {
+          "local": "fcos-firstboot-net.service"
+        }
+      }
+    ]
+  },
+
+  "systemd": {
+    "units": [
+      {
+        "name": "fcos-firstboot-net.service",
+        "enabled": true
+      }
+    ]
+  },
+
+  "passwd": {
+    "users": [
+      {
+        "name": "core",
+        "sshAuthorizedKeys": [
+          "{{ ignition_ssh_authorized_key | default('') }}"
+          "{{ fcos_cloud_support_pubkey | default('') }}"
+        ]
+      }
+    ]
+  }
+}

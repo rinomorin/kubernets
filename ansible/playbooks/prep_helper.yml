@@ -1,0 +1,70 @@
+
+- name: load environment
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: load environment
+      set_fact:
+        VM_HOST: "{{ lookup('env','VM_HOST')}}"
+        ipa_domain: "{{ lookup('env', 'ipa_domain') }}"
+        ipa_admin_password: "{{ lookup('env', 'ipa_admin_password') }}"
+        dns_zone: "{{ lookup('env', 'dns_zone') }}"
+        admin_id: "{{ lookup('env', 'admin_id') }}"
+        admin_set: "{{ lookup('env', 'admin_set') }}"
+        secops_id: "{{ lookup('env', 'secops_id') }}"
+        cloud_id: "{{ lookup('env', 'cloud_id') }}"
+        secops_pwd: "{{ lookup('env', 'secops_pwd') }}"
+        kubetnet_version: "{{ lookup('env', 'kubetnet_version') }}"
+        cluster_ip_addr: "{{ lookup('env', 'cluster_ip_addr') }}"
+        cluster_netmask: "{{ lookup('env', 'cluster_netmask') }}"
+        cloud_zone: "{{ lookup('env', 'cloud_zone') }}"
+        cluster_gateway: "{{ lookup('env', 'cluster_gateway') }}"
+        default_netmask: "{{ lookup('env', 'default_netmask') }}"
+        default_net_device: "{{ lookup('env', 'default_net_device') }}"
+        cluster_net_device: "{{ lookup('env', 'cluster_net_device') }}"
+        nat_net_device: "{{ lookup('env', 'nat_net_device') }}"
+        default_ansible_pwd: "{{ lookup('env', 'secops_pwd') }}"
+        secops_key: "{{ lookup('env','secops_key') }}"
+        secops_edkey: "{{ lookup('env','secops_edkey') }}"
+        ssh_key_path: "{{ lookup('env', 'ssh_key_path')| to_json }}"
+        account_name: "{{ lookup('env', 'account_name') }}"
+        masters: "{{ groups['control_nodes'] | default([]) }}"
+        workers: "{{ groups['worker_nodes'] | default([]) }}"
+        helper_node: "{{ groups['helpers'][0] | default([]) }}"
+        helper_node_ip: "{{ hostvars[groups['helpers'][0]].ansible_host }}"
+        node_list: "{{ groups['control_nodes'] + groups['worker_nodes'] }}"
+
+        # Network layout
+        cloud_networks:
+          house: "192.168.100.0/24"
+          private: "10.0.0.0/24"
+          nat: "172.16.0.0/24"
+
+        # Interface mapping
+        cloud_interfaces:
+          house: "enp1s0"
+          private: "enp2s0"
+          nat: "enp3s0"
+
+    - name: Gather facts (ensure ansible_facts contain IPs)
+      shell: "hostname -I|awk -F172 '{print \"172\"$NF}'|awk '{print $1}'"
+      register: get_nat
+      delegate_to: "{{ helper_node }}"
+
+    - name: Find helper node IP starting with 172.16
+      set_fact:
+        helper_nat_ip: "{{ get_nat.stdout| default('172.16.0.112') }}"
+      delegate_to: "{{ helper_node }}"
+    
+    - set_fact:
+        fcos_cloud_support_pub_key: ""
+        vm_nat_ip_map: null
+
+
+- name: fix helpers status for cloud deployments
+  gather_facts: false
+  hosts: helper
+  become: true
+  roles:
+    - build_helper
+    

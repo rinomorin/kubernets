@@ -1,0 +1,10 @@
+- name: Allow httpd to read TLS private key
+  sefcontext:
+    target: "{{ cert_key_path | dirname }}(/.*)?"
+    setype: httpd_sys_rw_content_t
+    state: present
+  delegate_to: helper
+
+- name: Restore SELinux context
+  command: restorecon -Rv /etc/pki/tls
+  delegate_to: helper

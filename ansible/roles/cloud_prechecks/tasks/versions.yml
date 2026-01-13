@@ -1,0 +1,64 @@
+---
+# ============================================================
+# cloud_prechecks: Detect-only — version collection (no comparisons)
+# ============================================================
+
+# ------------------------------------------------------------
+# 0. Guarantee all precheck dictionaries exist BEFORE any use
+# ------------------------------------------------------------
+- name: Initialize missing precheck dictionaries
+  set_fact:
+    precheck_ansible: "{{ precheck_ansible | default({}) }}"
+    precheck_helper: "{{ precheck_helper | default({}) }}"
+    precheck_kvm: "{{ precheck_kvm | default({}) }}"
+    precheck_network: "{{ precheck_network | default({}) }}"
+    precheck_fcos: "{{ precheck_fcos | default({}) }}"
+    precheck_repos: "{{ precheck_repos | default({}) }}"
+    precheck_kubernetes: "{{ precheck_kubernetes | default({}) }}"
+    precheck_versions: "{{ precheck_versions | default({}) }}"
+  ignore_errors: true
+  changed_when: false
+
+# ------------------------------------------------------------
+# 6. Build version facts dictionary (no version() test)
+# # ------------------------------------------------------------
+#           python_version: "{{ python_version.stdout.split(' ')[-1] | default('unknown') }}"
+#           pip_version: "{{ pip_version.stdout.split(' ')[1] | default('unknown') }}"
+#           ansible_version: "{{ ansible_version.full | default('unknown') }}"
+- name: Build version facts dictionary
+  set_fact:
+    precheck_versions:
+      python:
+        detected: >-
+          {{ precheck_ansible.python_version| default('') }}
+        expected_min: "{{ expected_versions.python_min | string }}"
+
+      pip:
+        detected: >-
+          {{ precheck_ansible.pip_version | default('') }}
+        expected_min: "{{ expected_versions.pip_min | string }}"
+
+      ansible:
+        detected: >-
+          {{ precheck_ansible.ansible_version | default('') }}
+        expected_min: "{{ expected_versions.ansible_min | string }}"
+
+      kubeadm:
+        detected: "{{ precheck_helper.kubeadm_version | default('unknown') }}"
+        expected_min: "{{ expected_versions.kubeadm_min | string }}"
+      kubectl:
+        detected: "{{ precheck_helper.kubectl_version | default('unknown') }}"
+        expected_min: "{{ expected_versions.kubectl_min | string }}"
+      crictl:
+        detected: "{{ precheck_helper.crictl_version | default('unknown') }}"
+        expected_min: "{{ expected_versions.crictl_min | string }}"
+      podman:
+        detected: "{{ precheck_helper.podman_version | default('unknown') }}"
+        expected_min: "{{ expected_versions.podman_min | string }}"
+
+      fcos:
+        detected: "{{ precheck_fcos.fcos_version | default('0') | string }}"
+        expected_min: "{{ expected_versions.fcos_min | string }}"
+      coreos_installer:
+        detected: "{{ precheck_fcos.coreos_installer_version | default('unknown') }}"
+        expected_min: "{{ expected_versions.coreos_installer_min | string }}"

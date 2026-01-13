@@ -1,0 +1,86 @@
+---
+# ============================================================
+# cloud_prechecks: Detect-only — repo definitions
+# ============================================================
+
+# ------------------------------------------------------------
+# 1. Detect Kubernetes repo file
+# ------------------------------------------------------------
+- name: Detect Kubernetes repo file
+  stat:
+    path: /etc/yum.repos.d/kubernetes.repo
+  register: kube_repo
+  ignore_errors: true
+  changed_when: false
+
+# ------------------------------------------------------------
+# 2. Detect Kubernetes repo baseurl version
+# ------------------------------------------------------------
+- name: Detect Kubernetes repo baseurl version
+  command: >
+    grep -E "baseurl=https://pkgs.k8s.io/core:/stable:/{{ kubernetes_version }}/rpm/"
+    /etc/yum.repos.d/kubernetes.repo
+  register: kube_repo_version
+  ignore_errors: true
+  changed_when: false
+  when: kube_repo.stat.exists
+
+# ------------------------------------------------------------
+# 3. Detect Kubernetes repo GPG key
+# ------------------------------------------------------------
+- name: Detect Kubernetes repo GPG key
+  command: >
+    grep -E "gpgkey=https://pkgs.k8s.io/core:/stable:/{{ kubernetes_version }}/rpm/repodata/repomd.xml.key"
+    /etc/yum.repos.d/kubernetes.repo
+  register: kube_repo_gpg
+  ignore_errors: true
+  changed_when: false
+  when: kube_repo.stat.exists
+
+# ------------------------------------------------------------
+# 4. Detect CRI-O repo file
+# ------------------------------------------------------------
+- name: Detect CRI-O repo file
+  stat:
+    path: /etc/yum.repos.d/crio.repo
+  register: crio_repo
+  ignore_errors: true
+  changed_when: false
+
+# ------------------------------------------------------------
+# 5. Detect CRI-O repo baseurl version
+# ------------------------------------------------------------
+- name: Detect CRI-O repo baseurl version
+  command: >
+    grep -E "baseurl=https://download.opensuse.org/repositories/isv:/cri-o:/stable:/{{ crio_version }}/rpm/"
+    /etc/yum.repos.d/crio.repo
+  register: crio_repo_version
+  ignore_errors: true
+  changed_when: false
+  when: crio_repo.stat.exists
+
+# ------------------------------------------------------------
+# 6. Detect CRI-O repo GPG key
+# ------------------------------------------------------------
+- name: Detect CRI-O repo GPG key
+  command: >
+    grep -E "gpgkey=https://download.opensuse.org/repositories/isv:/cri-o:/stable:/{{ crio_version }}/rpm/repodata/repomd.xml.key"
+    /etc/yum.repos.d/crio.repo
+  register: crio_repo_gpg
+  ignore_errors: true
+  changed_when: false
+  when: crio_repo.stat.exists
+
+# ------------------------------------------------------------
+# 7. Build repo precheck dictionary
+# ------------------------------------------------------------
+- name: Build repo precheck results
+  set_fact:
+    precheck_repos:
+      kubernetes_repo: "{{ 0 if kube_repo.stat.exists else 1 }}"
+      kubernetes_repo_version: "{{ kubernetes_version | regex_replace('^v','') | default(0)  }}"
+      kubernetes_repo_gpg: "{{ 0 if (kube_repo_gpg.rc | default(1)) == 0 else 1 }}"
+
+      crio_repo: "{{ 0 if crio_repo.stat.exists else 1 }}"
+      crio_repo_version: "{{ crio_version | regex_replace('^v','') | default(0) }}"
+      crio_repo_gpg: "{{ 0 if (crio_repo_gpg.rc | default(1)) == 0 else 1 }}"

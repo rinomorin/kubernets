@@ -1,0 +1,154 @@
+---
+- name: Install nginx
+  package:
+    name: nginx
+    state: present
+
+- name: insure http as been restarted
+  command: ipactl restart
+  delegate_to: helper
+
+- name: Ensure nginx conf.d exists
+  file:
+    path: /etc/nginx/conf.d
+    state: directory
+
+- name: Ensure certmonger is running
+  service:
+    name: certmonger
+    state: started
+    enabled: true
+
+- name: Allow nginx to read IPA TLS private key
+  file:
+    path: /etc/pki/tls/private/{{ inventory_hostname_short }}.key
+    mode: '0640'
+    owner: root
+    group: nginx
+
+- name: Request SSL certificate from IPA
+  command: >
+    ipa-getcert request -r 
+    -f /etc/nginx/certs/{{ inventory_hostname }}.crt 
+    -k /etc/nginx/certs/{{ inventory_hostname }}.key 
+    -K nginx/{{ inventory_hostname }} 
+    -D {{ inventory_hostname }}
+  args:
+    creates: "/etc/nginx/certs/{{ inventory_hostname }}.crt"
+
+
+- name: Install minimal nginx.conf
+  run_once: true
+  template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    mode: '0644'
+    force: true
+  notify: restart nginx
+
+- name: Disable ALL listeners in nginx.conf.default
+  replace:
+    path: /etc/nginx/nginx.conf.default
+    regexp: '^\s*listen\s+.*;'
+    replace: '# listen disabled by helper_node_prepare'
+  notify: restart nginx
+
+# Install HTTP listener
+- name: Install nginx HTTP listener for FCOS assets
+  copy:
+    dest: /etc/nginx/conf.d/fcos.conf
+    mode: '0644'
+    become: true
+    content: |
+      server {
+          listen {{ nat_ip_device }}:80;
+          server_name {{ inventory_hostname }};
+
+          disable_symlinks off;
+          autoindex on;
+
+          location /boot/     { alias /srv/fcos/http/; }
+          location /ignition/ { alias /srv/fcos/ignition/; }
+          location /butane/   { alias /srv/fcos/butane/; }
+          location /ipxe/     { alias /srv/fcos/ipxe/; }
+      }
+  notify: restart nginx
+
+- name: Ensure httpd directories exist
+  become: false
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ cloud_helper_workdir }}/ignition"
+    - "{{ cloud_helper_workdir }}/fcos"
+
+- name: Ensure httpd is running and enabled
+  become: true
+  service:
+    name: httpd
+    state: started
+    enabled: true
+
+- name: Create global SSL configuration snippet
+  become: true
+  copy:
+    dest: "/etc/nginx/conf.d/ssl_params.conf"
+    mode: "0644"
+    content: |
+      # Global SSL settings for HOME.MORINSOFT.CA
+      ssl_certificate     /etc/nginx/certs/{{ inventory_hostname }}.crt;
+      ssl_certificate_key /etc/nginx/certs/{{ inventory_hostname }}.key;
+
+      # Standard Hardening
+      ssl_protocols TLSv1.2 TLSv1.3;
+      ssl_prefer_server_ciphers on;
+      ssl_ciphers HIGH:!aNULL:!MD5;
+      ssl_session_timeout 1d;
+      ssl_session_cache shared:SSL:50m;
+
+- name: Remove legacy fcos.conf
+  file:
+    path: /etc/nginx/conf.d/fcos.conf
+    state: absent
+
+- name: Install unified cloud_helper.conf (SSL + HTTP)
+  copy:
+    dest: "/etc/nginx/conf.d/cloud_helper.conf"
+    mode: "0644"
+    content: |
+      # HTTPS Server - Secure Management
+      server {
+          listen {{ nat_ip_device }}:443 ssl;
+          server_name {{ inventory_hostname }};
+          include /etc/nginx/conf.d/ssl_params.conf;
+
+          location /ignition/ { alias {{ cloud_helper_workdir }}/ignition/; }
+          location /fcos/     { alias {{ cloud_helper_workdir }}/fcos/; }
+      }
+
+      # HTTP Server - FCOS Provisioning & iPXE
+      server {
+          listen {{ nat_ip_device }}:80;
+          server_name _;
+
+          disable_symlinks off;
+          autoindex on;
+
+          # Combined paths from both original files
+          location /ignition/ { alias {{ cloud_helper_workdir }}/ignition/; }
+          location /fcos/     { alias {{ cloud_helper_workdir }}/fcos/; }
+          location /boot/     { alias {{ cloud_helper_workdir }}/fcos/; }
+          location /ipxe/     { alias {{ cloud_helper_workdir }}/ipxe/; }
+          location /butane/   { alias {{ cloud_helper_workdir }}/butane/; }
+      }
+  notify: restart nginx
+  
+# Validate configuration
+- name: Validate Nginx configuration
+  command: nginx -t
+  register: nginx_test
+  changed_when: false
+  failed_when: nginx_test.rc != 0
+

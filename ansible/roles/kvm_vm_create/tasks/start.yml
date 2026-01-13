@@ -1,0 +1,15 @@
+# start.yml
+---
+- debug:
+    msg: "<kernel>{{ fcos_http_base_url }}/vmlinuz</kernel>"
+  when: inventory_hostname == helper_node
+
+- name: Start VM for each cluster node
+  virt:
+    name: "{{ item }}"
+    state: running
+  loop: "{{ groups['cluster_nodes'] }}"
+  delegate_to: "{{ VM_HOST }}"
+  when: inventory_hostname == helper_node
+  tags:
+    - vm_start

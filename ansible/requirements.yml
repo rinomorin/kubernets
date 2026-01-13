@@ -1,0 +1,4 @@
+# requirements.yml
+collections:
+  - name: freeipa.ansible_freeipa
+    version: "*"

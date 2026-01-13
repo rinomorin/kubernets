@@ -1,0 +1,23 @@
+---
+
+- name: Ensure "{{cloud_id}}" SSH keypair exists
+  delegate_to: helper
+  become: yes
+  become_user: "{{cloud_id}}"
+  shell: |
+    test -f ~/.ssh/cluster_automation || \
+    ssh-keygen -t ed25519 -f ~/.ssh/cluster_automation -N ""
+  args:
+    executable: /bin/bash
+
+- name: Read "{{cloud_id}}" public key
+  delegate_to: helper
+  become: yes
+  become_user: "{{cloud_id}}"
+  slurp:
+    src: ~/.ssh/cluster_automation.pub
+  register: "cloud_id_pubkey"
+
+- name: Set fact for Ignition embedding
+  set_fact:
+    fcos_cloud_support_pub_key: "{{ cloud_id_pubkey.content | b64decode }}"

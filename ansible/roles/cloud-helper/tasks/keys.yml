@@ -1,0 +1,114 @@
+---
+# Generate SSH keypair on helper and install public key on KVM host
+
+- name: Generate SSH key for cloud_helper user on helper
+  become: true
+  become_user: "{{ cloud_helper_user }}"
+  user:
+    name: "{{ cloud_helper_user }}"
+    generate_ssh_key: yes
+    ssh_key_bits: 4096
+    ssh_key_file: .ssh/id_rsa
+  delegate_to: helper
+
+- name: Read the public key from the helper node
+  ansible.builtin.slurp:
+    src: "/home/{{ cloud_helper_user }}/.ssh/id_rsa.pub"
+  delegate_to: helper
+  register: helper_ssh_key
+
+- name: Prep SSH environment for KVM host
+  block:
+    - name: Remove ALL existing authorized keys for {{ cloud_helper_user }} on KVM host
+      file:
+        path: "/home/{{ cloud_helper_user }}/.ssh/authorized_keys"
+        state: absent
+      delegate_to: kvmdc01.home.morinsoft.ca
+
+    - name: Ensure .ssh directory exists with correct perms on KVM host
+      file:
+        path: "/home/{{ cloud_helper_user }}/.ssh"
+        state: directory
+        mode: '0700'
+        owner: "{{ cloud_helper_user }}"
+      delegate_to: kvmdc01.home.morinsoft.ca
+
+    - name: Remove old KVM host entry from helper's known_hosts
+      ansible.builtin.known_hosts:
+        name: "kvmdc01.home.morinsoft.ca"
+        path: "/home/{{ cloud_helper_user }}/.ssh/known_hosts"
+        state: absent
+      delegate_to: helper
+
+- name: Get KVM host SSH fingerprint
+  command: "ssh-keyscan -H kvmdc01.home.morinsoft.ca"
+  register: kvm_fingerprint
+  delegate_to: helper
+  changed_when: false
+
+- name: Update Helper known_hosts with KVM fingerprint
+  ansible.builtin.known_hosts:
+    name: "kvmdc01.home.morinsoft.ca"
+    key: "{{ item }}"
+    path: "/home/{{ cloud_helper_user }}/.ssh/known_hosts"
+    state: present
+  loop: "{{ kvm_fingerprint.stdout_lines }}"
+  delegate_to: helper
+
+- name: Ensure authorized_keys contains NEW helper public key (Native Shell)
+  delegate_to: kvmdc01.home.morinsoft.ca
+  become: true
+  shell: |
+    set -o pipefail
+    mkdir -p /home/{{ cloud_helper_user }}/.ssh
+    chmod 700 /home/{{ cloud_helper_user }}/.ssh
+    # 'exclusive: yes' logic: overwrite the file with ONLY this key
+    echo "{{ helper_ssh_key['content'] | b64decode }}" > /home/{{ cloud_helper_user }}/.ssh/authorized_keys
+    chmod 600 /home/{{ cloud_helper_user }}/.ssh/authorized_keys
+    chown -R {{ cloud_helper_user }}:{{ cloud_helper_user }} /home/{{ cloud_helper_user }}/.ssh
+  args:
+    executable: /bin/bash
+  # This makes the task idempotent by checking if the file already matches the key
+  changed_when: false
+  
+- name: Configure SSH client behavior on Helper
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  blockinfile:
+    path: "/home/{{ cloud_helper_user }}/.ssh/config"
+    create: yes
+    owner: "{{ cloud_helper_user }}"
+    group: "{{ cloud_helper_user }}"
+    mode: '0600'
+    block: |
+      Host *
+          StrictHostKeyChecking accept-new
+          IdentityFile ~/.ssh/id_rsa
+  delegate_to: helper
+
+# - name: Add SSH config entry for cluster automation
+#   become: yes
+#   become_user: "{{ cloud_helper_user }}"
+#   blockinfile:
+#     path: "~/.ssh/config"
+#     mode: "0600"
+#     create: yes
+#     marker: "# {mark} ANSIBLE MANAGED BLOCK cluster automation"
+#     block: |
+#       Host masters-nodes
+#         Host {{ cloud_zone.split('.')[0] }}.* {{ hostvars[groups['control_nodes'][0]].ansible_host }} 10.* msrlv9*
+#         IdentityFile ~/.ssh/cluster_automation
+#         StrictHostKeyChecking accept-new
+#         User core
+#       Host cluster-nodes
+#         Host {{ cloud_zone.split('.')[0] }}.* {{ hostvars[groups['helpers'][0]].ansible_host.rsplit('.', 1)[0] ~ '.4*' }} 10.* msrlv9*
+#         IdentityFile ~/.ssh/cluster_automation
+#         StrictHostKeyChecking accept-new
+#         User core
+
+#       Host home
+#         Host {{ hostvars[groups['helpers'][0]].ansible_host.rsplit('.', 1)[0] ~ '.*' }} *.{{ ipa_domain }} {{ lookup('env', 'VM_HOST') }} {{ lookup('env', 'VM_HOST').split('.')[0] }}
+
+#         IdentityFile {{ helper_ssh_key_path }}
+#         StrictHostKeyChecking accept-new
+#         User {{ cloud_helper_user }}

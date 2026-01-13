@@ -21,7 +21,7 @@
       --auto-forwarders \
       --setup-dns
   when: not ipa_conf.stat.exists
-  no_log: true
+  # no_log: true
 
 - name: create certs from cacert.p12
   become: yes

@@ -1,0 +1,101 @@
+---
+#
+# cloud_helper_prep — Default Variables
+# All values come from inventory or environment variables.
+# No hardcoded IPs, networks, URLs, or versions.
+#
+
+###############################################
+# Helper Node Identity & Paths
+###############################################
+cloud_helper_user: "{{ lookup('env','CLOUD_HELPER_USER') | default('cloud_helper', true) }}"
+cloud_helper_workdir: "{{ lookup('env','HELPER_WORKDIR') | default('/opt/' ~ cloud_helper_user, true) }}"
+cloud_helper_bin_dir: "{{ lookup('env','HELPER_BIN_DIR') | default(cloud_helper_workdir ~ '/bin', true) }}"
+cloud_helper_venv_path: "{{ lookup('env','CLOUD_HELPER_VENV') | default('/opt/cloud_helper/venv', true) }}"
+cloud_helper_ssh_key: "{{ lookup('env','HELPER_SSH_KEY_PATH') | default(cloud_helper_workdir ~ '/id_rsa_cloud_helper', true) }}"
+cloud_helper_ssh_pubkey: "{{ lookup('env','helper_ssh_pubkey_path') | default(cloud_helper_ssh_key ~ '.pub', true) }}"
+
+load_helper_packages: "{{ lookup('env','HELPER_PACKAGES') | default('jq,curl,qemu-img', true) }}"
+cloud_helper_packages: "{{ load_helper_packages.split(',') }}"
+
+###############################################
+# KVM Host & Libvirt Networks (Inventory‑Driven)
+###############################################
+kvm_host: "{{ hostvars['kvmdc01'].ansible_host }}"
+kvm_libvirt_networks: "{{ hostvars['kvmdc01'].libvirt_networks }}"
+
+# Extract networks by name
+provider_network: >-
+  {{
+    kvm_libvirt_networks
+    | selectattr('name','equalto','default')
+    | map(attribute='cidr')
+    | first
+  }}
+
+provision_network: >-
+  {{
+    kvm_libvirt_networks
+    | selectattr('name','equalto','br-cluster')
+    | map(attribute='cidr')
+    | first
+  }}
+
+maintenance_network: >-
+  {{
+    kvm_libvirt_networks
+    | selectattr('name','equalto','br-nat')
+    | map(attribute='cidr')
+    | first
+  }}
+
+# Gateways (first usable IP)
+provider_gateway: "{{ provider_network | regex_replace('/\\d+$','') | regex_replace('\\.0$','.1') }}"
+provision_gateway: "{{ provision_network | regex_replace('/\\d+$','') | regex_replace('\\.0$','.1') }}"
+maintenance_gateway: "{{ maintenance_network | regex_replace('/\\d+$','') | regex_replace('\\.0$','.1') }}"
+
+###############################################
+# Interface Mapping (Helper vs FCOS VMs)
+###############################################
+# Detect helper node
+is_helper: "{{ inventory_hostname == 'helper' }}"
+
+# Provider network interface
+provider_interface: >-
+  {{
+    'enp1s0' if is_helper else 'enp5s0'
+  }}
+
+# Provisioning network interface
+provision_interface: >-
+  {{
+    'enp2s0' if is_helper else 'enp4s0'
+  }}
+
+# Maintenance network interface
+maintenance_interface: >-
+  {{
+    'enp3s0' if is_helper else 'enp3s0'
+  }}
+
+###############################################
+# FCOS Installer
+###############################################
+coreos_image_url: "{{ lookup('env','COREOS_IMAGE_URL') | default('https://builds.coreos.fedoraproject.org/...raw.xz', true) }}"
+
+###############################################
+# Kubernetes & CRI‑O Repositories
+###############################################
+kubernetes_repo_ver: "{{ lookup('env','kubetnet_version') | default('1.34', true) }}"
+kubernetes_repo_url: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_repo_ver }}/rpm/"
+kubernetes_repo_gpg: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_repo_ver }}/rpm/repodata/repomd.xml.key"
+
+
+crio_repo_version: "{{ kubernetes_repo_ver }}"
+crio_repo_url: "https://download.opensuse.org/repositories/isv:/cri-o:/stable:/v{{ kubernetes_repo_ver }}/rpm/"
+crio_repo_gpg: "https://download.opensuse.org/repositories/isv:/cri-o:/stable:/v{{ kubernetes_repo_ver }}/rpm/repodata/repomd.xml.key"
+
+###############################################
+# Cluster VIP (Inventory‑Driven)
+###############################################
+cluster_vip: "{{ hostvars['helper'].cluster_vip | default(lookup('env','cluster_ip_addr'), true) }}"

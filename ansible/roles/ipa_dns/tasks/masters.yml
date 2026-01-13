@@ -1,0 +1,22 @@
+---
+- name: Add A records for masters
+  become: yes
+  command: >
+    ipa dnsrecord-add {{ ipa_dns_zone }} {{ hostvars[item].hostname.split('.')[0] }}
+    --a-ip-address={{ hostvars[item].ansible_host }}
+  loop: "{{ masters }}"
+  register: master_dns
+  failed_when: >
+    master_dns.rc != 0
+    and ('already exists' not in master_dns.stderr)
+    and ('no modifications' not in master_dns.stderr)
+  changed_when: "'Added record' in master_dns.stdout"
+
+
+# - name: Ensure forward A record for ipa_helper
+#   become: yes
+#   command: >
+#     ipa dnsrecord-add {{ ipa_domain }} {{ ipa_helper }} --a-rec={{ ipa_helper_ip }}
+#   register: add_a_helper
+#   changed_when: "'already exists' not in add_a_helper.stdout"
+#   failed_when: false

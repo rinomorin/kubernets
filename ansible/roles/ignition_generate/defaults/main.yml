@@ -1,0 +1,6 @@
+---
+butane_input_dir: /srv/fcos/butane
+ignition_output_dir: /srv/fcos/ignition
+butane_binary: /usr/bin/butane
+ssh_authorized_keys:
+  - "{{ lookup('env', 'secops_edkey') }}"

@@ -1,0 +1,236 @@
+###############################################################
+# Install podman images
+###############################################################
+
+- name: Pull CoreOS Toolchain Images as cloud_helper_user
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  shell: "podman pull quay.io/coreos/{{ item }}:release"
+  loop: [butane, coreos-installer, ignition-validate]
+  register: podman_pull
+
+- name: Add CoreOS tool functions to .bashrc
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  blockinfile:
+    path: "~/.bashrc"
+    marker: "# {mark} COREOS TOOL FUNCTIONS"
+    block: |
+      coreos_installer() {
+        podman run --pull=always \
+          --rm --interactive \
+          --security-opt label=disable \
+          --volume "${PWD}:/pwd" --workdir /pwd \
+          quay.io/coreos/coreos-installer:release "$@"
+      }
+
+      butane() {
+        podman run --rm --interactive \
+          --security-opt label=disable \
+          --volume "${PWD}:/pwd" --workdir /pwd \
+          quay.io/coreos/butane:release "$@"
+      }
+
+      ignition_validate() {
+        podman run --rm --interactive \
+          --security-opt label=disable \
+          --volume "${PWD}:/pwd" --workdir /pwd \
+          quay.io/coreos/ignition-validate:release "$@"
+      }
+
+- name: Ensure configuration directory exists
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  ansible.builtin.file:
+    path: "/home/{{ cloud_helper_user }}/{{ item }}"
+    state: directory
+    mode: '0755'
+  loop: [".config",".config/containers"]
+
+
+- name: Secure podman 
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  file:
+    path: "/home/{{ cloud_helper_user }}/.config/containers/containers.conf"
+    state: touch
+    mode: '0644'
+
+- name: Ensure subuid mapping for cloud_helper_user
+  become: yes
+  lineinfile:
+    path: /etc/subuid
+    line: "{{ cloud_helper_user }}:100000:65536"
+    create: yes
+    state: present
+
+- name: Ensure subgid mapping for cloud_helper_user
+  become: yes
+  lineinfile:
+    path: /etc/subgid
+    line: "{{ cloud_helper_user }}:100000:65536"
+    create: yes
+    state: present
+
+
+- name: Get UID of cloud_helper_user
+  become: yes
+  command: id -u {{ cloud_helper_user }}
+  register: helper_uid
+
+- name: Harden Podman configuration
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  blockinfile:
+    path: "/home/{{ cloud_helper_user }}/.config/containers/containers.conf"
+    marker: "# {mark} Podman Lock down"
+    block: |
+      # =====================================================================
+      # Hardened Podman configuration for automation environments
+      # Rootless, systemd-free, deterministic, and secure for production
+      # =====================================================================
+
+      [engine]
+      cgroup_manager = "cgroupfs"
+      systemd = false
+      auto_update = false
+      events_logger = "file"
+      image_default_transport = "docker://"
+      pull_policy = "missing"
+      no_new_privileges = true
+      sdnotify = false
+      service_timeout = 0
+      signature_policy = ""
+      prune_images = false
+
+      [containers]
+      no_new_privileges = true
+      netns = "private"
+      network_backend = "cni"
+      restart_policy = "no"
+      devices = []
+      ipcns = "private"
+      pidns = "private"
+      utsns = "private"
+      
+      [network]
+      cni_default_network = ""
+      dns_enabled = false
+
+      [secrets]
+      driver = ""
+
+      [storage]
+      driver = "overlay"
+      graphroot = "/home/{{ cloud_helper_user }}/.local/share/containers/storage"
+      runroot = "/run/user/$UID/containers"
+
+- name: Ensure .bashrc-awx exists for AWX-only environment
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  file:
+    path: "/home/{{ cloud_helper_user }}/.bashrc-awx"
+    state: touch
+    mode: '0644'
+
+
+- name: Add CoreOS tool functions to .bashrc-awx
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  blockinfile:
+    path: "~/.bashrc-awx"
+    marker: "# {mark} COREOS TOOL FUNCTIONS"
+    block: |
+      coreos_installer() {
+        podman run --pull=always \
+          --rm --interactive \
+          --security-opt label=disable \
+          --volume "${PWD}:/pwd" --workdir /pwd \
+          quay.io/coreos/coreos-installer:release "$@"
+      }
+
+      butane() {
+        podman run --rm --interactive \
+          --security-opt label=disable \
+          --volume "${PWD}:/pwd" --workdir /pwd \
+          quay.io/coreos/butane:release "$@"
+      }
+
+      ignition_validate() {
+        podman run --rm --interactive \
+          --security-opt label=disable \
+          --volume "${PWD}:/pwd" --workdir /pwd \
+          quay.io/coreos/ignition-validate:release "$@"
+      }
+
+###############################################################
+# Podman + CoreOS Toolchain Preflight Validation
+###############################################################
+
+- name: Validate subuid mapping exists
+  become: yes
+  command: "grep {{ cloud_helper_user }} /etc/subuid"
+  register: subuid_check
+  changed_when: false
+
+- name: Validate subgid mapping exists
+  become: yes
+  command: "grep {{ cloud_helper_user }} /etc/subgid"
+  register: subgid_check
+  changed_when: false
+
+- name: Validate containers.conf exists
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  stat:
+    path: "/home/{{ cloud_helper_user }}/.config/containers/containers.conf"
+  register: containers_conf
+
+- name: Fail if containers.conf missing
+  fail:
+    msg: "containers.conf missing — Podman hardening incomplete"
+  when: not containers_conf.stat.exists
+
+- name: Validate Podman rootless works
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  command: podman info --format '{{ "{{ .Store.GraphRoot }}" }}'
+
+  register: podman_info
+  changed_when: false
+
+- name: Validate CoreOS toolchain images exist
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  command: podman images --format '{{ "{{.Repository}}:{{.Tag}}" }}'
+  register: podman_images
+  changed_when: false
+
+- name: Fail if required images missing
+  fail:
+    msg: "Missing CoreOS toolchain images"
+  when: >
+    ('quay.io/coreos/butane:release' not in podman_images.stdout) or
+    ('quay.io/coreos/coreos-installer:release' not in podman_images.stdout) or
+    ('quay.io/coreos/ignition-validate:release' not in podman_images.stdout)
+
+- name: Validate butane runs
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  command: podman run --rm quay.io/coreos/butane:release --help
+  register: butane_check
+  changed_when: false
+
+- name: Validate coreos-installer runs
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  command: podman run --rm quay.io/coreos/coreos-installer:release --help
+  register: installer_check
+  changed_when: false
+
+- name: Validate ignition-validate runs
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  command: podman run --rm quay.io/coreos/ignition-validate:release --help
+  register: ignition_check
+  changed_when: false

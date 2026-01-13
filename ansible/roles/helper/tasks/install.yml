@@ -1,0 +1,76 @@
+- name: create repo
+  shell: |
+    # Define versions
+    KUBERNETES_VERSION=v1.34
+    CRIO_VERSION=v1.34
+
+    # Kubernetes repo
+    cat <<EOF > /etc/yum.repos.d/kubernetes.repo
+    [kubernetes]
+    name=Kubernetes
+    baseurl=https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/rpm/
+    enabled=1
+    gpgcheck=1
+    gpgkey=https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/rpm/repodata/repomd.xml.key
+    EOF
+
+    # CRI-O repo
+    cat <<EOF > /etc/yum.repos.d/cri-o.repo
+    [cri-o]
+    name=CRI-O
+    baseurl=https://download.opensuse.org/repositories/isv:/cri-o:/stable:/$CRIO_VERSION/rpm/
+    enabled=1
+    gpgcheck=1
+    gpgkey=https://download.opensuse.org/repositories/isv:/cri-o:/stable:/$CRIO_VERSION/rpm/repodata/repomd.xml.key
+    EOF
+  register: add_repo
+  when: "'helpers' in group_names or 'cluster_nodes' in group_names"
+
+- name: Disable swap
+  command: swapoff -a
+
+- name: Remove swap entry from fstab
+  replace:
+    path: /etc/fstab
+    regexp: '^\s*([^#].*swap.*)$'
+    replace: '# \1'
+
+- name: Load kernel modules
+  copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+
+- name: Configure sysctl for Kubernetes networking
+  copy:
+    dest: /etc/sysctl.d/k8s.conf
+    content: |
+      net.bridge.bridge-nf-call-iptables=1
+      net.bridge.bridge-nf-call-ip6tables=1
+      net.ipv4.ip_forward=1
+  notify: Reload sysctl
+
+- name: Install CRI-O and Podman
+  yum:
+    name:
+      - cri-o
+      - podman
+      - kubelet 
+      - kubeadm 
+      - kubectl
+    state: present
+    update_cache: yes
+
+- name: Enable CRI-O service
+  systemd:
+    name: crio
+    enabled: yes
+    state: started
+
+- name: Enable kubelet
+  systemd:
+    name: kubelet
+    enabled: yes
+    state: started
+    

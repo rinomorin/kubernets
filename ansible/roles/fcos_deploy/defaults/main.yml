@@ -1,0 +1,22 @@
+---
+# ... rest of your variables ...
+vm_host: "{{ lookup('env', 'VM_HOST') | default('kvmdc01.home.morinsoft.ca', true) }}"
+cloud_helper_user: "{{ lookup('env', 'CLOUD_HELPER_USER') | default('cloud_helper', true) }}"
+
+# OS Hardware/NIC names
+nic_maint: "{{ lookup('env', 'nat_net_device') | default('enp1s0', true) }}"
+nic_provision: "{{ lookup('env', 'cluster_net_device') | default('enp2s0', true) }}"
+nic_provider: "{{ lookup('env', 'default_net_device') | default('enp3s0', true) }}"
+
+# KVM Bridge Names
+br_maint: "{{ lookup('env', 'KVM_NETWORK_NAT') | default('br-nat', true) }}"
+br_provision: "{{ lookup('env', 'KVM_NETWORK_CLUSTER') | default('br-cluster', true) }}"
+br_provider: "{{ lookup('env', 'KVM_NETWORK_PROVIDER') | default('br0', true) }}"
+
+# Storage and Resources
+image_path: "/var/lib/libvirt/images"
+fcos_image_name: "fedora-coreos-qemu.x86_64.qcow2"
+disk_size: "{{ lookup('env', 'VM_DISK_SIZE') | default('50', true) }}G"
+vm_cpu: "{{ lookup('env', 'VM_CPU') | default(2, true) }}"
+vm_mem: "{{ lookup('env', 'VM_MEM') | default(4096, true) }}"
+cloud_helper_workdir: "{{ lookup('env', 'HELPER_WORKDIR') | default('/opt/cloud_helper', true) }}"

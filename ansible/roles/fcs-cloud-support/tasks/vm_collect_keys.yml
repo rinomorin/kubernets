@@ -1,0 +1,23 @@
+---
+
+- name: Fetch VM public key
+  delegate_to: helper
+  become: yes
+  become_user: "{{cloud_id}}"
+  shell: |
+    ssh -i ~/.ssh/cluster_automation \
+        -o StrictHostKeyChecking=no \
+        core@{{ vm_nat_ip_map[item] }} \
+        "cat ~/.ssh/id_ed25519.pub"
+  register: vm_pubkeys
+  loop: "{{ node_list }}"
+  loop_control:
+    loop_var: item
+
+- name: Build vm_pubkey_map
+  set_fact:
+    vm_pubkey_map: "{{ vm_pubkey_map | default({}) | combine({ item: vm_pubkeys.results[idx].stdout }) }}"
+  loop: "{{ node_list }}"
+  loop_control:
+    loop_var: item
+    index_var: idx

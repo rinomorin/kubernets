@@ -1,0 +1,70 @@
+---
+# Install minimal packages on helper and KVM host
+
+###############################################################
+# Ensure helper packages are installed
+###############################################################
+- name: Install helper packages
+  package:
+    name: "{{ cloud_helper_packages }}"
+    state: present
+  become: true
+
+# - name: Install helper packages
+#   package:
+#     name: "{{ helper_packages }}"
+#     state: present
+
+###############################################################
+# Ensure Python venv exists
+###############################################################
+- name: Ensure python3-venv tools installed
+  package:
+    name:
+      - python3
+      - python3-pip
+    state: present
+  become: true
+
+- name: Ensure cloud_helper venv directory exists
+  file:
+    path: "{{ cloud_helper_venv_path }}"
+    state: directory
+    owner: "{{ cloud_helper_user }}"
+    group: "{{ cloud_helper_user }}"
+    mode: '0755'
+  become: true
+
+- name: Create venv if missing
+  become: true
+  become_user: "{{ cloud_helper_user }}"
+  command: python3 -m venv "{{ cloud_helper_venv_path }}"
+  args:
+    creates: "{{ cloud_helper_venv_path }}/bin/activate"
+
+###############################################################
+# Upgrade pip inside venv
+###############################################################
+- name: Upgrade pip inside venv
+  become: true
+  become_user: "{{ cloud_helper_user }}"
+  shell: "{{ cloud_helper_venv_path }}/bin/pip install --upgrade pip"
+
+###############################################################
+# Install ansible inside venv
+###############################################################
+- name: Install ansible inside venv
+  become: true
+  become_user: "{{ cloud_helper_user }}"
+  shell: "{{ cloud_helper_venv_path }}/bin/pip install ansible"
+
+- name: Ensure venv activates on login for cloud_helper_user
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  lineinfile:
+    path: "/home/{{ cloud_helper_user }}/.bashrc"
+    regexp: 'source {{ cloud_helper_workdir }}/venv/bin/activate'
+    line: 'source {{ cloud_helper_workdir }}/venv/bin/activate'
+    insertafter: EOF
+
+

@@ -1,0 +1,43 @@
+###############################################################
+# 1. Ensure Host home SSH config entry is present
+###############################################################
+- name: Ensure Host home SSH config entry is present
+  delegate_to: helper
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  ansible.builtin.blockinfile:
+    path: "~/.ssh/config"
+    mode: "0600"
+    create: yes
+    marker: "# {mark} ANSIBLE MANAGED BLOCK home access"
+    insertafter: EOF
+    block: |
+      Host home
+        Host {{ cloud_zone.split('.')[0] }}.* {{ kvm_host.split('.')[0] }}.{{ kvm_host.split('.')[1] }}.{{ kvm_host.split('.')[2] }}.* *.{{ VM_HOST.split('.')[1:] | join('.')  }} {{ VM_HOST }} {{VM_HOST.split('.')[0]}} 10.* msrlv9*
+        IdentityFile /opt/cloud_helper/id_rsa_cloud_helper
+        StrictHostKeyChecking accept-new
+        User cloud_helper
+
+
+###############################################################
+# 8. Validate libvirt networks exist on KVM host
+###############################################################
+- name: Validate libvirt networks exist on KVM host
+  become: true
+  become_user: "{{ cloud_helper_user }}"
+  shell: |
+    ssh  {{ kvm_host }} "virsh -c qemu:///system net-info {{ item.name }}"
+  loop: "{{ kvm_libvirt_networks }}"
+  register: kvm_net_info
+  failed_when: kvm_net_info.rc != 0
+  changed_when: false
+
+###############################################################
+# 9. Validate KVM host connectivity (only the host itself)
+###############################################################
+- name: Validate reachability to KVM host
+  become: true
+  command: ping -c 1 {{ kvm_host }}
+  register: ping_kvm
+  failed_when: ping_kvm.rc != 0
+  changed_when: false

@@ -1,0 +1,12 @@
+[Unit]
+Description=FCOS First Boot Network Configuration
+After=network-pre.target
+Before=NetworkManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/fcos-firstboot-net.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

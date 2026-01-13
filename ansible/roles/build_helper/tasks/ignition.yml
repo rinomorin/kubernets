@@ -1,0 +1,601 @@
+
+- name : Create tasks/main.yml for ignition role
+  copy:
+    dest: "{{ cloud_helper_workdir }}/ansible/roles/ignition/tasks/main.yml"
+    mode: "0644"
+    content: |
+      {% raw %}
+      ---
+      - name: Ensure ignition directory exists
+        delegate_to: localhost
+        become: false
+        file:
+          path: "{{ cloud_helper_workdir }}/ignition"
+          state: directory
+          mode: "0755"
+
+      - name: Generate master Ignition configs
+        delegate_to: localhost
+        become: false
+        template:
+          src: "master.ign.j2"
+          dest: "{{ cloud_helper_workdir }}/ignition/{{ item }}.ign"
+          mode: "0644"
+        loop: "{{ groups['masters'] }}"
+        loop_control:
+          loop_var: item
+
+      - name: Generate worker Ignition configs
+        delegate_to: localhost
+        become: false
+        template:
+          src: "worker.ign.j2"
+          dest: "{{ cloud_helper_workdir }}/ignition/{{ item }}.ign"
+          mode: "0644"
+        loop: "{{ groups['workers'] }}"
+        loop_control:
+          loop_var: item
+      {% endraw %}
+
+- name : Create templates/worker.ign.j2 for ignition role
+  copy:
+    dest: "{{ cloud_helper_workdir }}/ansible/roles/ignition/templates/worker.ign.j2"
+    mode: "0644"
+    content: |
+      {% raw %}
+            {
+        "ignition": { "version": "{{ ignition_version }}" },
+        "storage": {},
+        "systemd": { "units": [] },
+        "passwd": {
+          "users": [
+            {
+              "name": "core",
+              "sshAuthorizedKeys": [
+                "{{ lookup('file', cloud_helper_workdir + '/.ssh/cluster_automation.pub') | default('', true) }}"
+              ]
+            }
+          ]
+        }
+      }
+      {% endraw %}
+
+# - name : Create templates/shutdown.sh.j2 for ignition role
+#   copy:
+#     owner: "{{ cloud_helper_user }}"
+#     group: "{{ cloud_helper_user }}"
+#     dest: "{{ cloud_helper_workdir }}/ansible/roles/vm_create/templates/shutdown.sh.j2"
+#     mode: "0644"
+#     content: |
+#       {% raw %}
+#       #!/bin/bash
+#       # Shutdown script for {{ vm_name }}
+#       sudo poweroff
+#       {% endraw %}
+
+- name : Create files/shutdown.sh.j2 for vm_create role
+  copy:
+    owner: "{{ cloud_helper_user }}"
+    group: "{{ cloud_helper_user }}"
+    dest: "{{ cloud_helper_workdir }}/ansible/roles/vm_create/files/shutdown.sh.j2"
+    mode: "0644"
+    content: |
+      {% raw %}
+      #!/bin/bash
+      # Shutdown script for {{ vm_name }}
+      sudo poweroff
+      {% endraw %}
+
+- name : Create templates/master.ign.j2 for ignition role
+  copy:
+    owner: "{{ cloud_helper_user }}"
+    group: "{{ cloud_helper_user }}"
+    dest: "{{ cloud_helper_workdir }}/ansible/roles/ignition/templates/master.ign.j2"
+    mode: "0644"
+    content: |
+      {% raw %}
+      {
+        "ignition": { "version": "{{ ignition_version }}" },
+        "storage": {},
+        "systemd": { "units": [] },
+        "passwd": {
+          "users": [
+            {
+              "name": "core",
+              "sshAuthorizedKeys": [
+                "{{ lookup('file', cloud_helper_workdir + '/.ssh/cluster_automation.pub') | default('', true) }}"
+              ]
+            }
+          ]
+        }
+      }
+      {% endraw %}
+
+- name : Create vm_create/main.yml for ignition role
+  copy:
+    owner: "{{ cloud_helper_user }}"
+    group: "{{ cloud_helper_user }}"  
+    dest: "{{ cloud_helper_workdir }}/ansible/roles/vm_create/tasks/main.yml"
+    mode: "0644"
+    force: yes
+    content: |
+      {% raw %}
+      ---            
+      - name: Ensure FCOS boot directory exists on KVM host
+        delegate_to: "{{ kvm_host }}"
+        become: true
+        shell: |
+          sudo mkdir -p /var/lib/libvirt/boot/fcos
+          sudo chmod -R 755 /var/lib/libvirt/boot
+          sudo chown -R qemu:qemu /var/lib/libvirt/boot
+        args:
+          creates: /var/lib/libvirt/boot/fcos
+
+      # - name: Download FCOS live kernel
+      #   delegate_to: "{{ kvm_host }}"
+      #   become: true
+      #   get_url:
+      #     url: "{{ fcos_live_kernel_url }}"
+      #     dest: /tmp/vmlinuz
+      #     mode: "0644"
+
+      # - name: Download FCOS live initramfs
+      #   delegate_to: "{{ kvm_host }}"
+      #   become: true
+      #   get_url:
+      #     url: "{{ fcos_live_initramfs_url }}"
+      #     dest: /tmp/initramfs.img
+      #     mode: "0644"
+
+      # - name: sleep 10 secons
+      #   pause:
+      #     seconds: 10
+
+      # - name: Move FCOS live kernel to boot directory
+      #   delegate_to: "{{ kvm_host }}"
+      #   become: true
+      #   command: >
+      #     sudo mv -f /tmp/initramfs.img /var/lib/libvirt/boot/fcos/fcos-initramfs.img
+
+      # - name: Move FCOS live kernel to boot directory
+      #   delegate_to: "{{ kvm_host }}"
+      #   become: true
+      #   command: >
+      #     sudo mv /tmp/vmlinuz /var/lib/libvirt/boot/fcos/fcos-vmlinuz
+
+      # - name:  copy FCOS live kernel to boot directory
+      #   delegate_to: "{{ kvm_host }}"
+      #   become: true
+      #   command: >
+      #     sudo cp -f /var/lib/libvirt/boot/fcos/fcos-initramfs.img /var/lib/libvirt/boot/fcos/initramfs.img
+
+      # - name: COPY FCOS live kernel to boot directory
+      #   delegate_to: "{{ kvm_host }}"
+      #   become: true
+      #   command: >
+      #     sudo cp -f /var/lib/libvirt/boot/fcos/fcos-vmlinuz /var/lib/libvirt/boot/fcos/vmlinuz
+
+      # - name: Move FCOS live kernel to boot directory
+      #   delegate_to: "{{ kvm_host }}"
+      #   become: true
+      #   command: >
+      #     sudo find /var/lib/libvirt/boot/fcos -type f -exec chmod 0644 {} \;
+      
+      # - name: Move FCOS live kernel to boot directory
+        # delegate_to: "{{ kvm_host }}"
+        # become: true
+        # command: >
+        #   sudo find /var/lib/libvirt/boot/fcos -type f -exec chown qemu:qemu {} \;
+
+      - name: Set KVM host
+        set_fact:
+          kvm_host: "{{ groups['kvm'][0] }}"
+
+      - name: Ensure images dir on KVM host
+        delegate_to: "{{ kvm_host }}"
+        become: true
+        file:
+          path: "/var/lib/libvirt/images"
+          state: directory
+          mode: "0755"
+
+      # - name: Download FCOS live rootfs
+      #   become: false
+      #   delegate_to: localhost
+      #   get_url:
+      #     url: "{{ fcos_live_rootfs_url }}"
+      #     dest: "{{ cloud_helper_workdir }}/fcos/rootfs.img"
+      #     mode: "0644"
+
+      # ------------------------------------------------------------
+      # Masters
+      # ------------------------------------------------------------
+      - name: Create master VMs
+        include_tasks: create_vm.yml
+        loop: "{{ groups['masters'] }}"
+        loop_control:
+          loop_var: vm
+
+      # ------------------------------------------------------------
+      # Workers
+      # ------------------------------------------------------------
+      - name: Create worker VMs
+        include_tasks: create_vm.yml
+        loop: "{{ groups['workers'] }}"
+        loop_control:
+          loop_var: vm
+
+      {% endraw %}
+
+- name : Create tasks/create_vm.yml for ignition role
+  copy:
+    owner: "{{ cloud_helper_user }}"
+    group: "{{ cloud_helper_user }}"
+    dest: "{{ cloud_helper_workdir }}/ansible/roles/vm_create/tasks/create_vm.yml"
+    mode: "0644"
+    content: |
+      {% raw %}
+      ---
+      - name: Set VM variables
+        set_fact:
+          vm_name: "{{ vm }}"
+          vm_cpu: "{{ hostvars[vm].vm_cpu }}"
+          vm_ram: "{{ hostvars[vm].vm_ram_mb }}"
+          vm_disk: "{{ hostvars[vm].vm_disk_gb }}"
+          helper_http_ip: "{{ lookup('env','helper_http_ip') | default('172.16.0.20') }}"
+          fcos_iso_url: "{{ lookup('env','FCOS_ISO_URL') | default('https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/43.20251120.3.0/x86_64/fedora-coreos-43.20251120.3.0-live-iso.x86_64.iso', true) }}" 
+          fcos_iso_sig: "{{ lookup('env','FCOS_ISO_SIG') | default('https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/43.20251120.3.0/x86_64/fedora-coreos-43.20251120.3.0-live-iso.x86_64.iso.sig', true) }}"
+          fcos_iso_sha256: "{{ lookup('env','FCOS_ISO_SHA256') | default('5529503bfed563171d599b5df6a8588a23ac963149e4ac3d185acf7cd51aa3d1', true ) }}"
+
+      - name: Create files/shutdown.sh.j2 for vm_create role
+        copy:
+          owner: "{{ cloud_helper_user }}"
+          group: "{{ cloud_helper_user }}"
+          dest: "{{ cloud_helper_workdir }}/ansible/roles/vm_create/templates/shutdown.sh.j2"
+          mode: "0644"
+          content: |
+            #!/bin/bash
+            # Shutdown script for {{ vm_name }}
+            sudo poweroff
+
+      - name: Create files/0000-customize.yaml.j2 for vm_create role
+        copy:
+          owner: "{{ cloud_helper_user }}"
+          group: "{{ cloud_helper_user }}"
+          dest: "{{ cloud_helper_workdir }}/ansible/roles/vm_create/files/0000-customize.yaml.j2"
+          mode: "0644"
+          force:  true
+          content: |
+            # FCOS installer configuration
+            dest-device: /dev/vda
+
+            # Optional: embed Ignition (already handled by --dest-ignition)
+            ignition-file: "/etc/coreos/installer.d/ignition.ign"
+
+            # Optional: kernel args
+            append-karg:
+              - console=ttyS0
+
+      - name: Create installer config file for ISO customization
+        copy:
+          src: 0000-customize.yaml.j2
+          dest: "/tmp/{{ vm_name }}-0000-customize.yaml"
+          mode: '0644'
+          force: true
+
+
+      - name: Create files/install.sh.j2 for vm_create role
+        copy:
+          owner: "{{ cloud_helper_user }}"
+          group: "{{ cloud_helper_user }}"
+          dest: "{{ cloud_helper_workdir }}/ansible/roles/vm_create/templates/install.sh.j2"
+          mode: "0644"
+          content: |
+            #!/bin/bash
+            set -euxo pipefail
+
+            # Run the installer
+            coreos-installer install \
+              --config-file /etc/coreos/installer.d/0000-customize.yaml \
+              --fetch-retries infinite \
+              /dev/vda
+
+
+      - name: Create shutdown script for ISO customization
+        delegate_to: localhost
+        become: false
+        template:
+          src: shutdown.sh.j2
+          dest: "/tmp/{{ vm_name }}-shutdown.sh"
+          mode: '0755'
+
+      - name: Create install script for ISO customization
+        delegate_to: localhost
+        become: false
+        template:
+          src: install.sh.j2
+          dest: "/tmp/{{ vm_name }}-install.sh"
+          mode: '0755'
+
+      - name: Download Fedora CoreOS stable stream metadata
+        become: yes
+        become_user: "{{ cloud_helper_user }}"
+        get_url:
+          url: "{{ fcos_iso_url }}"
+          dest: "{{ cloud_helper_workdir }}/fcos/fcos.iso"
+          mode: "0644"
+
+      - name: wait for 5 seconds
+        pause:
+          seconds: 5
+
+      - name: Customize FCOS ISO on helper
+        delegate_to: localhost
+        become: false
+        command: >
+          coreos-installer iso customize
+          --dest-ignition {{ cloud_helper_workdir }}/ignition/{{ vm_name }}.ign
+          --pre-install /tmp/{{ vm_name }}-install.sh
+          --post-install /tmp/{{ vm_name }}-shutdown.sh
+          --installer-config /tmp/{{ vm_name }}-0000-customize.yaml
+          {{ cloud_helper_workdir }}/fcos/fcos.iso
+          -o /tmp/{{ vm_name }}-custom.iso
+
+      - name: Copy customized ISO from controller to KVM host
+        delegate_to: "{{ kvm_host }}"
+        copy:
+          src: "/tmp/{{ vm_name }}-custom.iso"
+          dest: "/var/lib/libvirt/boot/fcos/{{ vm_name }}-custom.iso"
+          mode: "0644"
+
+      - name: Move ISO to KVM libvirt directory
+        delegate_to: "{{ kvm_host }}"
+        shell: >
+          sudo mv -f /tmp/{{ vm_name }}-custom.iso /var/lib/libvirt/boot/fcos/{{ vm_name }}-custom.iso
+          chmod 0644 /var/lib/libvirt/boot/fcos/{{ vm_name }}-custom.iso
+          chown qemu:qemu /var/lib/libvirt/boot/fcos/{{ vm_name }}-custom.iso
+        args:
+          creates: "/var/lib/libvirt/boot/fcos/{{ vm_name }}-custom.iso"
+
+      - name: Check if VM already exists
+        delegate_to: "{{ kvm_host }}"
+        become: true
+        command: "virsh dominfo {{ vm_name }}"
+        register: vm_exists
+        failed_when: false
+        changed_when: false
+
+      - name: Create VM disk if missing
+        delegate_to: "{{ kvm_host }}"
+        shell: "sudo qemu-img create -f qcow2 /var/lib/libvirt/images/{{ vm_name }}.qcow2 {{ vm_disk_gb }}G"
+        when: vm_exists.rc != 0
+
+      - name: Create VM VARS disk if missing
+        delegate_to: "{{ kvm_host }}"
+        shell: |
+          sudo mkdir -p /var/lib/libvirt/qemu/nvram
+          sudo cp /usr/share/edk2/ovmf/OVMF_VARS.fd /var/lib/libvirt/qemu/nvram/{{ vm_name }}_VARS.fd
+          sudo chown qemu:qemu /var/lib/libvirt/qemu/nvram/{{ vm_name }}_VARS.fd
+          sudo restorecon -Rv /var/lib/libvirt/qemu/nvram
+        when: vm_exists.rc != 0
+
+      - name: Create VM using customized ISO debug
+        debug:
+          msg: >
+            sudo virt-install
+            --name {{ vm_name }}
+            --memory {{ vm_ram }}
+            --vcpus {{ vm_cpu }}
+            --disk path=/var/lib/libvirt/images/{{ vm_name }}.qcow2,format=qcow2
+            --os-variant fedora-coreos-stable
+            --network bridge=br-nat
+            --network bridge=br-cluster
+            {% if vm_name in groups['masters'] %}
+            --network bridge=br0
+            {% endif %}
+            --graphics none
+            --cdrom /var/lib/libvirt/boot/fcos/{{ vm_name }}-custom.iso
+            --boot uefi
+            --noautoconsole
+
+      - name: Create VM using customized ISO
+        delegate_to: "{{ kvm_host }}"
+        command: >
+          sudo virt-install
+          --name {{ vm_name }}
+          --memory {{ vm_ram }}
+          --vcpus {{ vm_cpu }}
+          --disk path=/var/lib/libvirt/images/{{ vm_name }}.qcow2,format=qcow2
+          --os-variant fedora-coreos-stable
+          --network bridge=br-nat
+          --network bridge=br-cluster,link_state=down
+          {% if vm_name in groups['masters'] %}
+            --network bridge=br0,link_state=down
+          {% endif %}
+          --graphics none
+          --cdrom /var/lib/libvirt/boot/fcos/{{ vm_name }}-custom.iso
+          --boot uefi
+          --noautoconsole
+
+      - name: Wait for VM to shut down after installation
+        delegate_to: "{{ kvm_host }}"
+        become: true
+        shell: |
+          while "virsh -c qemu:///system domstate {{ vm_name }}" | grep -q running; do
+            sleep 5
+          done
+        retries: 120
+        delay: 5
+
+      - name: Dump VM XML
+        delegate_to: "{{ kvm_host }}"
+        command: "virsh -c qemu:///system dumpxml {{ vm_name }}"
+        register: vm_xml
+
+      - name: Rewrite domain XML to remove ISO and force disk boot
+        delegate_to: "{{ kvm_host }}"
+        copy:
+          dest: "/tmp/{{ vm_name }}.xml"
+          content: |
+            {{ vm_xml.stdout
+              | regex_replace('<disk.*cdrom.*?</disk>', '')
+              | regex_replace('<boot dev=.cdrom./>', '')
+              | regex_replace('</os>', '<boot dev="hd"/></os>')
+            }}
+
+      - name: Redefine VM with updated XML
+        delegate_to: "{{ kvm_host }}"
+        command: "virsh -c qemu:///system define /tmp/{{ vm_name }}.xml"
+
+      - name: Boot installed VM
+        delegate_to: "{{ kvm_host }}"
+        command: "virsh -c qemu:///system start {{ vm_name }}"
+
+      {% endraw %}
+
+
+- name : Create coreos_install/main.yml for ignition role
+  copy:
+    owner: "{{ cloud_helper_user }}"
+    group: "{{ cloud_helper_user }}"  
+    dest: "{{ cloud_helper_workdir }}/ansible/roles/coreos_install/tasks/main.yml"
+    mode: "0644"
+    content: |
+      {% raw %}
+  
+      # - name: Ensure FCOS directory exists on helper
+      #   become: false
+      #   delegate_to: localhost
+      #   file:
+      #     path: "{{ cloud_helper_workdir }}/fcos"
+      #     state: directory
+      #     mode: "0755"
+
+      - name: Download FCOS live rootfs
+        become: false
+        delegate_to: localhost
+        get_url:
+          url: "{{ fcos_live_rootfs_url }}"
+          dest: "{{ cloud_helper_workdir }}/fcos/rootfs.img"
+          mode: "0644"
+
+      {% endraw %}
+
+- name : Create kubeadm_init/main.yml for ignition role
+  copy:
+    owner: "{{ cloud_helper_user }}"
+    group: "{{ cloud_helper_user }}"
+    dest: "{{ cloud_helper_workdir }}/ansible/roles/kubeadm_init/tasks/main.yml"
+    mode: "0644"
+    content: |
+      {% raw %}
+      ---
+      - name: Wait for master SSH to be reachable
+        delegate_to: "{{ groups['masters'][0] }}"
+        wait_for_connection:
+          timeout: 600
+
+      - name: Run kubeadm init on master
+        delegate_to: "{{ groups['masters'][0] }}"
+        become: true
+        shell: |
+          kubeadm init \
+            --pod-network-cidr={{ cluster_pod_cidr }} \
+            --service-cidr={{ cluster_service_cidr }} \
+            --kubernetes-version={{ kubernetes_version }} \
+            --control-plane-endpoint={{ groups['masters'][0] }}:6443 \
+            2>&1 | tee /root/kubeadm-init.log
+        args:
+          executable: /bin/bash
+        register: kubeadm_init_run
+        changed_when: "'kubeadm init' in kubeadm_init_run.stdout"
+
+      - name: Fetch admin.conf to helper
+        delegate_to: "{{ groups['masters'][0] }}"
+        fetch:
+          src: /etc/kubernetes/admin.conf
+          dest: "{{ artifacts_dir }}/admin.conf"
+          flat: true
+
+      {% endraw %}
+
+- name : Create kubeadm_join/main.yml for ignition role
+  copy:
+    owner: "{{ cloud_helper_user }}"
+    group: "{{ cloud_helper_user }}"
+    dest: "{{ cloud_helper_workdir }}/ansible/roles/kubeadm_join/tasks/main.yml"
+    mode: "0644"
+    content: |
+      {% raw %}
+      ---
+      - name: Generate join command on master
+        delegate_to: "{{ groups['masters'][0] }}"
+        become: true
+        shell: kubeadm token create --print-join-command
+        register: join_cmd
+        changed_when: false
+
+      - name: Join workers to cluster
+        delegate_to: "{{ item }}"
+        become: true
+        shell: "{{ join_cmd.stdout }}"
+        args:
+          executable: /bin/bash
+        loop: "{{ groups['workers'] }}"
+
+      {% endraw %}
+
+
+- name : Create cluster_validate for ignition role
+  copy:
+    owner: "{{ cloud_helper_user }}"
+    group: "{{ cloud_helper_user }}"
+    dest: "{{ cloud_helper_workdir }}/ansible/roles/cluster_validate/tasks/main.yml"
+    mode: "0644"
+    content: |
+      {% raw %}
+      ---
+      - name: Set kubeconfig path
+        set_fact:
+          kubeconfig_path: "{{ artifacts_dir }}/admin.conf"
+
+      - name: Wait for nodes to be Ready
+        shell: |
+          KUBECONFIG={{ kubeconfig_path }} kubectl get nodes --no-headers | awk '{print $2}' | grep -v Ready && exit 1 || exit 0
+        register: node_ready_check
+        retries: 30
+        delay: 10
+        until: node_ready_check.rc == 0
+        changed_when: false
+
+      - name: Show nodes
+        shell: |
+          KUBECONFIG={{ kubeconfig_path }} kubectl get nodes -o wide
+        register: nodes_out
+        changed_when: false
+
+      - debug:
+          var: nodes_out.stdout
+
+      - name: Show pods
+        shell: |
+          KUBECONFIG={{ kubeconfig_path }} kubectl get pods -A
+        register: pods_out
+        changed_when: false
+
+      - debug:
+          var: pods_out.stdout
+
+      {% endraw %}
+
+
+# - name : Create tasks/main.yml for ignition role
+#   copy:
+#     dest: "{{ cloud_helper_workdir }}/ansible/roles/ignition/tasks/main.yml"
+#     mode: "0644"
+#     content: |
+#       {% raw %}
+#       {% endraw %}
+
+
+  # httpd.conf.j2

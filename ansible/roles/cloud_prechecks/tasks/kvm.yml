@@ -1,0 +1,36 @@
+---
+# 1. Detect SSH connectivity
+- name: Detect SSH connectivity to KVM host
+  become: true
+  become_user: "{{ cloud_helper_user }}"
+  shell: "ssh -o BatchMode=yes {{ kvm_host }} 'echo ok' || true"
+  register: kvm_ssh_test
+  ignore_errors: true
+  changed_when: false
+
+# 2. Detect libvirtd service
+- name: Detect libvirtd service status on KVM host
+  become: true
+  become_user: "{{ cloud_helper_user }}"
+  shell: "ssh {{ kvm_host }} 'systemctl is-active libvirtd' || true"
+  register: libvirtd_status
+  ignore_errors: true
+  changed_when: false
+
+# 3. Detect libvirt networks
+- name: Detect libvirt networks on KVM host
+  become: true
+  become_user: "{{ cloud_helper_user }}"
+  shell: "ssh {{ kvm_host }} 'virsh -c qemu:///system net-info {{ item }}' || true"
+  register: libvirt_net_check
+  ignore_errors: true
+  changed_when: false
+  loop: "{{ libvirt_networks_expected }}"
+
+# 4. Build KVM precheck dictionary
+- name: Build KVM precheck results
+  set_fact:
+    precheck_kvm:
+      ssh_to_kvm: "{{ 0 if kvm_ssh_test.stdout == 'ok' else 1 }}"
+      libvirtd_service: "{{ 0 if (libvirtd_status.stdout | default('inactive')) == 'active' else 1 }}"
+      networks: "{{ dict(libvirt_networks_expected | zip(libvirt_net_check.results | map(attribute='rc') | map('int'))) }}"

@@ -1,0 +1,117 @@
+- name: Create environment file with variable references only
+  copy:
+    owner: "{{ cloud_helper_user }}"
+    group: "{{ cloud_helper_user }}"
+    dest: "{{ cloud_helper_workdir }}/env_vars.sh"
+    mode: "0644"
+    force: yes
+    content: |
+      # Ansible role: Build Helper - Environment Variables
+      export CLOUD_HELPER_USER="{{ lookup('env','CLOUD_HELPER_USER') | default('cloud_helper') }}"
+      export CLOUD_HELPER_WORKDIR="{{ lookup('env','HELPER_WORKDIR') | default('/opt/cloud_helper') }}"
+
+      # NODE Builder variables
+      export FCOS_IMAGE_URL="https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/43.20241201.3.0/x86_64/fedora-coreos-43.20241201.3.0-metal.x86_64.raw.xz"
+      STREAM_JSON={{lookup('env','HELPER_WORKDIR')}}/fcos/stable.json
+
+      export FCOS_ISO_URL="https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/43.20251120.3.0/x86_64/fedora-coreos-43.20251120.3.0-live-iso.x86_64.iso"
+      export FCOS_ISO_SIG="https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/43.20251120.3.0/x86_64/fedora-coreos-43.20251120.3.0-live-iso.x86_64.iso.sig"
+      export FCOS_ISO_SHA256="5529503bfed563171d599b5df6a8588a23ac963149e4ac3d185acf7cd51aa3d1"
+
+      export FCOS_LIVE_KERNEL_URL=$(jq -r '.architectures.x86_64.artifacts.metal.formats.pxe.kernel.location' "$STREAM_JSON")
+      export FCOS_LIVE_INITRAMFS_URL=$(jq -r '.architectures.x86_64.artifacts.metal.formats.pxe.initramfs.location' "$STREAM_JSON")
+      export FCOS_LIVE_ROOTFS_URL=$(jq -r '.architectures.x86_64.artifacts.metal.formats.pxe.rootfs.location' "$STREAM_JSON")
+
+      export KUBERNETES_VERSION="{{ lookup('env','kubetnet_version') | default('1.34') }}"
+      export IGNITION_VERSION="3.4.0"
+
+      # KVM Info
+      export KVM_LIBVIRT_URI="{{ lookup('env','KVM_LIBVIRT_URI') | default('qemu+ssh:///system') }}"
+      export KVM_POOL_NAME="{{ lookup('env','KVM_POOL_NAME') | default('KVM_Pool') }}"
+      export KVM_NETWORK_CLUSTER="{{ lookup('env','KVM_NETWORK_CLUSTER') | default('br-cluster') }}"
+      export KVM_NETWORK_NAT="{{ lookup('env','KVM_NETWORK_NAT') | default('br-nat') }}"
+      export KVM_NETWORK_PROVIDER="{{ lookup('env','KVM_NETWORK_PROVIDER') | default('br-provisioning') }}"
+      export helper_http_ip="{{ nat_ip_device | default('172.16.0.20') }}"
+      # Node Info
+      export VM_CPU={{ lookup('env','VM_CPU') | default(4) }}
+      export VM_RAM_MB={{ lookup('env','VM_MEM') | default(8192) }}
+      export VM_DISK_SIZE={{ lookup('env','VM_DISK_SIZE') | default(50) }}
+      export VM_HOST="{{lookup('env','VM_HOST') | default('kvmdc01') }}"
+      # Cloud Info
+      export CLUSTER_NAME="{{ cloud_zone | default('k8s-cluster') }}"
+      export CLUSTER_POD_CIDR="{{ CLUSTER_POD_CIDR | default('10.244.0.0/16') }}"
+      export CLUSTER_SERVICE_CIDR="{{ CLUSTER_SERVICE_CIDR | default('10.96.0.0/12') }}"
+  when: (cloud_helper_workdir ~ '/ansible/group_vars/all.yml') is not file
+
+
+- debug:
+    msg: "worker {{ cloud_helper_workdir }}"
+
+- name: Set inventory vars
+  set_fact:
+    helper_id: "{{ groups['helper_nodes'][0] }}"
+    helper_hostname: "{{ hostvars['helper']['hostname'] }}"
+    helper_ip: "{{ hostvars['helper']['ansible_host'] }}"
+
+    kvm_id: "{{ groups['kvm'][0] }}"
+    kvm_hostname: "{{ hostvars[groups['kvm'][0]]['hostname'] }}"
+    kvm_ip: "{{ hostvars[groups['kvm'][0]]['ansible_host'] }}"
+
+    control_id: "{{ groups['control_nodes'][0] }}"
+    control_hostname: "{{ hostvars[groups['control_nodes'][0]]['hostname'] }}"
+    control_ip: "{{ hostvars[groups['control_nodes'][0]]['ansible_host'] }}"
+
+    worker_1_id: "{{ groups['worker_nodes'][0] }}"
+    worker_1_hostname: "{{ hostvars[groups['worker_nodes'][0]]['hostname'] }}"
+    worker_1_ip: "{{ hostvars[groups['worker_nodes'][0]]['ansible_host'] }}"
+
+    worker_2_id: "{{ groups['worker_nodes'][1] }}"
+    worker_2_hostname: "{{ hostvars[groups['worker_nodes'][1]]['hostname'] }}"
+    worker_2_ip: "{{ hostvars[groups['worker_nodes'][1]]['ansible_host'] }}"
+
+- name: add ansible.cfg file
+  copy:
+    owner: "{{ cloud_helper_user }}"
+    group: "{{ cloud_helper_user }}"
+    dest: "{{ cloud_helper_workdir }}/ansible/ansible.cfg"
+    mode: "0644"
+    force: yes
+    content: |
+      [defaults]
+      inventory = ./inventory/hosts.ini
+      remote_user = {{  cloud_helper_user | default('cloud_helper') }}
+      host_key_checking = True
+      retry_files_enabled = False
+      stdout_callback = yaml
+      timeout = 30
+
+      # Force Ansible to use your ~/.ssh/config exactly as-is
+      [ssh_connection]
+      ssh_args = -F /home/{{ cloud_helper_user}}/.ssh/config
+      control_path = ~/.ansible/cp/%%h-%%p-%%r
+      control_master = auto
+      control_persist = 60s
+      pipelining = True
+
+  
+- name: Create inventory file with variable references only
+  copy:
+    owner: "{{ cloud_helper_user }}"
+    group: "{{ cloud_helper_user }}"
+    dest: "{{ cloud_helper_workdir }}/ansible/inventory/hosts.ini"
+    mode: "0644"
+    content: |
+      [helper]
+      helper ansible_connection=local
+
+      [kvm]
+      {{ kvm_id }} ansible_host={{ kvm_ip }}
+
+      [masters]
+      {{ control_id }} ansible_host={{ control_ip }} vm_cpu=4 vm_ram_mb=8192 vm_disk_gb=50
+
+      [workers]
+      {{ worker_1_id }} ansible_host={{ worker_1_ip }} vm_cpu=4 vm_ram_mb=8192 vm_disk_gb=50
+      {{ worker_2_id }} ansible_host={{ worker_2_ip }} vm_cpu=4 vm_ram_mb=8192 vm_disk_gb=50
+
+  when: (cloud_helper_workdir ~ '/ansible/group_vars/all.yml') is not file

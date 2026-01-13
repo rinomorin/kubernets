@@ -1,0 +1,21 @@
+---
+#
+# cloud_helper_prep — Handlers
+# Triggered by repo changes, network changes, etc.
+#
+
+###############################################################
+# 1. Refresh package repositories
+###############################################################
+- name: refresh_repos
+  become: true
+  command: dnf clean all
+  changed_when: false
+
+###############################################################
+# 2. Reload network configuration
+###############################################################
+- name: restart_network
+  become: true
+  command: nmcli connection reload
+  changed_when: false

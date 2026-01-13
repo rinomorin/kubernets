@@ -1,0 +1,85 @@
+---
+#
+# cloud_helper_prep — FCOS Installer Preparation
+# Ensures FCOS image directory exists, downloads FCOS image, and validates installer.
+#
+
+###############################################################
+# 1. Ensure FCOS image directory exists
+###############################################################
+- name: Ensure FCOS image directory exists
+  file:
+    path: "{{ cloud_helper_workdir }}/fcos"
+    state: directory
+    owner: "{{ cloud_helper_user }}"
+    group: "{{ cloud_helper_user }}"
+    mode: '0755'
+  become: true
+
+###############################################################
+# 2. Download FCOS image (inventory/env‑driven URL)
+###############################################################
+- name: Download FCOS image if missing
+  get_url:
+    url: "{{ coreos_image_url }}"
+    dest: "{{ cloud_helper_workdir }}/fcos/{{ coreos_image_url | basename }}"
+    mode: '0644'
+  become: true
+  register: fcos_download
+
+###############################################################
+# 3. Validate FCOS image exists
+###############################################################
+- name: Validate FCOS image exists
+  stat:
+    path: "{{ cloud_helper_workdir }}/fcos/{{ coreos_image_url | basename }}"
+  register: fcos_image_stat
+
+- name: Fail if FCOS image is missing
+  fail:
+    msg: "FCOS image not found after download: {{ coreos_image_url }}"
+  when: not fcos_image_stat.stat.exists
+
+###############################################################
+# 4. Ensure coreos-installer is installed
+###############################################################
+- name: Ensure coreos-installer is installed
+  package:
+    name: coreos-installer
+    state: present
+  become: true
+
+###############################################################
+# 5. Validate coreos-installer binary
+###############################################################
+- name: Validate coreos-installer binary exists
+  stat:
+    path: /usr/bin/coreos-installer
+  register: coreos_installer_stat
+
+- name: Fail if coreos-installer is missing
+  fail:
+    msg: "coreos-installer binary not found on helper node"
+  when: not coreos_installer_stat.stat.exists
+
+###############################################################
+# 6. Prepare FCOS ignition directory
+###############################################################
+- name: Ensure ignition directory exists
+  file:
+    path: "{{ cloud_helper_workdir }}/ignition"
+    state: directory
+    owner: "{{ cloud_helper_user }}"
+    group: "{{ cloud_helper_user }}"
+    mode: '0755'
+  become: true
+
+###############################################################
+# 7. Debug FCOS installer state (optional)
+###############################################################
+- name: Debug FCOS installer state
+  debug:
+    msg:
+      fcos_image: "{{ cloud_helper_workdir }}/fcos/{{ coreos_image_url | basename }}"
+      installer_present: "{{ coreos_installer_stat.stat.exists }}"
+      ignition_dir: "{{ cloud_helper_workdir }}/ignition }}"

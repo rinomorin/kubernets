@@ -1,0 +1,76 @@
+---
+- name: Determine active mount point for workdir
+  delegate_to: helper
+  shell: |
+    # Walk up the path until we find a directory that exists
+    target_path="{{ helper_workdir }}"
+    while [ ! -d "$target_path" ]; do
+      target_path=$(dirname "$target_path")
+    done
+    # Get the mount point for that existing parent
+    df --output=target "$target_path" | tail -1
+  register: active_mount_point
+  changed_when: false
+
+- name: Gather storage facts
+  setup:
+    filter: ansible_mounts
+
+- name: Calculate disk growth requirements
+  set_fact:
+    # NEW STANDARD: Accessing via ansible_facts dictionary
+    target_mount: "{{ ansible_facts['mounts'] | selectattr('mount', 'equalto', active_mount_point.stdout | trim) | first }}"
+    required_free_mb: 5120
+
+- name: Check free space
+  set_fact:
+    # NEW STANDARD: No 'ansible_' prefix on the right side of the pipe
+    current_free_mb: "{{ (target_mount.size_available / 1024 / 1024) | int }}"
+    
+- name: Determine delta and required GBs
+  set_fact:
+    current_free_mb: "{{ (target_mount.size_available / 1024 / 1024) | int }}"
+    # Use round(0, 'ceil') to replace the missing 'ceil' filter
+    gb_to_add: "{{ (((required_free_mb - (target_mount.size_available / 1024 / 1024)) / 1024) | round(0, 'ceil') | int) }}"
+
+- name: Perform Growth Logic
+  # Only enter this block if current free space is less than required
+  when: (target_mount.size_available / 1024 / 1024) | int < required_free_mb | int
+  block:
+    - name: Get Volume Group name for {{ target_mount.device }}
+      shell: "lvs --noheadings -o vg_name {{ target_mount.device }} | tr -d ' '"
+      register: target_vg
+      changed_when: false
+
+    - name: Verify VG free space
+      # Using --nosuffix to get a clean number for float comparison
+      shell: "vgs {{ target_vg.stdout }} --noheadings -o vg_free --units g --nosuffix | tr -d ' '"
+      register: vg_free_gb
+      changed_when: false
+
+    - name: Halt if VG is full
+      fail:
+        msg: "Need {{ gb_to_add }}G but VG '{{ target_vg.stdout }}' only has {{ vg_free_gb.stdout }}G free."
+      # Ensure both sides are cast to float to prevent string comparison errors
+      when: (vg_free_gb.stdout | float) < (gb_to_add | float)
+
+    - name: Step 1 - Resize Logical Volume
+      command: "lvresize -L +{{ gb_to_add }}G {{ target_mount.device }}"
+      become: true
+
+    - name: Step 2 - Expand XFS Filesystem
+      command: "xfs_growfs {{ target_mount.mount }}"
+      become: true
+      register: grow_result
+
+    - name: Confirm new capacity
+      debug:
+        msg: 
+          - "Original Space: {{ current_free_mb }} MB"
+          - "Added: {{ gb_to_add }} GB"
+          - "Result: {{ grow_result.stdout_lines | last | default('Success') }}"
+
+- name: No growth needed
+  debug:
+    msg: "Current free space ({{ current_free_mb }} MB) meets or exceeds requirements ({{ required_free_mb }} MB)."
+  when: (target_mount.size_available / 1024 / 1024) | int >= required_free_mb | int

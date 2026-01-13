@@ -1,0 +1,3 @@
+masters: "{{ groups['control_nodes'] | default([]) }}"
+workers: "{{ groups['worker_nodes'] | default([]) }}"
+

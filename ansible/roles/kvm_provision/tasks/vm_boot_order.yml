@@ -16,10 +16,20 @@
   run_once: true
   delegate_to: kvmdc01
 
-- name: Share final_vm_order with all hosts
+- name: Share and merge final_vm_order with all hosts
   set_fact:
-    final_vm_order: "{{ hostvars['kvmdc01']['final_vm_order'] }}"
-  when: inventory_hostname != 'kvmdc01'
+    final_vm_order: >-
+      {{
+        (
+          (hostvars['kvmdc01']['final_vm_order'] | default([]))
+          + (final_vm_order | default([]))
+        ) | unique
+      }}
+  when:
+    - hostvars['kvmdc01']['final_vm_order'] is defined
+    - inventory_hostname != 'kvmdc01'
+
+- debug: msg="hostvars {{ final_vm_order }}"
 
 - name: Conditionally start VM if defined and not running
   shell: |

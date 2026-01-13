@@ -1,0 +1,31 @@
+---
+# Optional polkit rule to allow libvirt management by group (disabled by default)
+
+- name: Optionally deploy polkit rule on KVM host to allow libvirt management by group
+  when: enable_polkit_libvirt
+  block:
+    - name: Create polkit rule file on KVM host
+      copy:
+        dest: /etc/polkit-1/rules.d/50-libvirt-allow-{{ cloud_helper_user }}.rules
+        content: |
+          polkit.addRule(function(action, subject) {
+            if (action.id.indexOf("org.libvirt.unix.manage") == 0) {
+              {% for g in kvm_host_groups %}
+              if (subject.isInGroup("{{ g }}")) {
+                return polkit.Result.YES;
+              }
+              {% endfor %}
+            }
+          });
+        mode: "0644"
+      delegate_to: "{{ kvm_host }}"
+      become: true
+
+    - name: Ensure polkit rule file ownership and permissions on KVM host
+      file:
+        path: /etc/polkit-1/rules.d/50-libvirt-allow-{{ cloud_helper_user }}.rules
+        owner: root
+        group: root
+        mode: "0644"
+      delegate_to: "{{ kvm_host }}"
+      become: true

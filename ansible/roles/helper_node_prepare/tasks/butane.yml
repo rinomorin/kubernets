@@ -1,0 +1,17 @@
+---
+- name: Download Butane binary
+  get_url:
+    url: "{{ butane_url }}"
+    dest: "{{ butane_dest }}"
+    mode: '0755'
+
+- name: Symlink Butane into /usr/bin
+  file:
+    src: /usr/local/bin/butane
+    dest: /usr/bin/butane
+    state: link
+
+- name: Verify Butane installation
+  command: butane --version
+  register: butane_check
+  changed_when: false

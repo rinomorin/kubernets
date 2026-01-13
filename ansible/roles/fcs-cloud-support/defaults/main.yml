@@ -1,0 +1,2 @@
+cloud_id: "{{ lookup('env', 'cloud_id') | default('automator',true)}}"
+vm_nic_map: null

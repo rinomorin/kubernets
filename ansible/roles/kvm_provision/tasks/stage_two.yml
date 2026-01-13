@@ -1,9 +1,8 @@
   # roles/kvm_provision/tasks/start_vm.yml
-
 - name: Start VMs in dependency order
   include_tasks: vm_boot_order.yml
   vars:
-    ordered_groups: ['ca','ca_intermediate','helpers', 'dns']
+    ordered_groups: ['ca','ca_intermediate','helpers', 'dns', 'control_nodes', 'worker_nodes']
   when: vm_build_state != "running"  
 
 - name: Display wait time
@@ -51,6 +50,8 @@
   delegate_to: localhost
   become: false
   when: vm_build_state == "running"
+- name: probbing name
+  debug: msg="{{ vm_host }} or {{ vm_fqdn }}"
 
 - name: Probe VM with echo until SSH is ready
   become: false
@@ -66,7 +67,7 @@
   until: (ssh_check.stdout | default('')) == "sshok"
   retries: "{{ build_loops|int }}"
   delay: 10          # 10 seconds between attempts
-  no_log: true
+  # no_log: true
 
 - name: Show SSH check result
   debug:

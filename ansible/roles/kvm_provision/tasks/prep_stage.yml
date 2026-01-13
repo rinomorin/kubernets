@@ -1,6 +1,6 @@
 # check if ready
 # ──────── STAGE: Check existence ─────────
-- name: starting vm build
+- name: starting vm buildgit
   debug: msg="checking if system exist"
 
 - name: Display VM host

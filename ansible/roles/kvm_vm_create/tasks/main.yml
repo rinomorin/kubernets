@@ -1,0 +1,42 @@
+# main.yml
+---
+- name: Prepare helper node for FCOS ISO install
+  import_tasks: prep_role_helper.yml
+
+- name: Define VMs on KVM host
+  import_tasks: define.yml
+  tags: [vm_definition]
+
+# - name: include tasks for masters and workers
+#   include_tasks: per_vm.yml
+#   loop: "{{ groups['control_nodes'] + groups['worker_nodes'] }}"
+#   loop_control:
+#     loop_var: target_host
+#   vars:
+#     vm: "{{ target_host }}"
+
+# - name: deploy the nodes
+#   import_tasks: per_vm.yml
+# - name: Prepare iPXE boot file for this VM
+#   import_tasks: ipxe_symlink.yml
+#   tags: [vm_ipxe]
+
+# - name: test iPXE boot file for this VM
+#   import_tasks: ipxe_link_test.yml
+#   tags: [vm_ipxe_test]
+
+- name: Start VMs
+  import_tasks: start.yml
+  tags: [vm_start]
+
+# - name: Provision FCOS via ISO
+#   import_tasks: provisioning_iso.yml
+#   tags: [iso_provision]
+
+# - name: Detach ISO (optional)
+#   import_tasks: detach_iso.yml
+#   tags: [iso_cleanup]
+
+# - name: Reboot into installed system (optional)
+#   import_tasks: reboot.yml
+#   tags: [vm_reboot]

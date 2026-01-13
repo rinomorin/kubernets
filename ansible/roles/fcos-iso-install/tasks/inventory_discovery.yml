@@ -1,0 +1,23 @@
+---
+# roles/fcos-iso-install/tasks/inventory_discovery.yml
+
+- name: Resolve VM_HOST from inventory group (first host)
+  set_fact:
+    VM_HOST: "{{ groups[kvm_group | default('kvm')][0] }}"
+  run_once: true
+  delegate_to: localhost
+
+- name: Fail if no VM_HOST found
+  fail:
+    msg: "No hosts found in inventory group '{{ kvm_group | default('kvm') }}'."
+  when: VM_HOST is not defined
+  run_once: true
+  delegate_to: localhost
+
+- name: Debug discovered VM_HOST and node_list
+  debug:
+    msg:
+      - "VM_HOST={{ VM_HOST }}"
+      - "node_list={{ node_list }}"
+  run_once: true
+  delegate_to: localhost

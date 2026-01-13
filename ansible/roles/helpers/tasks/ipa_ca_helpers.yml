@@ -163,6 +163,65 @@
   delegate_to: "{{ ipa_master }}"
   run_once: true
 
+- debug:
+    var: replica_check
+
+- name: remove IPA 
+  become: yes
+  shell: "/usr/sbin/ipa-server-install --uninstall --unattended"
+  when:
+    - not ipa_conf.stat.exists            # only if this node isn’t already configured
+    # - ipa_conf.skip_reason == "Conditional result was False"
+
+- name: List active replicas (only on configured masters)
+  become: yes
+  shell: ipa-replica-manage list 2>/dev/null || true
+  register: replica_check
+  changed_when: false
+  when: ipa_conf.stat.exists
+  delegate_to: "{{ ipa_master }}"
+  run_once: true
+
+- name: Check if IPA client is already configured
+  stat:
+    path: /etc/ipa/default.conf
+  register: ipa_client_conf
+
+- debug:
+    var: replica_check    
+
+# - name: Install IPA replica on intermediate (CA)
+#   shell: |
+#     ipa-replica-install --unattended \
+#       --server={{ ipa_server }} \
+#       --domain={{ ipa_domain }} \
+#       --realm={{ ipa_realm }} \
+#       --admin-password='{{ ipa_admin_password }}' \
+#       --hostname={{ inventory_hostname }} \
+#       --setup-ca \
+#       --setup-kra \
+#       --auto-reverse \
+#       --auto-forwarders \
+#       --setup-dns
+#   when:
+#     - ipa_client_conf.stat.exists == false
+
+# - name: Install IPA replica on intermediate (CA)
+#   shell: |
+#     ipa-replica-install --unattended \
+#       --server={{ ipa_server }} \
+#       --domain={{ ipa_domain }} \
+#       --realm={{ ipa_realm }} \
+#       --admin-password='{{ ipa_admin_password }}' \
+#       --hostname={{ inventory_hostname }} \
+#       --setup-ca \
+#       --setup-kra \
+#       --auto-reverse \
+#       --auto-forwarders \
+#       --setup-dns --force-join
+
+#   when:
+#     - ipa_client_conf.stat.exists == false or ipa_force_join | default(false)
 
 - name: Install IPA replica on intermediate (CA)
   become: yes
@@ -178,11 +237,11 @@
       --setup-kra \
       --auto-reverse \
       --auto-forwarders \
-      --setup-dns
+      --setup-dns --force-join
   when:
     - not ipa_conf.stat.exists            # only if this node isn’t already configured
     - inventory_hostname not in (replica_check.stdout | default(""))
-  no_log: true
+  # no_log: true
 
 # --- Service checks ---
 - name: Check IPA related services on {{ ipa_helper }}

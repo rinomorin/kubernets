@@ -1,0 +1,152 @@
+---
+# 2. Generate per-VM MAC→IP JSON files on KVM host
+- name: Ensure firstboot directory exists for VM
+  file:
+    path: "{{ ignition_staging }}"
+    state: directory
+    mode: "0755"
+  
+# 1. Install generic first-boot script + unit into Ignition staging
+- name: Install first-boot network script into Ignition staging
+  copy:
+    src: fcos-firstboot-net.sh
+    dest: "{{ ignition_staging }}/fcos-firstboot-net.sh"
+    mode: "0755"
+
+- name: Install first-boot network systemd unit into Ignition staging
+  copy:
+    src: fcos-firstboot-net.service
+    dest: "{{ ignition_staging }}/fcos-firstboot-net.service"
+    mode: "0644"
+
+
+# 2. Generate per-VM MAC→IP JSON files on KVM host
+- name: Ensure firstboot directory exists for VM
+  delegate_to: "{{ VM_HOST }}"
+  file:
+    path: "/var/lib/libvirt/images/{{ item }}/firstboot"
+    state: directory
+    mode: "0755"
+  loop: "{{ node_list }}"
+  loop_control:
+    loop_var: item
+
+- name: Get NIC list for VM
+  delegate_to: "{{ VM_HOST }}"
+  shell: |
+    virsh domiflist {{ item }} \
+      | tail -n +3 \
+      | awk '{print $3, $5}'
+  register: vm_nics
+  loop: "{{ node_list }}"
+  loop_control:
+    loop_var: item
+
+
+- debug:
+    var: vm_nics
+
+- debug:
+    msg: "{{ item }} → {{ vm_nics.results[idx].stdout_lines }}"
+  loop: "{{ node_list }}"
+  loop_control:
+    loop_var: item
+    index_var: idx
+
+- name: Build vm_nic_map
+  set_fact:
+    vm_nic_map: "{{ vm_nic_map | default({}) | combine({
+      item: {
+        'nat_mac':     (nic_lines | select('search','^br-nat ')     | list | first | default('') ).split()[1] | default(''),
+        'cluster_mac': (nic_lines | select('search','^br-cluster ') | list | first | default('') ).split()[1] | default(''),
+        'default_mac': (nic_lines | select('search','^default ')    | list | first | default('') ).split()[1] | default('')
+      }
+    }) }}"
+  vars:
+    nic_lines: "{{ vm_nics.results[idx].stdout_lines | default([]) }}"
+  loop: "{{ node_list }}"
+  loop_control:
+    loop_var: item
+    index_var: idx
+
+- debug:
+    msg: "{{ item }} → {{ vm_nic_map[item] }}"
+  loop: "{{ node_list }}"
+  loop_control:
+    loop_var: item
+
+- set_fact:
+    ansible_ip_last: "{{ ansible_host.split('.')[-1] }}"
+    cloud_prefix: "{{ cloud_zone.split('.')[0:3] | join('.') }}"
+
+- set_fact:
+    cluster_ip: >-
+      {% if 'mast' in item %}
+      {{ cloud_prefix }}.{{ ansible_ip_last }}
+      {% else %}
+      {{ ansible_host }}
+      {% endif %}
+    default_ip: >-
+      {% if 'mast' in item %}
+      {{ ansible_host }}
+      {% else %}
+      ""
+      {% endif %}
+  loop: "{{ node_list }}"
+  loop_control:
+    loop_var: item
+
+- name: initialize node_ip_list
+  set_fact:
+    node_ip_list: {}
+
+- name: set node ip
+  set_fact:
+    node_ip_list: >-
+      {{
+        node_ip_list | combine({
+          item: {
+            "provider_ip": hostvars[item].ansible_host,
+            "provision_ip": cluster_network_base ~ (hostvars[item].ansible_host.split('.')[-1])
+          }
+        })
+      }}
+  loop: "{{ node_list }}"
+  loop_control:
+    loop_var: item
+
+- name: show node ip
+  debug:
+    msg: |
+      {{ item }} provider_ip: {{ node_ip_list[item].provider_ip }}
+      {{ item }} provision_ip: {{ node_ip_list[item].provision_ip }}
+  loop: "{{ node_list }}"
+  loop_control:
+    loop_var: item
+
+- name: Write per-VM network config JSON
+  delegate_to: localhost
+  become: false
+  copy:
+    dest: "{{ role_path }}/files/netconfig_{{ item }}.json"
+    mode: "0644"
+    force: true
+    content: |
+      {
+        "hostname": "{{ item }}.{{ cloud_zone }}",
+        "interfaces": {
+          {% if 'mast' in item %}
+          "{{ vm_nic_map[item].default_mac }}": "{{ node_ip_list[item].provider_ip }}",
+          "{{ vm_nic_map[item].cluster_mac }}": "{{ node_ip_list[item].provision_ip }}"
+          {% else %}
+          "{{ vm_nic_map[item].cluster_mac }}": "{{ node_ip_list[item].provider_ip }}"
+          {% endif %}
+        }
+      }
+  loop: "{{ node_list }}"
+  loop_control:
+    loop_var: item
+
+
+
+

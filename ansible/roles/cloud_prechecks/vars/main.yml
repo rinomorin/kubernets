@@ -1,0 +1,5 @@
+# Libvirt networks expected
+libvirt_networks_expected:
+  - default
+  - br-cluster
+  - br-nat

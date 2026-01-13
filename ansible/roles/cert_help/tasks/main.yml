@@ -1,0 +1,23 @@
+- name: Generate private key
+  include_tasks: key.yml
+
+- name: Generate CSR
+  include_tasks: csr.yml
+
+- name: Request IPA certificate
+  include_tasks: request.yml
+
+- name: Install certificate and CA chain
+  include_tasks: install.yml
+
+- name: Configure https_certs for HTTPS
+  include_tasks: https_certs.yml
+
+- name: Configure https_certs for nginx
+  include_tasks: nginx.yml
+
+- name: Fix SELinux contexts
+  include_tasks: selinux.yml
+
+- name: Validate HTTPS
+  include_tasks: validate.yml

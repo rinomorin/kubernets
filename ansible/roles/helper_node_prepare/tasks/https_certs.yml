@@ -1,0 +1,25 @@
+---
+# Restrict Apache binding ONLY on helper IPA
+- name: Ensure SSL listener binds only to helper IPA
+  replace:
+    path: /etc/httpd/conf.d/ssl.conf
+    regexp: '^Listen\s+443'
+    replace: 'Listen {{ helper_node_ip}}:443'
+  when: "'helpers' in group_names"
+  notify: Restart IPA services
+
+- name: Bind SSL VirtualHost to helper IPA only
+  replace:
+    path: /etc/httpd/conf.d/ssl.conf
+    regexp: '<VirtualHost _default_:443>'
+    replace: '<VirtualHost {{ helper_node_ip }}:443>'
+  when: "'helpers' in group_names"
+  notify: Restart IPA services
+
+- name: Disable wildcard listeners in httpd.conf
+  replace:
+    path: /etc/httpd/conf/httpd.conf
+    regexp: '^Listen 80$'
+    replace: 'Listen {{ helper_node_ip }}:80'
+  when: "'helpers' in group_names"
+  notify: Restart IPA services

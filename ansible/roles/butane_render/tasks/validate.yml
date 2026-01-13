@@ -1,0 +1,7 @@
+---
+- name: Validate Butane YAML syntax
+  command: /usr/bin/yq e '.' {{ item }}
+  loop: "{{ lookup('ansible.builtin.fileglob', butane_output_dir + '/*.bu', wantlist=True) }}"
+  changed_when: false
+  tags:
+    - butane validation

@@ -1,0 +1,33 @@
+# ============================================================
+# cloud_prechecks: Detect-only main task dispatcher
+# ============================================================
+
+- name: Preflight | Detect Ansible environment
+  include_tasks: ansible.yml
+
+- name: Preflight | Detect inventory consistency
+  include_tasks: inventory.yml
+
+- name: Preflight | Detect helper node readiness
+  include_tasks: helper.yml
+
+- name: Preflight | Detect KVM host readiness
+  include_tasks: kvm.yml
+
+- name: Preflight | Detect network layout
+  include_tasks: network.yml
+
+- name: Preflight | Detect FCOS installer environment
+  include_tasks: fcos.yml
+
+- name: Preflight | Detect repo definitions
+  include_tasks: repos.yml
+
+- name: Preflight | Detect Kubernetes tooling
+  include_tasks: kubernetes.yml
+
+- name: Preflight | Detect component versions
+  include_tasks: versions.yml
+
+- name: Preflight | Summarize results
+  include_tasks: summary.yml

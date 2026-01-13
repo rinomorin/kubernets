@@ -1,0 +1,140 @@
+# ============================================================
+# cloud_prechecks: Detect-only — helper node readiness
+# ============================================================
+
+# ------------------------------------------------------------
+# 1. Detect kubeadm/kubectl/crictl (system binaries)
+# ------------------------------------------------------------
+- name: Detect kubeadm binary
+  stat:
+    path: /usr/bin/kubeadm
+  register: kubeadm_stat
+  changed_when: false
+
+- name: Detect kubeadm version
+  when: kubeadm_stat.stat.exists
+  shell: "kubeadm version 2>/dev/null || true"
+  register: scan_kubeadm_version
+  changed_when: false
+
+- name: Extract kubeadm GitVersion safely
+  set_fact:
+    get_kubeadm_version: >-
+      {{
+        (scan_kubeadm_version.stdout + scan_kubeadm_version.stderr)
+        | regex_search('GitVersion:\"[^\"]+\"')
+        | default('GitVersion:"unknown"', true)
+        | regex_replace('GitVersion:\"', '')
+        | regex_replace('\"', '')
+      }}
+
+- name: Set kubeadm version fact
+  set_fact:
+    kubeadm_version: "{{ (get_kubeadm_version | regex_replace('^v','')) .split('.')[:2] | join('.') }}"
+
+- name: Detect kubectl binary
+  stat:
+    path: /usr/bin/kubectl
+  register: kubectl_stat
+  changed_when: false
+
+- name: Detect kubectl version
+  when: kubectl_stat.stat.exists
+  shell: "kubectl version --client 2>/dev/null || true"
+  register: kubectl_version
+  changed_when: false
+
+- name: Detect crictl binary
+  stat:
+    path: /usr/bin/crictl
+  register: crictl_stat
+  changed_when: false
+
+- name: Detect crictl version
+  when: crictl_stat.stat.exists
+  shell: "crictl --version 2>/dev/null || true"
+  register: crictl_version
+  changed_when: false
+
+# ------------------------------------------------------------
+# 2. Detect podman (system binary)
+# ------------------------------------------------------------
+- name: Detect podman binary
+  stat:
+    path: /usr/bin/podman
+  register: podman_stat
+  changed_when: false
+
+- name: Detect podman version
+  when: podman_stat.stat.exists
+  shell: "podman --version 2>/dev/null || true"
+  register: podman_version
+  changed_when: false
+
+# ------------------------------------------------------------
+# 3. Detect CRI-O service status
+# ------------------------------------------------------------
+# ------------------------------------------------------------
+# Detect if kubelet exists (determines if CRI-O is required)
+# ------------------------------------------------------------
+- name: Check if kubelet is installed
+  shell: "command -v kubelet >/dev/null 2>&1 && echo yes || echo no"
+  register: kubelet_present
+  changed_when: false
+
+- name: Detect CRI-O service status
+  shell: "systemctl is-active crio || true"
+  register: crio_status
+  changed_when: false
+
+# ------------------------------------------------------------
+# 4. Detect SSH connectivity to KVM host (using SSH config)
+# ------------------------------------------------------------
+- name: Detect SSH connectivity to KVM host
+  become: true
+  become_user: "{{ cloud_helper_user }}"
+  shell: "ssh {{ kvm_host }} 'echo ok' || true"
+  register: ssh_test
+  changed_when: false
+
+# - debug:
+#     msg: |
+#       "podman {{podman_version.stdout}}"
+
+    # "kubeadm {{kubeadm_version.stdout}}"
+  # "kubectl {{kubectl_version.stdout}}"
+  # "crictl {{crictl_version.stdout}}"
+
+
+- name: Build version outputs
+  set_fact:
+    precheck_outputs:
+      podman: "{{ podman_version.stdout.split(' ')[-1] | default('unknown') }}"
+      kubeadm: "{{ kubeadm_version | default('unknown') }}"
+      kubectl: "{{ kubectl_version.stdout.split(' ')[-1] | regex_replace('^v','') | default('unknown') }}"
+      crictl: "{{ crictl_version.stdout.split(' ')[-1] | regex_replace('^v','') | default('unknown') }}"
+
+# - debug:
+#     var: precheck_outputs
+# ------------------------------------------------------------
+# 5. Build helper precheck dictionary
+# ------------------------------------------------------------
+- name: Build helper precheck results
+  set_fact:
+    precheck_helper:
+      kubeadm: "{{ 0 if kubeadm_stat.stat.exists else 1 }}"
+      kubectl: "{{ 0 if kubectl_stat.stat.exists else 1 }}"
+      crictl: "{{ 0 if crictl_stat.stat.exists else 1 }}"
+      podman: "{{ 0 if podman_stat.stat.exists else 1 }}"
+      kubeadm_version: "{{ kubeadm_version | default('unknown') }}"
+      kubectl_version: "{{ precheck_outputs.kubectl.split('.')[0:2]  | join('.') | default('unknown') }}"
+      crictl_version: "{{ precheck_outputs.crictl.split('.')[0:2] | join('.') | default('unknown') }}"
+      podman_version: "{{ precheck_outputs.podman.split('.')[0:2] | join('.')  | default('unknown') }}"
+      crio_service: >-
+        {% if kubelet_present.stdout == 'no' %}
+        NA
+        {% else %}
+        {{ 0 if (crio_status.stdout | default('inactive')) == 'active' else 1 }}
+        {% endif %}
+      ssh_to_kvm: "{{ 0 if ssh_test.stdout == 'ok' else 1 }}"
+

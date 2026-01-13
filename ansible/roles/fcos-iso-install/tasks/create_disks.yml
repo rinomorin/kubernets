@@ -1,0 +1,12 @@
+---
+- name: Create VM disk if missing (delegated to VM_HOST, per-host overrides supported)
+  command: >
+    qemu-img create -f qcow2 {{ hostvars[item].disk_path | default(default_vm_disk_dir ~ '/' ~ item ~ '.qcow2') }}
+    {{ hostvars[item].disk_gb | default(default_vm_disk_size_gb) }}G
+  args:
+    creates: "{{ hostvars[item].disk_path | default(default_vm_disk_dir ~ '/' ~ item ~ '.qcow2') }}"
+  loop: "{{ node_list }}"
+  loop_control:
+    loop_var: item
+  delegate_to: "{{ VM_HOST }}"
+  become: true

@@ -1,0 +1,18 @@
+- debug:
+    msg: "cloud_helper_workdir {{ cloud_helper_workdir }}"
+- name: Include repository tasks
+  import_tasks: repository.yml
+- name: Include set SSH keys tasks
+  import_tasks: set_ssh_keys.yml
+- name: Configure https_certs for HTTPS
+  include_tasks: https_certs.yml
+- name: Configure nginx for HTTPS
+  include_tasks: nginx.yml
+# - name: Include base playbook tasks
+#   import_tasks: base_playbook.yml
+# - name: Include environment variable tasks
+#   import_tasks: env_vars.yml
+# - name: Include role base tasks
+#   import_tasks: role_base.yml
+# - name: Include ignition role tasks
+#   import_tasks: ignition.yml

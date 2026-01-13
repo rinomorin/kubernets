@@ -1,0 +1,117 @@
+# ============================================================
+# cloud_prechecks: Detect-only configuration
+# ============================================================
+
+# Cloud helper user (environment-driven)
+cloud_helper_user: "{{ lookup('env', 'CLOUD_HELPER_USER') | default('cloud_helper', true) }}"
+
+# Venv path for cloud_helper_user
+cloud_helper_venv_path: "{{ lookup('env', 'CLOUD_HELPER_VENV') | default('/opt/' + cloud_helper_user + '/venv', true) }}"
+
+cluster_vip: "{{ lookup('env', 'cluster_vip') | default('0.0.0.0', true) }}"
+ingress_vip: "{{ lookup('env', 'ingress_vip') | default('0.0.0.0', true) }}"
+
+# KVM host (inventory override allowed)
+kvm_host: "{{ lookup('env', 'VM_HOST') | default('kvmdc01', true) }}"
+
+# Required environment variables
+required_env_vars:
+  - CLOUD_HELPER_USER
+  - VM_HOST
+  - cloud_zone
+  - cluster_vip
+  - ingress_vip
+  - secops_edkey
+
+# FCOS image URL (environment-driven)
+coreos_image_url: "{{ lookup('env', 'COREOS_IMAGE_URL') | default('https://builds.coreos.fedoraproject.org/...raw.xz', true) }}"
+# # FCOS ISO (live installer)
+fcos_iso_url: "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/43.20251120.3.0/x86_64/fedora-coreos-43.20251120.3.0-live-iso.x86_64.iso"
+fcos_iso_local: "/tmp/fcos-embed/fcos-base.iso"
+fcos_iso_with_ign: "/var/lib/libvirt/images/fcos-with-ign.iso"
+
+# Kubernetes + CRI-O versions (environment-driven)
+kubernetes_version: "v{{ lookup('env', 'kubetnet_version') | default('1.34', true) }}"
+crio_version: "{{ kubernetes_version }}"
+
+# Expected versions (detect-only)
+expected_versions:
+  python_min: "3.12"
+  pip_min: "25.3"
+  ansible_min: "2.15"
+  kubeadm_min: "1.30"
+  kubectl_min: "1.30"
+  crictl_min: "1.30"
+  podman_min: "4.0"
+  fcos_min: "40"
+  coreos_installer_min: "0.17"
+
+# Required binaries on helper (venv-aware)
+k8s_required_bins:
+  - kubeadm
+  - kubectl
+  - crictl
+  - podman
+
+# Required services on helper
+helper_required_services:
+  - crio
+
+# Required services on KVM host
+kvm_required_services:
+  - libvirtd
+
+# Libvirt networks expected
+libvirt_networks_expected:
+  - default
+  - br-cluster
+  - br-nat
+
+
+# # User that must run all roles
+# cloud_helper_user: "{{ lookup('env', 'CLOUD_HELPER_USER') }}"
+# # Where you expect the venv to live for cloud_helper_user
+# cloud_helper_venv_path: "{{ lookup('env', 'CLOUD_HELPER_VENV') | default('/home/' + cloud_helper_user + '/.venv', true) }}"
+
+# # KVM host (inventory defines kvmdc01, but env override allowed)
+# kvm_host: "{{ lookup('env', 'VM_HOST') | default('kvmdc01', true) }}"
+
+# # Required environment variables
+# required_env_vars:
+#   - CLOUD_HELPER_USER
+#   - VM_HOST
+#   - cloud_zone
+#   - cluster_vip
+#   - ingress_vip
+#   - secops_edkey
+
+#   # FCOS image
+# coreos_image_url: "{{ lookup('env', 'COREOS_IMAGE_URL') | default('https://builds.coreos.fedoraproject.org/...raw.xz', true) }}"
+
+# # Kubernetes binaries expected on helper
+# k8s_required_bins:
+#   - kubeadm
+#   - kubectl
+#   - crictl
+#   - podman
+
+# # Services expected on helper
+# helper_required_services:
+#   - crio
+
+# # Services expected on KVM host
+# kvm_required_services:
+#   - libvirtd
+
+# # Kubernetes + CRI-O versions (environment‑driven)
+# kubernetes_version: "v{{ lookup('env', 'kubetnet_version') | default('1.34', true) }}"
+# crio_version: "v{{ lookup('env', 'kubetnet_version') | default('1.34', true) }}"
+
+# # Expected versions (override-safe)
+# expected_versions:
+#   ansible_min: "2.15.3"
+#   kubeadm_min: "1.34"
+#   kubectl_min: "1.34"
+#   crio_min: "1.34"
+#   podman_min: "5.0"
+#   fcos_min: "43"

@@ -1,0 +1,6 @@
+#!ipxe
+
+echo Booting ${hostname}
+
+chain http://172.16.0.20/ipxe/${hostname}.ipxe || \
+chain http://172.16.0.20/ipxe/default.ipxe

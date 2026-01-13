@@ -1,0 +1,71 @@
+---
+# tasks/test_connection.yml
+# Run connectivity and basic permission checks from the helper as cloud_helper.
+# Tag: test
+- name: Check SSH connectivity to KVM host (simple echo)
+  become: true
+  become_user: "{{ cloud_helper_user }}"
+  shell: >
+    ssh {{ kvm_host }} 'echo SSH_OK'|tr -d "\n"
+  register: ssh_connect
+  failed_when: false
+  changed_when: false
+  tags: test
+
+- name: Check remote user groups on KVM host
+  delegate_to: "{{ kvm_host }}"
+  become: true
+  shell: id -nG {{ cloud_helper_user }} |tr -d "\n" || true
+  register: remote_groups
+  changed_when: false
+  tags: test
+
+- name: Check virsh via wrapper (list domains) as cloud_helper
+  become: true
+  become_user: "{{ cloud_helper_user }}"
+  shell: >
+    {{ helper_bin_dir }}/{{ virsh_wrapper_name }} list --all 2>&1 | grep -vi '^Warning: Permanently added' || true
+  register: virsh_list
+  failed_when: false
+  changed_when: false
+  tags: test
+
+- name: Check virsh direct qemu+ssh URI (alternative)
+  become: true
+  become_user: "{{ cloud_helper_user }}"
+  shell: >
+    virsh -c "qemu+ssh://{{ cloud_helper_user }}@{{ kvm_host }}/system" list --all 2>&1 || true
+  register: virsh_direct
+  failed_when: false
+  changed_when: false
+  tags: test
+
+- name: Check qemu-img presence on KVM host
+  delegate_to: "{{ kvm_host }}"
+  become: true
+  command: which qemu-img
+  register: qemu_img_check
+  failed_when: false
+  changed_when: false
+  tags: test
+
+- name: Check libvirt networks on KVM host
+  delegate_to: "{{ kvm_host }}"
+  become: true
+  command: virsh net-list --all
+  register: virsh_net_list
+  failed_when: false
+  changed_when: false
+  tags: test
+
+- debug: msg="VM_HOST {{ VM_HOST }}"
+- name: Check authorized_key presence on KVM host
+  delegate_to: "{{ VM_HOST }}"
+  become: yes
+  shell: |
+    grep -F "{{ helper_pubkey.split(' ')[1] }}" /home/cloud_helper/.ssh/authorized_keys >/dev/null 2>&1 \
+      && echo KEY_PRESENT \
+      || echo KEY_MISSING
+  register: authorized_key_check
+- debug:
+    var: authorized_key_check

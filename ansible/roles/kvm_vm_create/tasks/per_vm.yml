@@ -1,0 +1,15 @@
+---
+- name: Prepare iPXE boot file for {{ vm }}
+  import_tasks: ipxe_symlink.yml
+  vars:
+    target_vm: "{{ vm }}"
+
+- name: Test iPXE boot file for {{ vm }}
+  import_tasks: ipxe_link_test.yml
+  vars:
+    target_vm: "{{ vm }}"
+
+- name: Start VM {{ vm }}
+  import_tasks: start.yml
+  vars:
+    target_vm: "{{ vm }}"

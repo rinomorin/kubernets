@@ -1,0 +1,22 @@
+---
+#
+# cloud_helper_prep — Main Orchestration
+# This file controls the execution order of all prep tasks.
+#
+- name: Prepare helper node environment
+  import_tasks: helper.yml
+
+- name: Configure CRI-O and Kubernetes repositories
+  import_tasks: repo.yml
+
+- name: Prepare helper networking (provider, provision, maintenance)
+  import_tasks: network.yml
+
+- name: Prepare KVM host for FCOS provisioning
+  import_tasks: kvm.yml
+
+- name: Prepare FCOS installer environment
+  import_tasks: fcos.yml
+
+- name: Install required kubernetes tools on helper node
+  import_tasks: kubernetes.yml

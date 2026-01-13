@@ -1,0 +1,66 @@
+---
+# ============================================================
+# cloud_prechecks: Detect-only — FCOS installer environment
+# ============================================================
+
+# ------------------------------------------------------------
+# 1. Detect coreos-installer binary
+# ------------------------------------------------------------
+- name: Detect coreos-installer binary
+  stat:
+    path: /usr/bin/coreos-installer
+  register: coreos_installer_stat
+  ignore_errors: true
+  changed_when: false
+
+# ------------------------------------------------------------
+# 2. Detect coreos-installer version
+# ------------------------------------------------------------
+- name: Detect coreos-installer version
+  shell: "coreos-installer --version || true"
+  register: coreos_installer_version
+  ignore_errors: true
+  changed_when: false
+  when: coreos_installer_stat.stat.exists
+
+# ------------------------------------------------------------
+# 3. Detect FCOS image URL reachability (safe)
+# ------------------------------------------------------------
+- name: Detect FCOS image URL reachability
+  shell: "curl -s -o /dev/null -w '%{http_code}' {{ coreos_image_url }} || true"
+  register: fcos_url_check
+  ignore_errors: true
+  changed_when: false
+
+# ------------------------------------------------------------
+# 4. Initialize FCOS version to 'unknown'
+# ------------------------------------------------------------
+
+- name: Extract FCOS image filename
+  set_fact:
+    fcos_version_detected: "{{ coreos_image_url.split('/')[-1] | default('unknown') }}"
+
+- name: Extract FCOS version segment (middle part)
+  set_fact:
+    fcos_version_revised: "{{ fcos_version_detected.split('-')[2] | default('unknown') }}"
+
+- name: Extract FCOS major version
+  set_fact:
+    fcos_version_final: "{{ fcos_version_revised.split('.')[0] | default('unknown') }}"
+
+
+- name: Build version outputs
+  set_fact:
+    precheck_outputs:
+      coreos_installer: "{{ coreos_installer_version.stdout.split(' ')[-1] | default('unknown') }}"
+      fcos: "{{ fcos_version_final | default('unknown') }}"
+# ------------------------------------------------------------
+# 6. Build FCOS precheck dictionary
+# ------------------------------------------------------------
+- name: Build FCOS precheck results
+  set_fact:
+    precheck_fcos:
+      coreos_installer: "{{ 0 if coreos_installer_stat.stat.exists else 1 }}"
+      coreos_installer_version: "{{ precheck_outputs.coreos_installer.split('.')[0:2] | join('.') | default('unknown') }}"
+      fcos_url_reachable: "{{ 0 if fcos_url_check.stdout in ['200','302'] else 1 }}"
+      fcos_version: "{{ precheck_outputs.fcos | default('unknown') }}"

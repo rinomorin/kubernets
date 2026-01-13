@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Cloud Precheck Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { background: #333; color: #fff; padding: 10px; }
+        h2 { border-bottom: 2px solid #333; padding-bottom: 4px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
+        th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+        th { background: #eee; }
+        .ok { color: green; font-weight: bold; }
+        .fail { color: red; font-weight: bold; }
+        .warn { color: orange; font-weight: bold; }
+        .gold { color: goldenrod; font-weight: bold; }
+        .section { margin-top: 30px; }
+    </style>
+
+<pre id="json"></pre>
+
+
+<script>
+// Load JSON and update page
+async function loadReport() {
+    try {
+        const response = await fetch("cloud_precheck_results.json?ts=" + Date.now());
+        const report = await response.json();
+        updatePage(report);
+    } catch (err) {
+        console.error("Failed to load JSON:", err);
+    }
+}
+
+function statusIcon(ok) {
+    return ok ? '<span class="ok">✔</span>' : '<span class="fail">✘</span>';
+}
+
+function updatePage(report) {
+    document.getElementById("generated").innerText = new Date().toISOString();
+
+    // -----------------------------
+    // ANSIBLE ENVIRONMENT
+    // -----------------------------
+    document.getElementById("python_version").innerHTML =
+        report.ansible.python_version;
+    document.getElementById("python_status").innerHTML =
+        statusIcon(report.ansible.python === 0);
+
+    document.getElementById("pip_version").innerHTML =
+        report.ansible.pip_version;
+    document.getElementById("pip_status").innerHTML =
+        statusIcon(report.ansible.pip === 0);
+
+    document.getElementById("ansible_version").innerHTML =
+        report.ansible.ansible_version;
+    document.getElementById("ansible_status").innerHTML =
+        statusIcon(report.ansible.ansible === 0);
+
+    document.getElementById("venv_dir").innerHTML =
+        report.ansible.venv_dir;
+
+    document.getElementById("bashrc_loads_venv").innerHTML =
+        report.ansible.bashrc_loads_venv;
+    document.getElementById("bashrc_status").innerHTML =
+        statusIcon(report.ansible.bashrc_loads_venv === "yes");
+
+// -----------------------------
+// HELPER NODE
+// -----------------------------
+let helperTable = "";
+
+for (const [key, value] of Object.entries(report.helper)) {
+
+    const normalized = String(value).trim().toUpperCase();
+    let ok;
+
+    if (key.includes("_version")) {
+        // *_version keys: > 0 is GOOD
+        ok = Number(value) > 0;
+    } else if (normalized === "NA") {
+        // NA values: always GOOD
+        ok = true;
+    } else {
+        // all other keys: 0 is GOOD
+        ok = Number(value) === 0;
+    }
+
+    helperTable += `
+        <tr>
+            <td>${key}</td>
+            <td>${value}</td>
+            <td>${statusIcon(ok)}</td>
+        </tr>`;
+}
+
+document.getElementById("helper_table").innerHTML = helperTable;
+
+    // -----------------------------
+    // KVM HOST
+    // -----------------------------
+    document.getElementById("ssh_to_kvm").innerHTML =
+        report.kvm.ssh_to_kvm;
+    document.getElementById("ssh_to_kvm_status").innerHTML =
+        statusIcon(report.kvm.ssh_to_kvm === 0);
+
+    document.getElementById("libvirtd_service").innerHTML =
+        report.kvm.libvirtd_service;
+    document.getElementById("libvirtd_status").innerHTML =
+        statusIcon(report.kvm.libvirtd_service === 0);
+
+    let nets = "";
+    for (const [net, val] of Object.entries(report.kvm.networks)) {
+        nets += `<li>${net}: ${val}</li>`;
+    }
+    document.getElementById("kvm_networks").innerHTML = nets;
+
+    const netMin = Math.min(...Object.values(report.kvm.networks));
+    document.getElementById("kvm_networks_status").innerHTML =
+        statusIcon(netMin === 0);
+
+    // -----------------------------
+    // NETWORK
+    // -----------------------------
+    let reach = "";
+    for (const [node, val] of Object.entries(report.network.provision_reachability)) {
+        reach += `
+        <tr>
+            <td>${node}</td>
+            <td>${val}</td>
+            <td>${statusIcon(val === 0)}</td>
+        </tr>`;
+    }
+    document.getElementById("reachability_table").innerHTML = reach;
+
+    document.getElementById("vip_in_use").innerHTML =
+        report.network.vip_in_use;
+    document.getElementById("vip_status").innerHTML =
+        statusIcon(report.network.vip_in_use === 0);
+
+    // -----------------------------
+    // FCOS
+    // -----------------------------
+    document.getElementById("coreos_installer").innerHTML =
+        report.fcos.coreos_installer;
+    document.getElementById("coreos_installer_status").innerHTML =
+        statusIcon(report.fcos.coreos_installer === 0);
+
+    document.getElementById("coreos_installer_version").innerHTML =
+        report.fcos.coreos_installer_version;
+
+    document.getElementById("fcos_url_reachable").innerHTML =
+        report.fcos.fcos_url_reachable;
+    document.getElementById("fcos_url_status").innerHTML =
+        statusIcon(report.fcos.fcos_url_reachable === 0);
+
+    document.getElementById("fcos_version").innerHTML =
+        report.fcos.fcos_version;
+    document.getElementById("fcos_version_status").innerHTML =
+        statusIcon(report.fcos.fcos_version !== "unknown");
+
+// -----------------------------
+    // REPOSITORIES
+// -----------------------------
+let repoTable = "";
+
+for (const [key, value] of Object.entries(report.repos)) {
+
+    let ok;
+
+    if (key.includes("_version")) {
+        // *_version keys: > 0 is GOOD
+        ok = value > 0;
+    } else {
+        // all other repo checks: 0 is GOOD
+        ok = value === 0;
+    }
+
+    repoTable += `
+        <tr>
+            <td>${key}</td>
+            <td>${value}</td>
+            <td>${statusIcon(ok)}</td>
+        </tr>`;
+}
+
+document.getElementById("repo_table").innerHTML = repoTable;
+// -----------------------------
+// KUBERNETES TOOLING
+// -----------------------------
+let kubeTable = "";
+
+for (const [key, value] of Object.entries(report.kubernetes)) {
+
+    const normalized = String(value).trim().toUpperCase();
+    let status;
+
+    // Status fields (numeric 0/1)
+    if (key.endsWith("_service")) {
+      if (normalized === "NA") { 
+        // NA values: always GOOD 
+        status = statusIcon(true);;
+        // ok = true; 
+      } else { 
+            status = statusIcon(value === 0);
+      }
+    // Version fields (strings)
+    } else if (key.endsWith("_version")) {
+        status = statusIcon(true);   // always show ✔ because version exists
+    // Fallback (just in case)
+    } else {
+        status = statusIcon(value === 0);
+    }
+
+    kubeTable += `
+        <tr>
+            <td>${key}</td>
+            <td>${value}</td>
+            <td>${status}</td>
+        </tr>`;
+    }
+
+    document.getElementById("kube_table").innerHTML = kubeTable;
+
+    // -----------------------------
+    // VERSION SUMMARY
+    // -----------------------------
+    let verTable = "";
+    for (const [comp, vals] of Object.entries(report.versions)) {
+        const detected = vals.detected || "0";
+        const expected = vals.expected_min || "0";
+
+        const d = detected.split(".");
+        const e = expected.split(".");
+
+        const dMaj = parseInt(d[0] || 0);
+        const dMin = parseInt(d[1] || 0);
+        const eMaj = parseInt(e[0] || 0);
+        const eMin = parseInt(e[1] || 0);
+
+        let status = "fail";
+        if (detected !== "0" && detected !== "unknown") {
+            if (dMaj > eMaj || (dMaj === eMaj && dMin > eMin)) status = "gold";
+            else if (dMaj < eMaj || (dMaj === eMaj && dMin < eMin)) status = "warn";
+            else status = "ok";
+        }
+
+        const icon =
+            status === "fail" ? "✘" :
+            status === "warn" ? "⚠️" :
+            status === "gold" ? "⭐" : "✔";
+
+        verTable += `
+        <tr>
+            <td>${comp}</td>
+            <td>${detected}</td>
+            <td>${expected}</td>
+            <td><span class="${status}">${icon}</span></td>
+        </tr>`;
+    }
+    document.getElementById("version_table").innerHTML = verTable;
+}
+
+// Auto-refresh every 5 minutes
+setInterval(loadReport, 300000);
+window.onload = loadReport;
+</script>
+
+</head>
+
+<body>
+
+<h1>Cloud Precheck Report (Detect‑Only)</h1>
+<p>Generated on: <span id="generated"></span></p>
+
+<!-- ========================================================= -->
+<!-- ANSIBLE ENVIRONMENT -->
+<!-- ========================================================= -->
+<div class="section">
+<h2>Ansible Environment</h2>
+<table>
+<tr><th>Check</th><th>Value</th><th>Status</th></tr>
+
+<tr><td>Python binary</td><td id="python_version"></td><td id="python_status"></td></tr>
+<tr><td>Pip binary</td><td id="pip_version"></td><td id="pip_status"></td></tr>
+<tr><td>Ansible binary</td><td id="ansible_version"></td><td id="ansible_status"></td></tr>
+<tr><td>Venv directory</td><td id="venv_dir"></td><td><span class="ok">✔</span></td></tr>
+<tr><td>.bashrc loads venv</td><td id="bashrc_loads_venv"></td><td id="bashrc_status"></td></tr>
+
+</table>
+</div>
+
+<!-- ========================================================= -->
+<!-- HELPER NODE -->
+<!-- ========================================================= -->
+<div class="section">
+<h2>Helper Node</h2>
+<table>
+<tr><th>Component</th><th>Status</th><th>Pass/Fail</th></tr>
+<tbody id="helper_table"></tbody>
+</table>
+</div>
+
+<!-- ========================================================= -->
+<!-- KVM HOST -->
+<!-- ========================================================= -->
+<div class="section">
+<h2>KVM Host</h2>
+<table>
+<tr><th>Check</th><th>Value</th><th>Status</th></tr>
+
+<tr><td>SSH connectivity</td><td id="ssh_to_kvm"></td><td id="ssh_to_kvm_status"></td></tr>
+<tr><td>libvirtd service</td><td id="libvirtd_service"></td><td id="libvirtd_status"></td></tr>
+
+<tr>
+    <td>Networks</td>
+    <td><ul id="kvm_networks"></ul></td>
+    <td id="kvm_networks_status"></td>
+</tr>
+
+</table>
+</div>
+
+<!-- ========================================================= -->
+<!-- NETWORK -->
+<!-- ========================================================= -->
+<div class="section">
+<h2>Network</h2>
+<table>
+<tr><th>Node</th><th>Reachable</th><th>Status</th></tr>
+<tbody id="reachability_table"></tbody>
+</table>
+
+<p><strong>VIP in use:</strong> <span id="vip_in_use"></span> <span id="vip_status"></span></p>
+</div>
+
+<!-- ========================================================= -->
+<!-- FCOS -->
+<!-- ========================================================= -->
+<div class="section">
+<h2>FCOS</h2>
+<table>
+<tr><th>Check</th><th>Value</th><th>Status</th></tr>
+
+<tr><td>coreos-installer present</td><td id="coreos_installer"></td><td id="coreos_installer_status"></td></tr>
+<tr><td>coreos-installer version</td><td id="coreos_installer_version"></td><td><span class="ok">✔</span></td></tr>
+<tr><td>FCOS image reachable</td><td id="fcos_url_reachable"></td><td id="fcos_url_status"></td></tr>
+<tr><td>FCOS version</td><td id="fcos_version"></td><td id="fcos_version_status"></td></tr>
+
+</table>
+</div>
+
+<!-- ========================================================= -->
+<!-- REPOSITORIES -->
+<!-- ========================================================= -->
+<div class="section">
+<h2>Repositories</h2>
+<table>
+<tr><th>Repo</th><th>Status</th><th>Pass/Fail</th></tr>
+<tbody id="repo_table"></tbody>
+</table>
+</div>
+
+<!-- ========================================================= -->
+<!-- KUBERNETES TOOLING -->
+<!-- ========================================================= -->
+<div class="section">
+<h2>Kubernetes Tooling</h2>
+<table>
+<tr><th>Check</th><th>Value</th><th>Status</th></tr>
+<tbody id="kube_table"></tbody>
+</table>
+</div>
+
+<!-- ========================================================= -->
+<!-- VERSION SUMMARY -->
+<!-- ========================================================= -->
+<div class="section">
+<h2>Version Summary</h2>
+<table>
+<tr><th>Component</th><th>Detected</th><th>Expected Minimum</th><th>Status</th></tr>
+<tbody id="version_table"></tbody>
+</table>
+</div>
+
+</body>
+</html>

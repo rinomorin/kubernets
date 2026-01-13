@@ -1,0 +1,77 @@
+---
+# ============================================================
+# cloud_prechecks: Detect-only — Ansible + venv environment
+# ============================================================
+
+- name: Preflight | Detect Ansible environment
+  become: true
+  become_user: "{{ cloud_helper_user }}"
+  delegate_to: helper
+  block:
+    - name: Detect whether .bashrc loads cloud_helper venv
+      shell: "grep -q '{{ cloud_helper_venv_path }}/bin/activate' ~/.bashrc && echo yes || echo no"
+      register: bashrc_venv_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: Detect python binary in venv
+      stat:
+        path: "{{ cloud_helper_venv_path }}/bin/python"
+      register: python_stat
+      ignore_errors: true
+      changed_when: false
+
+    - name: Detect pip binary in venv
+      stat:
+        path: "{{ cloud_helper_venv_path }}/bin/pip"
+      register: pip_stat
+      ignore_errors: true
+      changed_when: false
+
+    - name: Detect ansible binary in venv
+      delegate_to: helper
+      become: yes
+      stat:
+        path: "{{ cloud_helper_venv_path }}/bin/ansible"
+      register: ansible_stat
+      ignore_errors: true
+      changed_when: false
+   
+    - name: Detect python version
+      shell: "{{ cloud_helper_venv_path }}/bin/python --version 2>/dev/null || true"
+      register: python_version
+      ignore_errors: true
+      changed_when: false
+
+    - name: Detect pip version
+      shell: "{{ cloud_helper_venv_path }}/bin/pip --version 2>/dev/null || true"
+      register: pip_version
+      ignore_errors: true
+      changed_when: false
+
+    - name: Detect ansible version
+      shell: "{{ cloud_helper_venv_path }}/bin/ansible --version 2>/dev/null || true"
+      register: ansible_version
+      ignore_errors: true
+      changed_when: false
+
+    - name: get versions results into precheck
+      set_fact:
+        precheck_outputs:
+          python_version: "{{ python_version.stdout.split(' ')[-1] | default('unknown') }}"
+          pip_version: "{{ pip_version.stdout.split(' ')[1] | default('unknown') }}"
+          ansible_version: "{{ ansible_version.full | default('unknown') }}"
+     
+    - name: Build ansible precheck results
+      set_fact:
+        precheck_ansible:
+          python: "{{ 0 if python_stat.stat.exists else 1 }}"
+          pip: "{{ 0 if pip_stat.stat.exists else 1 }}"
+          ansible: "{{ 0 if ansible_stat.stat.exists else 1 }}"
+          python_version: "{{precheck_outputs.python_version.split('.')[0:2] | join('.') | default('unknown')}}"
+          pip_version: "{{ precheck_outputs.pip_version.split('.')[0:2] | join('.') | default('unknown') }}"
+          ansible_version: "{{  precheck_outputs.ansible_version.split('.')[0:2] | join('.') | default('unknown') }}"
+          venv_dir: "{{ cloud_helper_venv_path }}"
+          bashrc_loads_venv: "{{ bashrc_venv_check.stdout | default('no') }}"
+      ignore_errors: true
+      changed_when: false

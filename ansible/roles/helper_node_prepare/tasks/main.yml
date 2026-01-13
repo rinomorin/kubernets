@@ -1,0 +1,43 @@
+---
+- name: Configure https_certs for HTTPS
+  include_tasks: https_certs.yml
+
+- name: Configure nginx for HTTPS
+  include_tasks: nginx.yml
+
+- name: Ensure FCOS directory structure exists
+  import_tasks: dirs.yml
+  tags: [fcos, fcos_dirs]
+
+- name: Symlink FCOS dirs into web root
+  import_tasks: symlinks.yml
+  tags: [fcos, fcos_symlinks]
+
+- name: Install or update Butane
+  import_tasks: butane.yml
+  tags: [fcos, butane]
+
+- name: Ensure libvirt boot directory exists
+  file:
+    path: /var/lib/libvirt/boot
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+
+- name: Install or update Butane
+  import_tasks: get_fcos.yml
+  tags: [fcos, rootfs]
+
+- name: Install or update ipex
+  import_tasks: services.yml
+  tags: [fcos, rootfs]
+
+- name: Ensure SELinux contexts for FCOS assets
+  import_tasks: selinux.yml 
+  tags: [fcos, selinux]
+
+# - name: Validate HTTP access to FCOS assets
+#   import_tasks: validate.yml
+#   tags: [fcos, validate]

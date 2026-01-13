@@ -1,0 +1,74 @@
+---
+# roles/fcos-iso-install/tasks/embed_iso.yml
+
+- name: Ensure working embed directory on VM_HOST
+  file:
+    path: "{{ ignition_tmp }}/fcos-embed"
+    state: directory
+    mode: "0755"
+  delegate_to: "{{ VM_HOST }}"
+  run_once: true
+  become: true
+
+- name: Check whether fcos_iso_local already has embedded Ignition (on VM_HOST)
+  command: coreos-installer iso ignition show "{{ fcos_iso_local }}"
+  register: iso_ign_check
+  ignore_errors: true
+  delegate_to: "{{ VM_HOST }}"
+  run_once: true
+  become: true
+
+- name: Copy local ISO to working file on VM_HOST (overwrite) when no embedded Ignition
+  command: cp -f "{{ fcos_iso_local }}" "{{ ignition_tmp }}/fcos-embed/fcos-base.iso"
+  delegate_to: "{{ VM_HOST }}"
+  run_once: true
+  become: true
+  when: iso_ign_check.rc != 0
+
+- name: Download fresh ISO to working path on VM_HOST (if base ISO already embedded)
+  get_url:
+    url: "{{ fcos_iso_url }}"
+    dest: "{{ ignition_tmp }}/fcos-embed/fcos-base.iso"
+    mode: "0644"
+    force: true
+  delegate_to: "{{ VM_HOST }}"
+  run_once: true
+  become: true
+  when: iso_ign_check.rc == 0 and (iso_ign_check.stdout | default('') | trim) != ""
+
+- name: Embed Ignition into the working ISO on VM_HOST (use first node's ignition)
+  delegate_to: "{{ VM_HOST }}"
+  command: >
+    coreos-installer iso ignition embed
+    -i {{ ignition_staging }}/{{ node_list[0] }}-config.ign
+    {{ ignition_tmp }}/fcos-embed/fcos-base.iso
+  args:
+    chdir: "{{ ignition_tmp }}/fcos-embed"
+  register: embed_result
+  changed_when: embed_result.rc == 0
+  failed_when: embed_result.rc not in [0]
+  delegate_to: "{{ VM_HOST }}"
+  run_once: true
+  become: true
+
+- name: Copy embedded ISO to canonical embedded path on VM_HOST
+  copy:
+    src: "{{ ignition_tmp }}/fcos-embed/fcos-base.iso"
+    dest: "{{ fcos_iso_with_ign | default(default_vm_disk_dir ~ '/fcos-embedded.iso') }}"
+    remote_src: yes
+    mode: "0644"
+  delegate_to: "{{ VM_HOST }}"
+  run_once: true
+  become: true
+
+- name: Copy embedded ISO to per-node ISO files on VM_HOST
+  copy:
+    src: "{{ fcos_iso_with_ign | default(default_vm_disk_dir ~ '/fcos-embedded.iso') }}"
+    dest: "{{ default_vm_disk_dir ~ '/' ~ item ~ '-fcos-with-ign.iso' }}"
+    remote_src: yes
+    mode: "0644"
+  loop: "{{ node_list }}"
+  loop_control:
+    loop_var: item
+  delegate_to: "{{ VM_HOST }}"
+  become: true

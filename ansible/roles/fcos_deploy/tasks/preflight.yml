@@ -1,0 +1,13 @@
+---
+- name: Verify Environment Variables
+  fail:
+    msg: "Env var {{ item }} is missing. Did you source env_build.sh?"
+  when: lookup('env', item) == ''
+  loop: [VM_HOST, HELPER_SSH_KEY_PATH, KVM_NETWORK_CLUSTER]
+
+- name: Check KVM Network Availability
+  delegate_to: "{{ vm_host }}"
+  become: true
+  shell: "virsh net-info {{ item }}"
+  loop: ["{{ br_maint }}", "{{ br_provision }}", "{{ br_provider }}"]
+  changed_when: false

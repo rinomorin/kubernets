@@ -1,0 +1,6 @@
+{
+  "hostname": "msrlv9wrk02.cloud.home.morinsoft.ca",
+  "interfaces": {
+        "52:54:00:40:14:da": "10.0.0.42"
+      }
+}

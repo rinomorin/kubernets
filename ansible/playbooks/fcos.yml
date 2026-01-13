@@ -1,0 +1,194 @@
+---
+- name: load environment
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Ensure latest stable collections are installed on controller
+      delegate_to: localhost
+      become: false
+      run_once: true
+      command: "ansible-galaxy collection install {{ item }} --upgrade"
+      loop:
+        - community.general
+        - ansible.posix
+        - kubernetes.core  # Highly recommended for your FCOS/K8s work
+      changed_when: false # These commands check for updates every time
+
+    - name: load environment
+      set_fact:
+        VM_HOST: "{{ lookup('env','VM_HOST')}}"
+        ipa_domain: "{{ lookup('env', 'ipa_domain') }}"
+        ipa_admin_password: "{{ lookup('env', 'ipa_admin_password') }}"
+        dns_zone: "{{ lookup('env', 'dns_zone') }}"
+        admin_id: "{{ lookup('env', 'admin_id') }}"
+        admin_set: "{{ lookup('env', 'admin_set') }}"
+        secops_id: "{{ lookup('env', 'secops_id') }}"
+        cloud_id: "{{ lookup('env', 'cloud_id') }}"
+        secops_pwd: "{{ lookup('env', 'secops_pwd') }}"
+        kubetnet_version: "{{ lookup('env', 'kubetnet_version') }}"
+        cluster_ip_addr: "{{ lookup('env', 'cluster_ip_addr') }}"
+        cluster_netmask: "{{ lookup('env', 'cluster_netmask') }}"
+        cloud_zone: "{{ lookup('env', 'cloud_zone') }}"
+        cluster_gateway: "{{ lookup('env', 'cluster_gateway') }}"
+        default_netmask: "{{ lookup('env', 'default_netmask') }}"
+        default_net_device: "{{ lookup('env', 'default_net_device') }}"
+        cluster_net_device: "{{ lookup('env', 'cluster_net_device') }}"
+        nat_net_device: "{{ lookup('env', 'nat_net_device') }}"
+        default_ansible_pwd: "{{ lookup('env', 'secops_pwd') }}"
+        secops_key: "{{ lookup('env','secops_key') }}"
+        secops_edkey: "{{ lookup('env','secops_edkey') }}"
+        ssh_key_path: "{{ lookup('env', 'ssh_key_path')| to_json }}"
+        account_name: "{{ lookup('env', 'account_name') }}"
+        masters: "{{ groups['control_nodes'] | default([]) }}"
+        workers: "{{ groups['worker_nodes'] | default([]) }}"
+        helper_node: "{{ groups['helpers'][0] | default([]) }}"
+        helper_node_ip: "{{ hostvars[groups['helpers'][0]].ansible_host }}"
+        node_list: "{{ groups['control_nodes'] + groups['worker_nodes'] }}"
+
+        # Network layout
+        cloud_networks:
+          house: "192.168.100.0/24"
+          private: "10.0.0.0/24"
+          nat: "172.16.0.0/24"
+
+        # Interface mapping
+        cloud_interfaces:
+          house: "enp1s0"
+          private: "enp2s0"
+          nat: "enp3s0"
+
+# - name: Deploy Fedora CoreOS Cluster
+#   hosts: helper
+#   gather_facts: false
+#   # We run once because the role handles its own delegation and loops
+#   run_once: true  
+#   roles:
+#     - role: fcos_deploy
+
+#     - name: Gather facts (ensure ansible_facts contain IPs)
+#       shell: "hostname -I|awk -F172 '{print \"172\"$NF}'|awk '{print $1}'"
+#       register: get_nat
+#       delegate_to: "{{ helper_node }}"
+
+#     - name: Find helper node IP starting with 172.16
+#       set_fact:
+#         helper_nat_ip: "{{ get_nat.stdout| default('172.16.0.112') }}"
+#       delegate_to: "{{ helper_node }}"
+    
+#     - set_fact:
+#         fcos_cloud_support_pub_key: ""
+#         vm_nat_ip_map: null
+        
+# Stage 1 prep helper to be able to deploy nodes
+- name: Configure cloud helper and minimal KVM host changes
+  hosts: helper
+  become: true
+  roles:
+    - role: cloud-helper
+
+# - name: check helpers status for cloud deployments
+#   hosts: helper
+#   become: true
+#   roles:
+#     - cloud_prechecks 
+
+
+# - name: fix helpers status for cloud deployments
+#   gather_facts: false
+#   hosts: helper
+#   become: true
+#   roles:
+#     - cloud_helper_prep
+
+# - name: update helpers status for cloud deployments
+#   hosts: helper
+#   become: true
+#   roles:
+#     - cloud_prechecks 
+
+# # - name: Phase 0 – Helper node preparation (NGINX, dirs, symlinks)
+# #   hosts: helper
+# #   become: true
+# #   roles:
+# #     - role: helper_node_prepare
+# #       tags: [helper, phase0]
+
+# # rem from here
+
+
+# # - name: Phase 0 – Provision Fedora CoreOS VMs on KVM host
+# #   hosts: kvm
+# #   gather_facts: false
+# #   become: true
+# #   vars:
+# #     fcos_iso_url: "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/43.20251120.3.0/x86_64/fedora-coreos-43.20251120.3.0-live-iso.x86_64.iso"
+# #     # ignition_ssh_authorized_key: "{{ lookup('env','secops_key') example') }}"
+# #     use_virt_module: true
+# #   roles:
+# #     - role: fcos-iso-install
+# #     # - role: fcs-cloud-support
+# #     #   vars:
+# #     #     role_action: "firstboot"
+# #     #     cloud_id: "{{ lookup('env', 'cloud_id') | default('automator', true) }}"
+# #     #     cloud_zone: "{{ lookup('env', 'cloud_zone')}}"
+      
+
+# # - name: Prep certs
+# #   hosts: helper
+# #   become: true
+# #   roles:
+# #     - role: cert_help
+# #       tags: [cert_help, pre]
+
+# # - hosts: helper
+# #   roles:
+# #     - role: cert_help
+# #       vars:
+# #         cert_common_name: "helper.home.morinsoft.ca"
+# #         nginx_root: "/srv/fcos/http"
+
+
+
+# # - name: Phase 1 – Render Butane configs (masters & workers)
+# #   hosts: all
+# #   gather_facts: false
+# #   become: true
+# #   vars:
+# #     cluster_name: "{{ cloud_zone.split('.')[0]}}"
+# #     base_domain: "{{ ipa_domain }}"
+# #     ssh_authorized_keys: 
+# #       - "{{ secops_edkey}}"
+# #   roles:
+# #     - role: butane_render
+# #       tags: [butane, phase1]
+
+# # # - name: Phase 2 – Generate Ignition configs from Butane
+# # #   hosts: all
+# # #   become: true
+# # #   gather_facts: false
+# # #   roles:
+# # #     - role: ignition_generate
+# # #       tags: [ignition, phase2]
+
+# # - name: Phase 2 – Generate Ignition configs from Butane
+# #   hosts: helper
+# #   gather_facts: false
+# #   become: true
+# #   roles:
+# #     - ignition_generate
+
+# # - name: Phase 3 – Configure IPA DNS for cluster zone
+# #   hosts: ipa
+# #   become: true
+# #   gather_facts: false
+# #   roles:
+# #     - role: ipa_dns
+# #       tags: [ipa_dns, phase3]
+
+# # # # - name: Phase 4 – Create and start KVM VMs (masters & workers)
+# # # #   hosts: all
+# # # #   gather_facts: false
+# # # #   become: true
+# # # #   roles:
+# # # #     - role: kvm_vm_create
+# # # #       tags: [kvm, phase4]

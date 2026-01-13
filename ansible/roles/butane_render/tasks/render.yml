@@ -1,0 +1,32 @@
+---
+- name: Render master Butane templates
+  template:
+    src: master.bu.j2
+    dest: "{{ butane_output_dir }}/{{ item }}.bu"
+  loop: "{{ masters }}"
+  loop_control:
+    index_var: idx
+  vars:
+    node_hostname: "{{ hostvars[item].hostname.split('.')[0] }}"
+    node_ip_house: "{{ hostvars[item].ansible_host }}"
+    node_ip_private: >-
+      {{ hostvars[item].private_ip
+        | default(
+            cluster_ip_addr.split('.')[0:3] | join('.') ~ '.' ~
+            (hostvars[item].ansible_host.split('.')[-1] | int + idx)
+          )
+      }}
+
+- name: Render worker Butane templates
+  template:
+    src: worker.bu.j2
+    dest: "{{ butane_output_dir }}/{{ item }}.bu"
+  loop: "{{ workers }}"
+  loop_control:
+    index_var: idx
+  vars:
+    node_hostname: "{{ hostvars[item].hostname }}"
+    node_ip_house: "{{ hostvars[item].ansible_host }}"
+    node_ip_private: "{{ hostvars[item].private_ip | default('10.0.0.' ~ (100 + idx)) }}"
+  tags:
+    - worker_rendering

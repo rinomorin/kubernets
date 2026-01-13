@@ -1,0 +1,44 @@
+variant: fcos
+version: 1.6.0
+passwd:
+  users:
+    - name: core
+      ssh_authorized_keys:
+        - {{ helper_pub_key }}
+storage:
+  files:
+    - { path: /etc/hostname, mode: 0644, contents: { inline: "{{ hostvars[node_name].hostname }}" } }
+    - path: /etc/NetworkManager/system-connections/{{ nic_maint }}.nmconnection
+      mode: 0600
+      contents:
+        inline: |
+          [connection]
+          id={{ nic_maint }}
+          type=ethernet
+          interface-name={{ nic_maint }}
+          [ipv4]
+          method=auto
+    - path: /etc/NetworkManager/system-connections/{{ nic_provision }}.nmconnection
+      mode: 0600
+      contents:
+        inline: |
+          [connection]
+          id={{ nic_provision }}
+          type=ethernet
+          interface-name={{ nic_provision }}
+          [ipv4]
+          address1={{ hostvars[node_name].provision_ip }}/24
+          method=manual
+{% if hostvars[node_name].provider_ip is defined %}
+    - path: /etc/NetworkManager/system-connections/{{ nic_provider }}.nmconnection
+      mode: 0600
+      contents:
+        inline: |
+          [connection]
+          id={{ nic_provider }}
+          type=ethernet
+          interface-name={{ nic_provider }}
+          [ipv4]
+          address1={{ hostvars[node_name].provider_ip }}/24
+          method=manual
+{% endif %}

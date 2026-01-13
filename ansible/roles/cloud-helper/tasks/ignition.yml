@@ -1,0 +1,80 @@
+- name: Read the public key from the helper node
+  ansible.builtin.slurp:
+    src: "/home/{{ cloud_helper_user }}/.ssh/id_rsa.pub"
+  delegate_to: helper
+  register: helper_pubkey
+
+- name: Set global controller networking facts
+  set_fact:
+    controller_provider_ip: "{{ hostvars[groups['control_nodes'][0]].provider_ip }}"
+    controller_provision_ip: "{{ hostvars[groups['control_nodes'][0]].provision_ip }}"
+    worker_provision_ip: "{{ hostvars[groups['worker_nodes'][0]].provision_ip }}"
+  run_once: true
+
+- name: Ensure cloud_helper venv directory exists
+  become: true
+  file:
+    path: "{{ cloud_helper_workdir }}/{{ item }}"
+    state: directory
+    owner: "{{ cloud_helper_user }}"
+    group: "{{ cloud_helper_user }}"
+    mode: '0755'
+  loop: ["butane","ignition"]
+
+- name: Read the public key from the helper node
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  slurp:
+    src: "/home/{{ cloud_helper_user }}/.ssh/id_rsa.pub"
+  register: helper_pubkey
+
+- set_fact:
+    helper_ssh_key: "{{ helper_pubkey.content | b64decode | trim }}"
+
+- debug: msg="{{ helper_ssh_key }}"
+- name: Render master Butane templates
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  template:
+    src: ignition.bu.j2
+    dest: "{{ cloud_helper_workdir }}/butane/{{ item }}.bu"
+  loop: "{{ groups['control_nodes'] }}"
+  loop_control:
+    index_var: idx
+  vars:
+    hostname: "{{ hostvars[item].hostname }}"
+    provider_ip: "{{ hostvars[item].provider_ip | default('') }}"
+    cluster_ip: "{{ hostvars[item].provision_ip | default('10.0.0.' ~ (100 + idx)) }}"
+  tags:
+    - master_rendering
+
+- name: Render master Butane templates
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  template:
+    src: ignition.bu.j2
+    dest: "{{ cloud_helper_workdir }}/butane/{{ item }}.bu"
+  loop: "{{ groups['worker_nodes'] }}"
+  loop_control:
+    index_var: idx
+  vars:
+    hostname: "{{ hostvars[item].hostname }}"
+    cluster_ip: "{{ hostvars[item].provision_ip | default('10.0.0.' ~ (100 + idx)) }}"
+  tags:
+    - worker_rendering
+
+- name: Render ignition files
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  shell: |
+    source ~/.bashrc-awx
+    butane --pretty --strict \
+      "{{ item }}.bu" \
+      --output "{{ item }}.ign"
+    mv "{{ item }}.ign" "{{ cloud_helper_workdir }}/ignition/{{ item }}.ign"
+  loop: "{{ groups['control_nodes'] + groups['worker_nodes'] }}"
+  args:
+    chdir: "{{ cloud_helper_workdir }}/butane/"
+  tags:
+    - ignition_rendering
+

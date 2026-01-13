@@ -1,0 +1,38 @@
+- name: Create inventory file with variable references only
+  copy:
+    owner: "{{ cloud_helper_user }}"
+    group: "{{ cloud_helper_user }}"
+    dest: "{{ cloud_helper_workdir }}/ansible/cloud_build.yml"
+    mode: "0644"
+    content: |
+      ---
+      - name: Phase 2 - Build cloud (1 master, 2 workers)
+        hosts: helper
+        become: true
+        become_user: "{{ '{{ cloud_helper_user }}' }}"
+        gather_facts: false
+
+        vars:
+          ignition_dir: "{{ '{{ cloud_helper_workdir }}' }}/ignition"
+          artifacts_dir: "{{ '{{ cloud_helper_workdir }}' }}/artifacts"
+
+        pre_tasks:
+          - name: Ensure work directories exist
+            delegate_to: localhost
+            become: false
+            file:
+              path: "{{ '{{ cloud_helper_workdir }}/{{ item }}' }}"
+              state: directory
+              mode: '0755'
+            loop:
+              - "{{ '{{ ignition_dir }}' }}"
+              - "{{ '{{ artifacts_dir }}' }}"
+
+        roles:
+          - role: ignition
+          - role: vm_create
+          - role: coreos_install
+          - role: kubeadm_init
+          - role: kubeadm_join
+          - role: cluster_validate
+  when: (cloud_helper_workdir ~ '/ansible/group_vars/all.yml') is not file

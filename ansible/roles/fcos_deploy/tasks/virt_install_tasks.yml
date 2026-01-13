@@ -1,0 +1,14 @@
+---
+- shell: "sudo /bin/sh -c 'qemu-img create -f qcow2 -F qcow2 -b {{ image_path }}/{{ fcos_image_name }} {{ image_path }}/{{ node_name }}.qcow2 {{ disk_size }}'"
+- shell: |
+    sudo /bin/sh -c 'virt-install --name {{ node_name }} \
+      --vcpus {{ vm_cpu }} --memory {{ vm_mem }} \
+      --os-variant fedora-coreos-stable \
+      --disk path={{ image_path }}/{{ node_name }}.qcow2 \
+      --import --noautoconsole \
+      --network network={{ br_maint }},model=virtio \
+      --network network={{ br_provision }},model=virtio \
+      --network network={{ br_provider }},model=virtio \
+      --qemu-commandline=\"-fw_cfg name=opt/com.coreos/config,file={{ image_path }}/ignition/{{ node_name }}.ign\"'
+  register: virt_res
+  failed_when: "virt_res.rc != 0 and 'already exists' not in virt_res.stderr"

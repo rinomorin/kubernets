@@ -1,0 +1,42 @@
+# roles/fcos-iso-install/tasks/main.yml
+---
+# GET NIC LISTS FOR EACH VM
+- name: Get NIC list for VM
+  delegate_to: helper
+  shell: |
+    virsh domiflist {{ item }} --details | awk 'NR>2 {print $5, $3}'
+  register: vm_nics
+  loop: "{{ node_list }}"
+  loop_control:
+    loop_var: item
+
+- name: Discover inventory and VM_HOST
+  include_tasks: inventory_discovery.yml
+
+# get helper node ssh key 
+- name: load ssh_authorized_keys from helper
+  include_tasks: load_helper_key.yml
+
+- name: Define VMs on VM_HOST
+  include_tasks: define_vms.yml
+
+- name: set_first boot
+  include_tasks: firstboot_netconfig.yml
+
+- name: Render ignition files locally and copy to VM_HOST
+  include_tasks: render_ignition.yml
+
+- name: Embed Ignition into ISO(s) on VM_HOST
+  include_tasks: embed_iso.yml
+
+- name: Create VM disks on VM_HOST
+  include_tasks: create_disks.yml
+
+- name:  start VMs on VM_HOST
+  include_tasks: vm_start.yml
+
+# - name: Post-boot network configuration for FCOS VMs
+#   include_tasks: postboot_network.yml
+
+- name: Cleanup temporary files
+  include_tasks: cleanup.yml

@@ -1,0 +1,27 @@
+---
+- name: Ensure iPXE directory exists
+  file:
+    path: /var/www/html
+    state: directory
+  delegate_to: "{{ helper_node }}"
+
+# - debug: msg="vm={{ vm }}"
+# - name: Symlink per‑VM iPXE file to boot.ipxe
+#   file:
+#     src: "/srv/fcos/ipxe/{{ vm }}.ipxe"
+#     dest: "/usr/share/nginx/html/boot.ipxe"
+#     state: link
+#     force: true
+#   delegate_to: "{{ helper_node }}"
+
+# - name: Symlink per‑VM iPXE file to /ipexe/boot.ipxe (compat)
+#   file:
+#     src: "/srv/fcos/ipxe/{{ vm }}.ipxe"
+#     dest: "/srv/fcos/ipxe/boot.ipxe"
+#     state: link
+#     force: true
+#   delegate_to: "{{ helper_node }}"
+
+# - name: Wait for IPA to settle
+#   pause:
+#     seconds: 120

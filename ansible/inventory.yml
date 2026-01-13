@@ -1,19 +1,26 @@
 all:
   vars:
     ansible_user: secops
+
   hosts:
-    helper:
-      ansible_host: 192.168.100.20
-      hostname: helper01.home.morinsoft.ca
-    master01:
-      ansible_host: 192.168.100.30
-      hostname: master01.home.morinsoft.ca
-    worker01:
-      # ansible_host: 192.168.100.40
-      hostname: worker01.home.morinsoft.ca
-    worker02:
-      # ansible_host: 192.168.100.41
-      hostname: worker02.home.morinsoft.ca
+    helper: 
+      ansible_host: 192.168.100.20 
+      hostname: helper.home.morinsoft.ca 
+      provider_ip: 192.168.100.20
+      provision_ip: 10.0.0.20 
+    msrlv9mast01: 
+      ansible_host: 192.168.100.31 
+      hostname: msrlv9mast01.cloud.home.morinsoft.ca 
+      provider_ip: 192.168.100.31 
+      provision_ip: 10.0.0.31 
+    msrlv9wrk01: 
+      ansible_host: 10.0.0.41 
+      hostname: msrlv9wrk01.cloud.home.morinsoft.ca 
+      provision_ip: 10.0.0.41 
+    msrlv9wrk02: 
+      ansible_host: 10.0.0.42 
+      hostname: msrlv9wrk02.cloud.home.morinsoft.ca 
+      provision_ip: 10.0.0.42
     kvmdc01:
       ansible_host: 192.168.100.3
       hostname: kvmdc01.home.morinsoft.ca
@@ -27,55 +34,76 @@ all:
   children:
     control_nodes:
       hosts:
-        master_node:
+        msrlv9mast01:
+
     helper_nodes:
       hosts:
         helper:
+
     worker_nodes:
       hosts:
-        worker_node1:
-        worker_node2:
+        msrlv9wrk01:
+        msrlv9wrk02:
+
     infrastructure:
       hosts:
         kvmdc01:
         ipa01:
         ipa02:
         helper:
+
     ipa:
       hosts:
         ipa01:
         ipa02:
+
     cluster_nodes:
       hosts:
         helper:
-        master01:
-        worker01:
-        worker02:
+        msrlv9mast01:
+        msrlv9wrk01:
+        msrlv9wrk02:
+
     dns:
       hosts:
         ipa01:
         ipa02:
+
     ldap:
       hosts:
         ipa01:
-        ipa02:  
+        ipa02:
+
     ca:
       hosts:
         ipa01:
+
     ca_intermediate:
       hosts:
         ipa02:
+
     helpers:
       hosts:
         helper:
+
     ipa_servers:
       hosts:
         ipa01:
         ipa02:
+
     ntp:
       hosts:
         ipa01:
         ipa02:
+
     kvm:
       hosts:
         kvmdc01:
+          libvirt_networks:
+            - name: default
+              cidr: 192.168.100.0/24
+            - name: br-cluster
+              cidr: 10.0.0.0/24
+            - name: br-nat
+              cidr: 172.16.0.0/24
+

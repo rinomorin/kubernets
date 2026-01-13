@@ -1,0 +1,27 @@
+---
+# Basic checks and directory creation
+- name: Ensure helper working directories exist
+  become: true
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ helper_workdir }}"
+    - "{{ helper_bin_dir }}"
+
+- name: Fail early if kvm_host is not set
+  fail:
+    msg: "kvm_host is not set. Provide via env KVM_HOST or extra-vars."
+  when: kvm_host is not defined or kvm_host == ""
+
+- name: Ensure KVM host entry exists in /etc/hosts
+  become: yes
+  lineinfile:
+    path: /etc/hosts
+    state: present
+    insertafter: EOF
+    regexp: "^{{ lookup('env', 'VM_HOST_IP') | regex_escape }}\\s"
+    line: "{{ lookup('env', 'VM_HOST_IP') }} {{ lookup('env', 'VM_HOST') }} {{ lookup('env', 'VM_HOST').split('.')[0] }}"

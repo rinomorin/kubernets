@@ -1,0 +1,59 @@
+---
+# - name: Enable and start libvirtd
+#   service:
+#     name: libvirtd
+#     state: started
+#     enabled: true
+- name: Copy iPXE UEFI binary to nginx root
+  copy:
+    remote_src: true
+    src: /usr/share/ipxe/ipxe-snponly-x86_64.efi
+    dest: /usr/share/nginx/html/ipxe/ipxe-snponly-x86_64.efi
+    mode: '0644'
+  delegate_to: "{{ helper_node }}"
+
+- name: Install shared boot.ipxe
+  copy:
+    src: templates/boot.ipxe
+    dest: /usr/share/nginx/html/boot.ipxe
+    mode: '0644'
+  delegate_to: "{{ helper_node }}"
+
+- name: Install shared boot.ipxe
+  copy:
+    src: templates/boot.ipxe
+    dest: /usr/share/nginx/html/ipxe/boot.ipxe
+    mode: '0644'
+  delegate_to: "{{ helper_node }}"
+
+- name: Install shared boot.ipxe
+  copy:
+    src: templates/boot.ipxe
+    dest: /srv/fcos/ipxe/boot.ipxe
+    mode: '0644'
+  delegate_to: "{{ helper_node }}"
+
+- name: Render per-node iPXE scripts
+  template:
+    src: ipxe.ipxe.j2
+    dest: "/srv/fcos/ipxe/{{ item }}.ipxe"
+    mode: '0644'
+  loop: "{{ masters + workers }}"
+  run_once: true
+
+- name: Symlink FCOS dirs into web root
+  file:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    state: link
+  loop:
+    - { src: "/srv/fcos/butane",   dest: "/usr/share/nginx/html/butane" }
+    - { src: "/srv/fcos/ignition", dest: "/usr/share/nginx/html/ignition" }
+    - { src: "/srv/fcos/http", dest: "/usr/share/nginx/html/boot" }
+    - { src: "/srv/fcos/ipxe", dest: "/usr/share/nginx/html/ipxe" }
+    - { src: "/srv/fcos/pxe", dest: "/usr/share/nginx/html/pxe" }
+
+- name: Fetch boot.ipxe content
+  command: curl -s http://{{ nat_ip_device }}/ipxe/boot.ipxe
+  register: bootipxe
+  delegate_to: "{{ helper_node }}"

@@ -1,0 +1,124 @@
+#version=RHEL9
+url --mirrorlist={{ kickstart_baseos_url | default('https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=BaseOS-9.6') }}
+repo --name=AppStream --mirrorlist={{ kickstart_appstream_url | default('https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=AppStream-9.6') }}
+
+lang en_CA.UTF-8
+keyboard us
+timezone UTC
+
+# Primary NIC (management / IPA)
+network --device=enp1s0 --bootproto=static --ip={{ ip_addr }} --netmask={{ ip_mask }} --gateway={{ ip_gate }} --nameserver={{ dns_02 }},{{ dns_01 }} --hostname={{ ipa_host }}
+
+timesource --ntp-server=pool.ntp.org
+
+selinux --enforcing
+firewall --enabled --service=ssh
+
+ignoredisk --only-use=sda
+clearpart --all --initlabel
+bootloader --location=mbr --boot-drive=sda
+
+part /boot --fstype="xfs" --ondisk=sda --size=1024
+part /boot/efi --fstype="efi" --ondisk=sda --size=600 --fsoptions="umask=0077,shortname=winnt"
+part pv.{{ vg_short }} --fstype="lvmpv" --ondisk=sda --size=100 --grow
+volgroup {{ vg_name }} pv.{{ vg_short }}
+
+logvol /     --fstype="xfs" --size=8192 --name=rootlv --vgname={{ vg_name }}
+logvol swap  --fstype="swap" --size=2048 --name=swap --vgname={{ vg_name }}
+
+rootpw --iscrypted {{ pwd_hash }}
+user --name=sysadmin --password={{ pwd_hash }} --iscrypted --groups=wheel
+user --name=secops  --password={{ secops_hash }} --iscrypted --groups=wheel
+
+%packages
+--ignoremissing
+@^minimal-environment
+@standard
+# Kubernetes prerequisites
+iptables
+iproute
+conntrack-tools
+socat
+ethtool
+curl
+wget
+vim
+tmux
+git
+python3
+openssh-clients
+chrony
+audit
+policycoreutils
+policycoreutils-python-utils
+%end
+
+%post --interpreter=/bin/bash --log=/root/kickstart-post.log
+set -euo pipefail
+
+groupadd sshusers
+usermod -aG sshusers {{ admin_id }}
+usermod -aG sshusers {{ secops_id }}
+echo "{{ admin_id }} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+echo "{{ secops_id }} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Disable swap
+sed -i '/swap/d' /etc/fstab
+swapoff -a
+
+# Kernel modules & sysctl
+cat > /etc/modules-load.d/k8s.conf <<'EOF'
+overlay
+br_netfilter
+EOF
+modprobe overlay || true
+modprobe br_netfilter || true
+
+cat > /etc/sysctl.d/99-kubernetes.conf <<'EOF'
+net.bridge.bridge-nf-call-iptables = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward = 1
+EOF
+sysctl --system
+
+# Firewall ports for control plane
+systemctl enable --now firewalld
+firewall-cmd --permanent --add-service=ssh
+firewall-cmd --permanent --add-port=6443/tcp
+firewall-cmd --permanent --add-port=2379-2380/tcp
+firewall-cmd --permanent --add-port=10250/tcp
+firewall-cmd --permanent --add-port=10257/tcp
+firewall-cmd --permanent --add-port=10259/tcp
+firewall-cmd --reload
+
+# Chrony
+systemctl enable --now chronyd
+
+# Hostname
+hostnamectl set-hostname {{ hostname | default(inventory_hostname) }}
+
+echo "Master node baseline complete."
+
+echo "{{ admin_id }}:{{ admin_set }}" | chpasswd
+echo "{{ secops_id }}:{{ secops_pwd }}" | chpasswd
+
+echo '{{ secops_key }}' >> /home/secops/.ssh/authorized_keys
+
+nmcli con modify enp2s0 ipv4.addresses {{ cloud_master_ip }}/{{ ip_cid }}
+nmcli con modify enp2s0 ipv4.gateway {{ cluster_gateway }}
+nmcli con modify enp2s0 ipv4.method manual
+nmcli con modify enp2s0 ipv4.never-default yes
+nmcli con modify enp2s0 ipv6.method ignore
+nmcli con modify enp2s0 connection.autoconnect yes
+nmcli con up enp2s0
+
+nmcli con modify enp3s0 ipv4.method auto
+nmcli con modify enp3s0 ipv4.never-default yes
+nmcli con modify enp3s0 ipv6.method ignore
+nmcli con modify enp3s0 connection.autoconnect yes
+nmcli con up enp3s0
+
+
+%end
+
+shutdown

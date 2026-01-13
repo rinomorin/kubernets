@@ -1,0 +1,44 @@
+# Begin Global SA standard template Ver 2.0.0  Date 2015-04-01  * Master * Refer xxxxx Begin #
+#====================================================================
+# User Aliases
+#====================================================================
+# Replace sample group names with real group names for your account.
+# The User_Alias name must start with DFLT_UNIX_SA to identify the Alias
+#   as an SA alias
+#
+User_Alias      DFLT_LIBVIRT_BAU = %{{ this_group }}
+#
+#====================================================================
+# Host Aliases
+#====================================================================
+# Only allow execution on KVM hosts matching your naming standard
+#
+Host_Alias      DFLT_LIBVIRT_HOSTS = {{ kvm_host_pattern }}
+#
+#====================================================================
+# DFLT SA command Alias - libvirt operations
+#==================================================================== 
+#
+Cmnd_Alias   DFLT_LIBVIRT_CMD  = \
+    /usr/bin/systemctl start libvirtd, \
+    /usr/bin/systemctl stop libvirtd, \
+    /usr/bin/systemctl restart libvirtd, \
+    /usr/bin/systemctl enable libvirtd, \
+    /usr/bin/systemctl disable libvirtd, \
+    /usr/bin/systemctl enable --now libvirtd, \
+    /usr/bin/systemctl disable --now libvirtd, \
+    /usr/bin/systemctl status libvirtd, \
+    /usr/bin/systemctl reload libvirtd, \
+    /usr/bin/qemu-img, \
+    /usr/bin/virsh *, \
+    /usr/bin/virt-host-validate, \
+    /usr/bin/virt-install, \
+    /usr/bin/virt-xml, \
+    /usr/bin/virt-clone
+#
+# NOTE This Cmnd_Alias can only be used if secondary logging is in place
+#   on the server.
+#
+DFLT_LIBVIRT_BAU  DFLT_SA_HOSTS = (ALL) NOPASSWD:DFLT_LIBVIRT_CMD, NOEXEC: DFLT_SHELLESCAPE_ALL,!DFLT_NONE_EDITOR
+#
+# End Global SA standard template Ver 2.0.0  Date 2015-04-01   * Master * Refer xxxxx End #

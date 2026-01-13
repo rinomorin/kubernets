@@ -1,0 +1,26 @@
+# ---
+# - name: Create FCOS orchestration directories
+#   file:
+#     path: "{{ item }}"
+#     state: directory
+#     mode: "0755"
+#   loop: "{{ fcos_dirs }}"
+
+
+---
+- name: Create FCOS root directory
+  file:
+    path: "{{ fcos_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create FCOS subdirectories
+  file:
+    path: "{{ fcos_root }}/{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755' 
+  loop: "{{ fcos_dirs }}"

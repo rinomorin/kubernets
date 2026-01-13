@@ -1,0 +1,19 @@
+server {
+    listen {{ nat_ip_device }}:443 ssl;
+    server_name {{ inventory_hostname }}.{{ ipa_domain }};
+
+    ssl_certificate           /etc/pki/tls/certs/{{ inventory_hostname_short }}.crt;
+    ssl_certificate_key       /etc/pki/tls/private/{{ inventory_hostname_short }}.key;
+
+    ssl_trusted_certificate   /etc/pki/tls/certs/ipa-ca.crt;
+    ssl_client_certificate    /etc/pki/tls/certs/ipa-ca.crt;
+    ssl_verify_client         off;
+
+    disable_symlinks off;
+    autoindex on;
+
+    location /boot/     { alias /srv/fcos/http/; }
+    location /ignition/ { alias /srv/fcos/ignition/; }
+    location /butane/   { alias /srv/fcos/butane/; }
+    location /ipxe/     { alias /srv/fcos/ipxe/; }
+}
