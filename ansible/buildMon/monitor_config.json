@@ -1,5 +1,0 @@
-{
-  "monitor_target_dir": "/opt/dev/kubernets/ansible/playbooks/../buildMon",
-  "monitor_refresh": 60,
-  "monitor_title": "Server Build Monitor"
-}
