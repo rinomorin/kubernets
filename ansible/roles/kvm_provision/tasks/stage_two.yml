@@ -67,11 +67,7 @@
   until: (ssh_check.stdout | default('')) == "sshok"
   retries: "{{ build_loops|int }}"
   delay: 10          # 10 seconds between attempts
-  # no_log: true
-
-- name: Show SSH check result
-  debug:
-    msg: "SSH check result is {{ ssh_check.stdout }}"
+  no_log: true
 
 - name: Mark VM as ready
   set_fact:
@@ -105,4 +101,3 @@
     fi
   when: "'helper_nodes' in group_names or 'cluster_nodes' in group_names"
   no_log: true
-

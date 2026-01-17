@@ -1,16 +1,19 @@
 variant: fcos
 version: 1.6.0
+
 passwd:
   users:
     - name: core
       ssh_authorized_keys:
         - {{ helper_ssh_key }}
+
 storage:
   files:
     - path: /etc/hostname
       mode: 0644
       contents:
         inline: {{ hostname }}
+
     - path: /home/core/.ssh/config
       mode: 0600
       user:
@@ -62,3 +65,36 @@ storage:
           address1={{ provider_ip }}/24
           method=manual
 {% endif %}
+
+    # Bootstrap script (corrected)
+    - path: /usr/local/bin/cloud-helper-bootstrap.sh
+      mode: 0755
+      contents:
+        inline: |
+          #!/usr/bin/bash
+          set -euo pipefail
+
+          HOSTNAME=$(hostname)
+          IP=$(hostname -I | awk '{print $1}')
+
+          curl -X POST \
+            -F "hostname=${HOSTNAME}" \
+            -F "ip=${IP}" \
+            http://172.16:.0.20:8081/register
+
+systemd:
+  units:
+    - name: cloud-helper-bootstrap.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Cloud Helper Bootstrap Registration
+        After=network-online.target
+        Wants=network-online.target
+
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/local/bin/cloud-helper-bootstrap.sh
+
+        [Install]
+        WantedBy=multi-user.target

@@ -1,0 +1,61 @@
+from flask import Flask, request, jsonify
+import json, os
+import logging
+
+from datetime import datetime
+
+REGISTRY_PATH = "{{ cloud_helper_registry_path }}"
+LOG_DIR = "{{ cloud_helper_workdir }}"
+LOG_FILE = f"{LOG_DIR}/registry.log"
+
+# Ensure log directory exists
+os.makedirs(LOG_DIR, exist_ok=True)
+
+# Configure logging
+logging.basicConfig(
+    filename=LOG_FILE,
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+
+# Restrict log file permissions (CIS-friendly)
+try:
+    os.chmod(LOG_FILE, 0o600)
+except FileNotFoundError:
+    pass
+
+app = Flask(__name__)
+
+def load_registry():
+    if not os.path.exists(REGISTRY_PATH):
+        return {}
+    with open(REGISTRY_PATH, "r") as f:
+        return json.load(f)
+
+def save_registry(data):
+    os.makedirs(os.path.dirname(REGISTRY_PATH), exist_ok=True)
+    with open(REGISTRY_PATH, "w") as f:
+        json.dump(data, f, indent=2)
+
+@app.route("/register", methods=["POST"])
+def register():
+    hostname = request.form.get("hostname")
+    ip = request.form.get("ip")
+    client_ip = request.remote_addr
+
+    if not hostname or not ip:
+        logging.warning(f"Invalid request from {client_ip}: missing hostname or ip")
+        return jsonify({"error": "hostname and ip required"}), 400
+
+    registry = load_registry()
+    registry[hostname] = {
+        "ip": ip,
+        "last_seen": datetime.utcnow().isoformat() + "Z"
+    }
+    save_registry(registry)
+
+    logging.info(f"Registered host={hostname} ip={ip} from client={client_ip}")
+    return jsonify({"status": "ok"})
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8081)

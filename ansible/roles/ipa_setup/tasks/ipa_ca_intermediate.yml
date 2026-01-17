@@ -52,20 +52,12 @@
   register: trust_list
   changed_when: false
 
-- name: Show trust list entry for IPA CA
-  debug:
-    msg: "{{ trust_list.stdout | regex_search('HOME.MORINSOFT.CA', ignorecase=True) }}"
-
 # --- Verify CA trust with openssl ---
 - name: Verify IPA CA certificate is trusted
   command: >
     openssl verify -CAfile /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ipa/ca.crt
   register: ca_verify
   changed_when: false
-
-- name: Show CA verify result
-  debug:
-    msg: "{{ ca_verify.stdout }}"
 
 - name: Verify ipa master forward DNS from ca intermediate
   command: dig +short {{ ipa_master }}.{{ ipa_domain }} @{{ ipa_master_ip }}
@@ -221,17 +213,11 @@
   register: dns_zones
   changed_when: false
 
-- debug:
-    var: dns_zones.stdout
-
 # --- CA certificate validation ---
 - name: Validate CA certificate on 
   command: openssl x509 -in /etc/ipa/ca.crt -noout -text
   register: ca_cert
   changed_when: false
-
-- debug:
-    msg: "{{ ca_cert.stdout }}"
 
 # --- LDAP connectivity check ---
 - name: Test LDAP connectivity on 
@@ -239,16 +225,10 @@
   register: ldap_check
   changed_when: false
 
-- debug:
-    msg: "{{ ldap_check.stdout }}"
-
 # --- LDAPS connectivity check ---
 - name: Test LDAPS connectivity on 
   command: ldapsearch -H ldaps://localhost:636 -D "cn=Directory Manager" -w {{ ipa_dm_password }} -b "" -s base "(objectclass=*)"
   register: ldaps_check
   changed_when: false
   no_log: true
-
-- debug:
-    msg: "{{ ldaps_check.stdout }}"
 

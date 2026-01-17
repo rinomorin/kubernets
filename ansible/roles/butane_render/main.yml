@@ -1,4 +1,0 @@
-# SSH access for FCOS nodes
-ssh_authorized_keys:
-  - "{{ lookup('env', 'secops_edkey') }}"
-  # - "ssh-ed25519 AAAA... helper-node-key"

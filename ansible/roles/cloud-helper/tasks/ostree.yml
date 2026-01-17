@@ -1,0 +1,47 @@
+---
+# ============================================================
+# FCOS-only block
+# ============================================================
+- name: FCOS-only containerd setup
+  block:
+    # ============================================================
+    # 0. Detect if rpm-ostree is available (FCOS only)
+    # ============================================================
+    - name: Detect rpm-ostree availability
+      command: which rpm-ostree
+      register: ostree_check
+      failed_when: false
+      changed_when: false
+
+    - name: Skip rpm-ostree layering on non-FCOS systems
+      when: ostree_check.rc != 0
+      meta: end_play
+
+    # ============================================================
+    # 1. Layer Kubernetes packages (FCOS)
+    # ============================================================
+    - name: Layer Kubernetes packages
+      command: >
+        rpm-ostree install {{ fcos_k8s_packages | join(' ') }}
+      register: ostree_k8s
+      changed_when: "'changed' in ostree_k8s.stdout"
+
+    # ============================================================
+    # 2. Layer CRI packages (FCOS)
+    # ============================================================
+    - name: Layer CRI packages
+      command: >
+        rpm-ostree install {{ fcos_containerd_packages | join(' ') }}
+      register: ostree_cri
+      changed_when: "'changed' in ostree_cri.stdout"
+      when: fcos_cri == "containerd"
+
+    # ============================================================
+    # 3. Reboot FCOS node if layering changed
+    # ============================================================
+    - name: Reboot if rpm-ostree layering changed
+      reboot:
+      when: ostree_k8s.changed or ostree_cri.changed
+  when: >
+    ansible_facts['os_family'] == "RedHat"
+    and ansible_facts['distribution'] == "Fedora CoreOS"

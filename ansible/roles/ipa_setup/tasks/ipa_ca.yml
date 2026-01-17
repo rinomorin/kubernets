@@ -21,7 +21,7 @@
       --auto-forwarders \
       --setup-dns
   when: not ipa_conf.stat.exists
-  # no_log: true
+  no_log: true
 
 - name: create certs from cacert.p12
   become: yes
@@ -96,17 +96,9 @@
     klist
   register: kcerts
 
-- name: show kcerts
-  debug:
-    msg: "{{ kcerts.stdout }}"
-
 - name: get ca.crt Info
   shell: "openssl x509 -in /etc/ipa/ca.crt -noout -text"
   register: ca_cert_info
-
-- name: show ca.crt
-  debug:
-    msg: "{{ ca_cert_info.stdout }}"
 
 - name: test ldap 389
   shell: "ldapsearch -x -H ldap://localhost:389 -b \"dc=$(hostname -d | sed 's/\\./,dc=/g')\""
@@ -167,9 +159,6 @@
   changed_when: "'already exists' not in add_a_helper.stdout"
   failed_when: false
 
-- debug:
-    msg: "{{ add_a_intermediate }}"
-       
 - name: Add A record for {{ ipa_domain }} (zone apex)
   become: yes
   command: >
@@ -181,9 +170,6 @@
 - name: Verify forward DNS resolution for domain
   shell: dig +short {{ ipa_domain }} @{{ ipa_master_ip }}
   register: forward_domain
-
-- debug:
-    msg: "Forward lookup result for {{ ipa_domain }}: {{ forward_domain.stdout }}"
 
 - name: Verify {{ ipa_ca_intermediate }} forward DNS
   command: dig +short {{ ipa_ca_intermediate }}.{{ ipa_domain }} @{{ ipa_master_ip }}
@@ -235,12 +221,6 @@
   shell: dig +short -x {{ ipa_master_ip }} @{{ ipa_master_ip }}
   register: reverse_dns
 
-- debug:
-    msg: "Reverse lookup result: {{ reverse_dns.stdout }}"
-
 - name: Verify reverse DNS resolution intermediate
   shell: dig +short -x {{ ipa_ca_intermediate_ip }} @{{ ipa_master_ip }}
   register: reverse_dns2
-
-- debug:
-    msg: "Reverse lookup result2: {{ reverse_dns2.stdout }}"

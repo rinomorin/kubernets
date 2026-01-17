@@ -1,4 +1,3 @@
-
 - name: Download FCOS image using podman-based coreos_installer
   become: yes
   become_user: "{{ cloud_helper_user }}"
@@ -7,6 +6,7 @@
     coreos_installer download -p qemu -f qcow2.xz --decompress
   args:
     chdir: "{{ cloud_helper_workdir }}"
+
 
 - set_fact:
     staging_dir: "/tmp/fcos_artifacts"
@@ -30,6 +30,7 @@
   become: yes
   become_user: "{{ cloud_helper_user }}"
   shell: |
+    cp -f {{ latest_fcos_img.path }} {{ cloud_helper_workdir }}/fcos/fcos-base.qcow2
     ssh {{ kvm_host }} "mkdir -p {{ staging_dir }}"
     scp {{ latest_fcos_img.path }} {{ kvm_host }}:{{ staging_dir }}/fcos-base.qcow2
   run_once: true
@@ -98,7 +99,7 @@
       - "{{ br_maint }}"
       - "{{ br_provision }}"
 
-# 5. Cleanup on aisle one
+# 5. Cleanup on aisle five
 - name: Cleanup controller temporary files
   delegate_to: localhost
   become: false
@@ -140,7 +141,7 @@
     state: absent
   loop:
     - "{{ staging_dir }}"
-    - "{{ dest_dir }}"
+    # - "{{ dest_dir }}"
   run_once: true
 
 - name: Find helper temporary files
@@ -162,4 +163,3 @@
     state: absent
   loop: "{{ helper_tmp_files.files }}"
   run_once: true
-

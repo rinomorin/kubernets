@@ -1,0 +1,57 @@
+---
+# ============================================================
+# FCOS-only block
+# ============================================================
+- name: FCOS-only containerd setup
+  block:
+
+    # ============================================================
+    # 0. Detect rpm-ostree availability (FCOS only)
+    # ============================================================
+    - name: Detect rpm-ostree availability
+      command: which rpm-ostree
+      register: ostree_check
+      failed_when: false
+      changed_when: false
+
+    - name: Skip containerd setup on non-FCOS systems
+      when: ostree_check.rc != 0
+      meta: noop
+
+    # ============================================================
+    # 1. Ensure containerd config directory exists
+    # ============================================================
+    - name: Ensure containerd config directory exists
+      file:
+        path: /etc/containerd
+        state: directory
+
+    # ============================================================
+    # 2. Generate default containerd config
+    # ============================================================
+    - name: Generate default containerd config
+      command: containerd config default
+      register: containerd_cfg
+
+    # ============================================================
+    # 3. Write containerd config
+    # ============================================================
+    - name: Write containerd config
+      copy:
+        content: "{{ containerd_cfg.stdout }}"
+        dest: /etc/containerd/config.toml
+
+
+    # 4. Enable and start containerd
+    # ============================================================
+    - name: Enable and start containerd
+      systemd:
+        name: containerd
+        enabled: true
+        state: started
+
+    # 
+  when: >
+    ansible_facts['os_family'] == "RedHat"
+    and ansible_facts['distribution'] == "Fedora CoreOS"
+

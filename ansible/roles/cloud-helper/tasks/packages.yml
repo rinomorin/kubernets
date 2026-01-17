@@ -10,11 +10,6 @@
     state: present
   become: true
 
-# - name: Install helper packages
-#   package:
-#     name: "{{ helper_packages }}"
-#     state: present
-
 ###############################################################
 # Ensure Python venv exists
 ###############################################################

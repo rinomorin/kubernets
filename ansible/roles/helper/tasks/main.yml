@@ -1,3 +1,0 @@
-# role/ipa_setup/tasks/main.yml
-- name: install required code
-  import_tasks: install.yml

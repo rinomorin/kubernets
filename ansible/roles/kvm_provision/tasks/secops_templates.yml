@@ -102,13 +102,6 @@
     - cis_check.stdout == "built"
     - "'oscap.log' not in (cis_check2.stdout | default(''))"
 
-- name: Show oscap log content
-  debug:
-    msg: "oscap_log_content is {{ oscap_log_content.stdout }}"
-  when:
-    - cis_check.stdout == "built"   
-    - "'oscap.log' in (cis_check2.stdout| default(''))"
-
 - name: Compliance for ipa servers
   become: true
   vars:

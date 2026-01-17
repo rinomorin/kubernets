@@ -1,0 +1,201 @@
+---
+# ============================================================
+# 1. Authenticate with host principal
+# ============================================================
+- name: Authenticate with cloud host principal
+  become: true
+  command: >
+    kinit -k host/{{ cloud_dns_helper_name }}.{{ cloud_zone }}
+
+# ============================================================
+# 2. Clean old CSR/key/SAN config
+# ============================================================
+- name: Remove old CSR/key/SAN config
+  become: true
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/nginx-san.csr
+    - /tmp/nginx.key
+    - /tmp/openssl-san.cnf
+
+# ============================================================
+# 3. Build SAN config
+# ============================================================
+- name: Prepare SAN config file
+  become: true
+  ansible.builtin.shell: |
+    cat /etc/ssl/openssl.cnf <(printf "\n[SAN]\nsubjectAltName=DNS:{{ cloud_dns_helper_name }}.{{ cloud_zone }}") > /tmp/openssl-san.cnf
+  args:
+    executable: /bin/bash
+
+# ============================================================
+# 4. Generate private key
+# ============================================================
+- name: Generate Private Key
+  become: true
+  command: "openssl genrsa -out /tmp/nginx.key 4096"
+
+# ============================================================
+# 5. Generate CSR
+# ============================================================
+- name: Generate CSR with SAN
+  become: true
+  command: >
+    openssl req -new
+    -key /tmp/nginx.key
+    -out /tmp/nginx-san.csr
+    -subj "/CN={{ cloud_dns_helper_name }}.{{ cloud_zone }}"
+    -reqexts SAN
+    -config /tmp/openssl-san.cnf
+
+# ============================================================
+# 6. Request certificate
+# ============================================================
+- name: Request IPA Certificate
+  become: true
+  shell: |
+    set -o pipefail
+    ipa cert-request /tmp/nginx-san.csr \
+      --principal=host/{{ cloud_dns_helper_name }}.{{ cloud_zone }} | \
+      grep "Serial number" | grep -v hex | awk '{print $NF}'
+  register: cert_serno
+  changed_when: cert_serno.rc == 0
+
+# ============================================================
+# 7. Fetch signed certificate
+# ============================================================
+- name: Fetch Signed Certificate
+  become: true
+  command: >
+    ipa cert-show {{ cert_serno.stdout | trim | int }} --out /tmp/nginx.crt
+
+# ============================================================
+# 8. Verify modulus match
+# ============================================================
+- name: Verify Modulus Match
+  become: true
+  shell: |
+    set -o pipefail
+    KMOD=$(openssl rsa -noout -modulus -in /tmp/nginx.key | openssl sha256)
+    CMOD=$(openssl x509 -noout -modulus -in /tmp/nginx.crt | openssl sha256)
+    [ "$KMOD" = "$CMOD" ]
+  register: keymatch
+  changed_when: false
+
+# ============================================================
+# 9. Install certs + fullchain
+# ============================================================
+- name: Install certs
+  become: true
+  when: keymatch.rc == 0
+  block:
+    - name: Ensure cert directory exists
+      file:
+        path: /etc/nginx/certs
+        state: directory
+        mode: '0755'
+
+    - name: Copy IPA Root CA
+      copy:
+        src: /etc/ipa/ca.crt
+        dest: /etc/nginx/certs/root-ca.crt
+        remote_src: true
+        mode: '0644'
+
+    - name: Deploy Key and Cert
+      copy:
+        src: "/tmp/{{ item.src }}"
+        dest: "/etc/nginx/certs/{{ item.dest }}"
+        remote_src: true
+        mode: "{{ item.mode }}"
+      loop:
+        - { src: 'nginx.key', dest: 'nginx.key', mode: '0600' }
+        - { src: 'nginx.crt', dest: 'nginx.crt', mode: '0644' }
+
+    - name: Build Fullchain
+      shell: |
+        cat /etc/nginx/certs/nginx.crt /etc/nginx/certs/root-ca.crt > /etc/nginx/certs/nginx-fullchain.crt
+
+# ============================================================
+# 10. Install nginx.conf
+# ============================================================
+- name: Install minimal nginx.conf
+  run_once: true
+  template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    mode: '0644'
+  notify: restart nginx
+
+# ============================================================
+# 11. Ensure nginx directories exist
+# ============================================================
+- name: Ensure nginx directories exist
+  become: true
+  file:
+    path: "{{ cloud_helper_workdir }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - ignition
+    - fcos
+
+# ============================================================
+# 12. SELinux contexts
+# ============================================================
+- name: Set SELinux context for nginx directories
+  become: true
+  command: >
+    semanage fcontext -a -t httpd_sys_content_t '{{ cloud_helper_workdir }}(/.*)?'
+
+- name: Set SELinux context for subdirectories
+  become: true
+  command: >
+    semanage fcontext -a -t httpd_sys_content_t '{{ cloud_helper_workdir }}/{{ item }}(/.*)?'
+  loop:
+    - ignition
+    - fcos
+
+- name: Restore SELinux context
+  become: true
+  command: "restorecon -Rv {{ cloud_helper_workdir }}"
+
+# ============================================================
+# 13. Install nginx vhost
+# ============================================================
+- name: Install Cloud Helper Config
+  become: true
+  copy:
+    dest: "/etc/nginx/conf.d/cloud_helper.conf"
+    mode: "0644"
+    content: |
+      server {
+          listen {{ nat_ip_device }}:443 ssl;
+          server_name {{ cloud_dns_helper_name }}.{{ cloud_zone }};
+          
+          ssl_certificate     /etc/nginx/certs/nginx-fullchain.crt;
+          ssl_certificate_key /etc/nginx/certs/nginx.key;
+
+          location /ignition/ { alias {{ cloud_helper_workdir }}/ignition/; autoindex on; }
+          location /fcos/     { alias {{ cloud_helper_workdir }}/fcos/; autoindex on;}
+      }
+      server {
+          listen {{ nat_ip_device }}:80;
+          server_name {{ cloud_dns_helper_name }}.{{ cloud_zone }};
+          
+          location /ignition/ { alias {{ cloud_helper_workdir }}/ignition/; autoindex on;}
+          location /fcos/     { alias {{ cloud_helper_workdir }}/fcos/; autoindex on;}
+      }
+  notify: restart nginx
+
+# ============================================================
+# 14. Restart nginx
+# ============================================================
+- name: Ensure nginx is running
+  become: true
+  service:
+    name: nginx
+    state: restarted
+    enabled: true

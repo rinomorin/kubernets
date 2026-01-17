@@ -1,9 +1,0 @@
-- debug: msg="hostname {{ inventory_hostname }}.{{ ipa_domain }}"
-- name: Generate CSR
-  command: >
-    openssl req -new
-    -key {{ cert_key_path }}
-    -out {{ cert_csr_path }}
-    -subj "/CN={{ inventory_hostname }}.{{ ipa_domain }}"
-  args:
-    creates: "{{ cert_csr_path }}"

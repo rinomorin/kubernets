@@ -54,9 +54,6 @@
   delegate_to: localhost
   become: false
 
-# - debug: 
-#     msg: "account is {{ ACCOUNT }}"
-
 - name: Rename each ACCOUNT file to uppercase ACCOUNT
   command: >
     mv "{{ item.path }}"
@@ -74,10 +71,6 @@
   become: false
   register: visudo_check
   failed_when: visudo_check.rc != 0
-
-# - name: show results
-#   debug:
-#     msg: "check status:\n{{ visudo_check }}"
 
 - name: Copy validated sudoers files to clean staging path
   copy:

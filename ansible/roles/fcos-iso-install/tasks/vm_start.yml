@@ -1,9 +1,0 @@
----
-- name: Start domain with virsh (if not running) on VM_HOST
-  command: >
-    bash -lc "if ! virsh domstate {{ item }} | grep -q running; then virsh start {{ item }}; else echo already-running; fi"
-  loop: "{{ node_list }}"
-  loop_control:
-    loop_var: item
-  delegate_to: "{{ VM_HOST }}"
-  become: true

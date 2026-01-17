@@ -1,4 +1,3 @@
-
 - name: Only sshuser allowed
   become: yes
   copy:
@@ -35,14 +34,6 @@
     enabled: false
     masked: true
   when: "'autofs.service' in ansible_facts.services"
-
-
-# - name: Mask autofs service
-#   ansible.builtin.systemd:
-#     name: autofs
-#     state: stopped
-#     enabled: false
-#     masked: true
 
 - name: authselect updates
   become: yes
@@ -81,7 +72,6 @@
   command: chage -M {{ max_pass }} -m {{ min_pass }} -W {{ warn_pass }} {{ item }}
   loop: "{{ user_list.stdout_lines }}"
   register: pass_chage
-
 
 #  this is optional, i do plan to change later
 #  --skip-rule xccdf_org.ssgproject.content_rule_accounts_password_last_change_is_in_past 

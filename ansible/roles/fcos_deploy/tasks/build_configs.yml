@@ -1,9 +1,0 @@
----
-- name: Render and Convert
-  loop: "{{ groups['cluster_nodes'] | reject('equalto', 'helper') | list }}"
-  loop_control: { loop_var: node_name }
-  block:
-    - template: { src: nodes.bu.j2, dest: "/tmp/{{ node_name }}.bu" }
-    - shell: |
-        podman run --rm -v /tmp:/pwd -w /pwd quay.io/coreos/butane:release --pretty --strict {{ node_name }}.bu > /tmp/{{ node_name }}.ign;
-        podman run --rm -v /tmp:/pwd -w /pwd quay.io/coreos/ignition-validate:release {{ node_name }}.ign

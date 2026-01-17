@@ -1,0 +1,15 @@
+[Unit]
+Description=Cloud Helper Bootstrap API
+After=network-online.target
+Wants=network-online.target
+
+
+[Service]
+User={{ cloud_helper_api_user }}
+Group={{ cloud_helper_api_group }}
+WorkingDirectory={{ cloud_helper_api_dir }}
+ExecStart={{ cloud_helper_api_dir }}/run.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

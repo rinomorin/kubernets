@@ -1,0 +1,224 @@
+---
+# ============================================================
+# 1. Authenticate with host principal (keytab must already exist)
+# ============================================================
+- name: Authenticate with cloud host principal
+  become: true
+  command: >
+    kinit -k host/{{ cloud_dns_helper_name }}.{{ cloud_zone }}
+
+# ============================================================
+# 2. Install nginx
+# ============================================================
+- name: Install Nginx
+  ansible.builtin.package:
+    name: nginx
+    state: present
+
+# ============================================================
+# 3. Ensure working directory structure exists
+# ============================================================
+- name: Ensure nginx directories exist
+  become: true
+  file:
+    path: "{{ cloud_helper_workdir }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - ignition
+    - fcos
+
+# ============================================================
+# 4. Build SAN config (only if missing)
+# ============================================================
+- name: Prepare SAN config file
+  become: true
+  ansible.builtin.shell: |
+    cat /etc/ssl/openssl.cnf <(printf "\n[SAN]\nsubjectAltName=DNS:{{ cloud_dns_helper_name }}.{{ cloud_zone }}") > /tmp/openssl-san.cnf
+  args:
+    executable: /bin/bash
+    creates: /tmp/openssl-san.cnf
+
+# ============================================================
+# 5. Generate private key (only if missing)
+# ============================================================
+- name: Generate Private Key
+  become: true
+  command: "openssl genrsa -out /tmp/nginx.key 4096"
+  args:
+    creates: /tmp/nginx.key
+
+# ============================================================
+# 6. Generate CSR (only if missing)
+# ============================================================
+- name: Generate CSR with SAN
+  become: true
+  command: >
+    openssl req -new
+    -key /tmp/nginx.key
+    -out /tmp/nginx-san.csr
+    -subj "/CN={{ cloud_dns_helper_name }}.{{ cloud_zone }}"
+    -reqexts SAN
+    -config /tmp/openssl-san.cnf
+  args:
+    creates: /tmp/nginx-san.csr
+
+# ============================================================
+# 7. Request certificate (only if cert missing)
+# ============================================================
+- name: Request IPA Certificate
+  become: true
+  shell: |
+    set -o pipefail
+    ipa cert-request /tmp/nginx-san.csr \
+      --principal=host/{{ cloud_dns_helper_name }}.{{ cloud_zone }} | \
+      grep "Serial number" | grep -v hex | awk '{print $NF}'
+  register: cert_serno
+  changed_when: cert_serno.rc == 0
+  when: not (ansible_facts['files'] | default({})).get('/tmp/nginx.crt', false)
+
+# ============================================================
+# 8. Fetch certificate (only if missing)
+# ============================================================
+- name: Fetch Signed Certificate
+  become: true
+  command: >
+    ipa cert-show {{ cert_serno.stdout | trim | int }} --out /tmp/nginx.crt
+  args:
+    creates: /tmp/nginx.crt
+  when: cert_serno is defined
+
+# ============================================================
+# 9. Verify modulus match (detect corruption or mismatch)
+# ============================================================
+- name: Verify Modulus Match
+  become: true
+  shell: |
+    set -o pipefail
+    KMOD=$(openssl rsa -noout -modulus -in /tmp/nginx.key | openssl sha256)
+    CMOD=$(openssl x509 -noout -modulus -in /tmp/nginx.crt | openssl sha256)
+    [ "$KMOD" = "$CMOD" ]
+  register: keymatch
+  changed_when: false
+  failed_when: false
+
+# ============================================================
+# 10. Regenerate CSR + cert if modulus mismatch
+# ============================================================
+- name: Regenerate CSR if modulus mismatch
+  become: true
+  command: >
+    openssl req -new
+    -key /tmp/nginx.key
+    -out /tmp/nginx-san.csr
+    -subj "/CN={{ cloud_dns_helper_name }}.{{ cloud_zone }}"
+    -reqexts SAN
+    -config /tmp/openssl-san.cnf
+  when: keymatch.rc != 0
+
+- name: Request new certificate if modulus mismatch
+  become: true
+  shell: |
+    set -o pipefail
+    ipa cert-request /tmp/nginx-san.csr \
+      --principal=host/{{ cloud_dns_helper_name }}.{{ cloud_zone }} | \
+      grep "Serial number" | grep -v hex | awk '{print $NF}'
+  register: cert_serno_new
+  when: keymatch.rc != 0
+
+- name: Fetch new certificate if modulus mismatch
+  become: true
+  command: >
+    ipa cert-show {{ cert_serno_new.stdout | trim | int }} --out /tmp/nginx.crt
+  when: keymatch.rc != 0
+
+# ============================================================
+# 11. Install certs + fullchain
+# ============================================================
+- name: Install certs
+  become: true
+  block:
+    - name: Ensure cert directory exists
+      file:
+        path: /etc/nginx/certs
+        state: directory
+        mode: '0755'
+
+    - name: Copy IPA Root CA
+      copy:
+        src: /etc/ipa/ca.crt
+        dest: /etc/nginx/certs/root-ca.crt
+        remote_src: true
+        mode: '0644'
+
+    - name: Deploy Key and Cert
+      copy:
+        src: "/tmp/{{ item.src }}"
+        dest: "/etc/nginx/certs/{{ item.dest }}"
+        remote_src: true
+        mode: "{{ item.mode }}"
+      loop:
+        - { src: 'nginx.key', dest: 'nginx.key', mode: '0600' }
+        - { src: 'nginx.crt', dest: 'nginx.crt', mode: '0644' }
+
+    - name: Build Fullchain
+      shell: |
+        cat /etc/nginx/certs/nginx.crt /etc/nginx/certs/root-ca.crt > /etc/nginx/certs/nginx-fullchain.crt
+
+# ============================================================
+# 12. SELinux contexts
+# ============================================================
+- name: Set SELinux context for nginx directories
+  become: true
+  command: >
+    semanage fcontext -a -t httpd_sys_content_t '{{ cloud_helper_workdir }}(/.*)?'
+
+- name: Set SELinux context for subdirectories
+  become: true
+  command: >
+    semanage fcontext -a -t httpd_sys_content_t '{{ cloud_helper_workdir }}/{{ item }}(/.*)?'
+  loop:
+    - ignition
+    - fcos
+
+- name: Restore SELinux context
+  become: true
+  command: "restorecon -Rv {{ cloud_helper_workdir }}"
+
+# ============================================================
+# 13. Install nginx vhost
+# ============================================================
+- name: Install Cloud Helper Config
+  become: true
+  copy:
+    dest: "/etc/nginx/conf.d/cloud_helper.conf"
+    mode: "0644"
+    content: |
+      server {
+          listen {{ nat_ip_device }}:443 ssl;
+          server_name {{ cloud_dns_helper_name }}.{{ cloud_zone }};
+          
+          ssl_certificate     /etc/nginx/certs/nginx-fullchain.crt;
+          ssl_certificate_key /etc/nginx/certs/nginx.key;
+
+          location /ignition/ { alias {{ cloud_helper_workdir }}/ignition/; autoindex on; }
+          location /fcos/     { alias {{ cloud_helper_workdir }}/fcos/; autoindex on;}
+      }
+      server {
+          listen {{ nat_ip_device }}:80;
+          server_name {{ cloud_dns_helper_name }}.{{ cloud_zone }};
+          
+          location /ignition/ { alias {{ cloud_helper_workdir }}/ignition/; autoindex on;}
+          location /fcos/     { alias {{ cloud_helper_workdir }}/fcos/; autoindex on;}
+      }
+  notify: restart nginx
+
+# ============================================================
+# 14. Restart nginx
+# ============================================================
+- name: Ensure nginx is running
+  become: true
+  service:
+    name: nginx
+    state: restarted
+    enabled: true

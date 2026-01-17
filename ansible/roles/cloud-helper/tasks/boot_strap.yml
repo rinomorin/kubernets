@@ -1,0 +1,86 @@
+---
+- name: Ensure API directory exists
+  file:
+    path: "{{ cloud_helper_api_dir }}"
+    state: directory
+    owner: "{{ cloud_helper_api_user }}"
+    group: "{{ cloud_helper_api_group }}"
+    mode: '0755'
+
+- name: Copy requirements file to final_vm_order
+  copy:
+    src: files/requirements.txt
+    dest: "{{ cloud_helper_api_dir }}/requirements.txt"
+    owner: "{{ cloud_helper_api_user }}"
+    group: "{{ cloud_helper_api_group }}"
+    mode: '0644'
+
+- name: Install Python requirements for bootstrap API
+  pip:
+    requirements: "{{ cloud_helper_api_dir }}/requirements.txt"
+    virtualenv: "{{ cloud_helper_workdir }}/venv"
+    virtualenv_python: python3
+  become: true
+  become_user: "{{ cloud_helper_api_user }}"
+
+- name: Allow API port 8081 through firewalld
+  become: true
+  firewalld:
+    port: 8081/tcp
+    permanent: true
+    state: enabled
+
+- name: Reload firewalld 
+  become: true 
+  service: 
+    name: firewalld 
+    state: reloaded
+
+- name: Deploy bootstrap API application
+  template:
+    src: app.py.j2
+    dest: "{{ cloud_helper_api_dir }}/app.py"
+    owner: "{{ cloud_helper_api_user }}"
+    group: "{{ cloud_helper_api_group }}"
+    mode: '0755'
+  
+- name: Deploy bootstrap API application
+  template:
+    src: run.sh.j2
+    dest: "{{ cloud_helper_api_dir }}/run.sh"
+    owner: "{{ cloud_helper_api_user }}"
+    group: "{{ cloud_helper_api_group }}"
+    mode: '0755'
+
+- name: Add SELinux fcontext for cloud_helper bin directory
+  command: semanage fcontext -a -t usr_t "/opt/cloud_helper/bin(/.*)?"
+  register: semanage_result
+  failed_when: semanage_result.rc not in [0,1]
+
+- name: Restore SELinux context on cloud_helper bin directory
+  command: restorecon -Rv /opt/cloud_helper/bin
+
+- name: Deploy systemd service
+  template:
+    src: cloud-helper-bootstrap-api.service.j2
+    dest: /etc/systemd/system/cloud-helper-bootstrap-api.service
+    mode: '0644'
+  notify: restart bootstrap api
+
+- name: Ensure registry directory exists
+  file:
+    path: "{{ cloud_helper_registry_path | dirname }}"
+    state: directory
+    owner: "{{ cloud_helper_api_user }}"
+    group: "{{ cloud_helper_api_group }}"
+    mode: '0755'
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: true
+
+- name: Enable and start bootstrap API
+  systemd:
+    name: cloud-helper-bootstrap-api.service
+    enabled: true
+    state: started

@@ -1,0 +1,183 @@
+---
+# ============================================================
+# 0. Authenticate as admin
+# ============================================================
+- name: Authenticate as IPA admin
+  delegate_to: "{{ ipa_master }}"
+  become: yes
+  command: kinit admin
+  args:
+    stdin: "{{ ipa_admin_password }}"
+  no_log: true
+
+# ============================================================
+# 1. Forward zone
+# ============================================================
+- name: Check if forward zone exists
+  delegate_to: "{{ ipa_master }}"
+  become: yes
+  command: ipa dnszone-show {{ cloud_zone }} --raw
+  register: zone_check
+  failed_when: false
+  changed_when: false
+
+- name: Create forward zone if missing
+  delegate_to: "{{ ipa_master }}"
+  become: yes
+  command: >
+    ipa dnszone-add {{ cloud_zone }}
+    --name-server={{ ipa_master }}.{{ ipa_domain }}.
+  when: zone_check.rc != 0
+  register: create_zone
+  changed_when: create_zone.rc == 0
+
+# ============================================================
+# 2. Reverse zone
+# ============================================================
+- name: Split NAT IP into octets
+  set_fact:
+    octets: "{{ nat_ip_device.split('.') }}"
+
+- name: Build reverse zone
+  set_fact:
+    reverse_zone: "{{ octets[1] }}.{{ octets[0] }}.in-addr.arpa."
+
+- name: Check if reverse zone exists
+  delegate_to: "{{ ipa_master }}"
+  become: yes
+  command: ipa dnszone-show {{ reverse_zone }} --raw
+  register: rev_check
+  failed_when: false
+  changed_when: false
+
+- name: Create reverse zone if missing
+  delegate_to: "{{ ipa_master }}"
+  become: yes
+  command: >
+    ipa dnszone-add {{ reverse_zone }}
+    --name-server={{ ipa_master }}.{{ ipa_domain }}.
+  when: rev_check.rc != 0
+  register: rev_create
+  changed_when: rev_create.rc == 0
+
+# ============================================================
+# 3. Forward A record
+# ============================================================
+- name: Ensure forward A record exists
+  delegate_to: "{{ ipa_master }}"
+  become: yes
+  command: >
+    ipa dnsrecord-add {{ cloud_zone }}
+    {{ cloud_dns_helper_name }}
+    --a-ip-address={{ nat_ip_device }}
+  register: add_forward
+  failed_when: false
+  changed_when: "'Added record' in add_forward.stdout"
+
+# ============================================================
+# 4. NS delegation in parent zone
+# ============================================================
+- name: Ensure NS delegation exists in parent zone
+  delegate_to: "{{ ipa_master }}"
+  become: yes
+  command: >
+    ipa dnsrecord-add {{ ipa_domain }}
+    {{ cloud_zone.split('.')[0] }}
+    --ns-rec={{ ipa_master }}.{{ ipa_domain }}.
+  register: parent_ns
+  failed_when: false
+  changed_when: "'Added record' in parent_ns.stdout"
+
+# ============================================================
+# 5. NS record inside child zone
+# ============================================================
+- name: Ensure NS record exists in child zone
+  delegate_to: "{{ ipa_master }}"
+  become: yes
+  command: >
+    ipa dnsrecord-add {{ cloud_zone }}
+    @ --ns-rec={{ ipa_master }}.{{ ipa_domain }}.
+  register: child_ns
+  failed_when: false
+  changed_when: "'Added record' in child_ns.stdout"
+
+# ============================================================
+# 6. PTR record
+# ============================================================
+- name: Build PTR name
+  set_fact:
+    ptr_name: "{{ octets[3] }}"
+
+- name: Ensure reverse PTR record exists
+  delegate_to: "{{ ipa_master }}"
+  become: yes
+  command: >
+    ipa dnsrecord-add {{ reverse_zone }}
+    {{ ptr_name }}
+    --ptr-rec={{ cloud_dns_helper_name }}.{{ cloud_zone }}.
+  register: add_reverse
+  failed_when: false
+  changed_when: "'Added record' in add_reverse.stdout"
+
+# ============================================================
+# 7. Host principal + HTTP service
+# ============================================================
+- name: Ensure cloud host principal exists
+  delegate_to: "{{ ipa_master }}"
+  become: yes
+  command: ipa host-add {{ cloud_dns_helper_name }}.{{ cloud_zone }}
+  register: add_cloud_host
+  failed_when: false
+  changed_when: "'Added host' in add_cloud_host.stdout"
+
+- name: Ensure HTTP service principal exists
+  delegate_to: "{{ ipa_master }}"
+  become: yes
+  command: ipa service-add HTTP/{{ cloud_dns_helper_name }}.{{ cloud_zone }}
+  register: add_http_svc
+  failed_when: false
+  changed_when: "'Added service' in add_http_svc.stdout"
+
+- name: Ensure cloud host owns HTTP service
+  delegate_to: "{{ ipa_master }}"
+  become: yes
+  command: >
+    ipa service-add-host
+    HTTP/{{ cloud_dns_helper_name }}.{{ cloud_zone }}
+    {{ cloud_dns_helper_name }}.{{ cloud_zone }}
+  register: add_http_host
+  failed_when: false
+  changed_when: "'Host added' in add_http_host.stdout"
+
+# ============================================================
+# 8. Keytab handling (safe, idempotent)
+# ============================================================
+- name: Test existing keytab
+  become: yes
+  command: >
+    kinit -kt /etc/krb5.keytab
+    host/{{ cloud_dns_helper_name }}.{{ cloud_zone }}@{{ ipa_domain | upper }}
+  register: keytab_test
+  failed_when: false
+  changed_when: false
+
+- name: Regenerate keytab only if authentication fails
+  delegate_to: "{{ ipa_master }}"
+  become: yes
+  command: >
+    ipa-getkeytab -s {{ ipa_master }}.{{ ipa_domain }}
+    -p host/{{ cloud_dns_helper_name }}.{{ cloud_zone }}
+    -k /tmp/helper-cloud.keytab
+  when: keytab_test.rc != 0
+  register: new_keytab
+  changed_when: new_keytab.rc == 0
+
+- name: Install new keytab if generated
+  become: yes
+  copy:
+    src: /tmp/helper-cloud.keytab
+    dest: /etc/krb5.keytab
+    owner: root
+    group: root
+    mode: '0600'
+  when: keytab_test.rc != 0

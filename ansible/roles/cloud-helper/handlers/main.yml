@@ -20,3 +20,9 @@
   become: true
   command: nmcli connection reload
   changed_when: false
+
+- name: restart bootstrap api
+  systemd:
+    name: cloud-helper-bootstrap-api.service
+    state: restarted
+

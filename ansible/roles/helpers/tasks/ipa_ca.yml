@@ -159,10 +159,7 @@
   register: add_a_intermediate
   changed_when: "'already exists' not in add_a_intermediate.stdout"
   failed_when: false
-
-- debug:
-    msg: "{{ add_a_intermediate }}"
-       
+   
 - name: Add A record for {{ ipa_domain }} (zone apex)
   become: yes
   command: >
@@ -174,9 +171,6 @@
 - name: Verify forward DNS resolution for domain
   shell: dig +short {{ ipa_domain }} @{{ ipa_master_ip }}
   register: forward_domain
-
-- debug:
-    msg: "Forward lookup result for {{ ipa_domain }}: {{ forward_domain.stdout }}"
 
 - name: Verify {{ ipa_ca_intermediate }} forward DNS
   command: dig +short {{ ipa_ca_intermediate }}.{{ ipa_domain }} @{{ ipa_master_ip }}
@@ -228,12 +222,6 @@
   shell: dig +short -x {{ ipa_master_ip }} @{{ ipa_master_ip }}
   register: reverse_dns
 
-- debug:
-    msg: "Reverse lookup result: {{ reverse_dns.stdout }}"
-
 - name: Verify reverse DNS resolution intermediate
   shell: dig +short -x {{ ipa_ca_intermediate_ip }} @{{ ipa_master_ip }}
   register: reverse_dns2
-
-- debug:
-    msg: "Reverse lookup result2: {{ reverse_dns2.stdout }}"

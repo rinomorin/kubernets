@@ -1,2 +1,0 @@
-- name: Join worker node to cluster
-  command: "{{ hostvars['helper']['kubeadm_join'] }}"

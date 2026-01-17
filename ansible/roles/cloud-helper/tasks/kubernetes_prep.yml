@@ -1,0 +1,14 @@
+- name: Layer CRI-O
+  command: rpm-ostree install cri-o
+  register: layer
+  changed_when: "'changed' in layer.stdout"
+
+- name: Reboot if needed
+  reboot:
+  when: layer.changed
+
+- name: Enable kubelet
+  systemd:
+    name: kubelet
+    enabled: true
+

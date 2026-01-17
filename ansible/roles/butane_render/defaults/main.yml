@@ -1,6 +1,0 @@
----
-butane_output_dir: /srv/fcos/butane
-masters: "{{ groups['control_nodes'] | default([]) }}"
-workers: "{{ groups['worker_nodes'] | default([]) }}"
-control_nodes: "{{ groups['control_nodes'] | default([]) }}"
-worker_nodes: "{{ groups['worker_nodes'] | default([]) }}"

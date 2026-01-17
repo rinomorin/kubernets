@@ -29,8 +29,6 @@
     - hostvars['kvmdc01']['final_vm_order'] is defined
     - inventory_hostname != 'kvmdc01'
 
-- debug: msg="hostvars {{ final_vm_order }}"
-
 - name: Conditionally start VM if defined and not running
   shell: |
     if virsh dominfo {{ vm_host2 }} >/dev/null 2>&1; then
@@ -55,8 +53,4 @@
 
 - name: Include shutdown check
   include_tasks: check_vm_state.yml
-  
-- name: Show VM start result
-  debug:
-    msg: "{{ vm_build_state }}"
   

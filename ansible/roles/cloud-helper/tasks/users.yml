@@ -30,16 +30,6 @@
   delegate_to: "{{ kvm_host }}"
   become: true
 
-# - name: Ensure ignition dir exists on KVM host
-#   file:
-#     path: /var/lib/libvirt/images/ignition/
-#     state: directory
-#     owner: qemu
-#     group: qemu
-#     mode: "0755"
-#   delegate_to: "{{ kvm_host }}"
-#   become: true
-
 - name: Ensure cloud_helper user exists on KVM host (optional)
   user:
     name: "{{ cloud_helper_user }}"
@@ -58,13 +48,6 @@
     append: true
   delegate_to: "{{ kvm_host }}"
   become: true
-
-
-# ---
-#
-# cloud_helper_prep — Helper Node Preparation
-# Prepares the helper node environment, user, SSH keys, venv, and packages.
-#
 
 
 ###############################################################
@@ -87,4 +70,3 @@
     group: "{{ cloud_helper_user }}"
     mode: '0755'
   become: true
-

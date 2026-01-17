@@ -19,25 +19,11 @@
   when:
     - "'helpers' in group_names"
 
-- debug: msg="{{ ipa_pkg }}"
-  when:
-    - "'helpers' in group_names"
-
-- debug: msg="group_names {{ group_names }}"
-  when:
-    - "'helpers' in group_names"
-
-
 - name: Import IPA status check tasks
   import_tasks: check_ipa.yml
   when:
     - "'helpers' in group_names"
     - ipa_pkg.stdout is not search("not installed")
-
-- debug: 
-    msg:
-      - "global_vm_build_state {{ global_vm_build_state}}"
-      - "vm_build_state {{ vm_build_stage }}"
 
 # role/ipa_setup/tasks/main.yml
 - name: set ipa helpers
@@ -50,22 +36,10 @@
 
     - name: Prep for ca helper
       import_tasks: ipa_ca_helpers.yml
-
-    # - name: define intermediate
-    #   import_tasks: intermediate.yml
-    #   vars:
-    #     ca_name: "ca_home"
-    #     ca_subject: "intermediate CA"
-    #     ca_description: "Intermediate CA for issuing service certs"
         
   when: 
     - "'helpers' in group_names"
     - vm_build_state in ["scanned","non-compliant","compliant"]
-
-- debug: 
-    msg:
-      - "global_vm_build_state {{ global_vm_build_state}}"
-      - "vm_build_state {{ vm_build_stage }}"
 
 - name: Secure final ipa host
   import_tasks: secops.yml
@@ -77,5 +51,3 @@
   set_fact:
     global_vm_build_state: "{{ vm_build_stage }}"
     vm_build_state: "{{ vm_build_stage }}"
-
-

@@ -1,0 +1,47 @@
+---
+# ============================================================
+# FCOS-only block
+# ============================================================
+- name: FCOS-only containerd setup
+  block:
+
+    # ============================================================
+    # 0. Detect rpm-ostree availability (FCOS only)
+    # ============================================================
+    - name: Detect rpm-ostree availability
+      command: which rpm-ostree
+      register: ostree_check
+      failed_when: false
+      changed_when: false
+
+    - name: Skip kubelet setup on non-FCOS systems
+      when: ostree_check.rc != 0
+      meta: noop
+
+    # ============================================================
+    # 1. Ensure kubelet drop-in directory exists
+    # ============================================================
+    - name: Ensure kubelet drop-in directory exists
+      file:
+        path: "{{ fcos_kubelet_dropin_dir }}"
+        state: directory
+
+    # ============================================================
+    # 2. Deploy kubelet drop-in
+    # ============================================================
+    - name: Deploy kubelet drop-in
+      template:
+        src: kubelet.service.d/10-kubeadm.conf.j2
+        dest: "{{ fcos_kubelet_dropin_dir }}/10-kubeadm.conf"
+
+    # ============================================================
+    # 3. Enable kubelet
+    # ============================================================
+    - name: Enable kubelet
+      systemd:
+        name: kubelet
+        enabled: true
+    # 
+  when: >
+    ansible_facts['os_family'] == "RedHat"
+    and ansible_facts['distribution'] == "Fedora CoreOS"

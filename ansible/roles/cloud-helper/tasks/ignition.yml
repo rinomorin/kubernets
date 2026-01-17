@@ -77,4 +77,3 @@
     chdir: "{{ cloud_helper_workdir }}/butane/"
   tags:
     - ignition_rendering
-

@@ -100,7 +100,6 @@
   when: kinit_check.rc != 0
 
 # --- Pre-flight validation before replica install ---
-
 - name: Check Dogtag CA service on master
   delegate_to: "{{ ipa_master }}"
   command: systemctl is-active pki-tomcatd@pki-tomcat.service
@@ -163,9 +162,6 @@
   delegate_to: "{{ ipa_master }}"
   run_once: true
 
-- debug:
-    var: replica_check
-
 - name: remove IPA 
   become: yes
   shell: "/usr/sbin/ipa-server-install --uninstall --unattended"
@@ -187,42 +183,6 @@
     path: /etc/ipa/default.conf
   register: ipa_client_conf
 
-- debug:
-    var: replica_check    
-
-# - name: Install IPA replica on intermediate (CA)
-#   shell: |
-#     ipa-replica-install --unattended \
-#       --server={{ ipa_server }} \
-#       --domain={{ ipa_domain }} \
-#       --realm={{ ipa_realm }} \
-#       --admin-password='{{ ipa_admin_password }}' \
-#       --hostname={{ inventory_hostname }} \
-#       --setup-ca \
-#       --setup-kra \
-#       --auto-reverse \
-#       --auto-forwarders \
-#       --setup-dns
-#   when:
-#     - ipa_client_conf.stat.exists == false
-
-# - name: Install IPA replica on intermediate (CA)
-#   shell: |
-#     ipa-replica-install --unattended \
-#       --server={{ ipa_server }} \
-#       --domain={{ ipa_domain }} \
-#       --realm={{ ipa_realm }} \
-#       --admin-password='{{ ipa_admin_password }}' \
-#       --hostname={{ inventory_hostname }} \
-#       --setup-ca \
-#       --setup-kra \
-#       --auto-reverse \
-#       --auto-forwarders \
-#       --setup-dns --force-join
-
-#   when:
-#     - ipa_client_conf.stat.exists == false or ipa_force_join | default(false)
-
 - name: Install IPA replica on intermediate (CA)
   become: yes
   shell: |
@@ -241,7 +201,7 @@
   when:
     - not ipa_conf.stat.exists            # only if this node isn’t already configured
     - inventory_hostname not in (replica_check.stdout | default(""))
-  # no_log: true
+  no_log: true
 
 # --- Service checks ---
 - name: Check IPA related services on {{ ipa_helper }}
@@ -261,17 +221,17 @@
   debug:
     var: ipa_services.results
 
-# --- Kerberos host principal check ---
-- name: Verify Kerberos kinit with host keytab
-  command: >
-    kinit -kt /etc/krb5.keytab host/{{ inventory_hostname }}.{{ ipa_domain | lower }}@{{ ipa_domain | upper }}
-  register: kinit_host
-  changed_when: false
+# # --- Kerberos host principal check ---
+# - name: Verify Kerberos kinit with host keytab
+#   command: >
+#     kinit -kt /etc/krb5.keytab host/{{ inventory_hostname }}.{{ ipa_domain | lower }}@{{ ipa_domain | upper }}
+#   register: kinit_host
+#   changed_when: false
 
-- name: Fail if Kerberos host kinit failed
-  fail:
-    msg: "Kerberos kinit with host keytab failed on {{ ipa_helper }}"
-  when: kinit_host.rc != 0
+# - name: Fail if Kerberos host kinit failed
+#   fail:
+#     msg: "Kerberos kinit with host keytab failed on {{ ipa_helper }}"
+#   when: kinit_host.rc != 0
 
 # --- DNS zone check ---
 - name: Verify DNS zones on {{ ipa_helper }}
@@ -279,17 +239,11 @@
   register: dns_zones
   changed_when: false
 
-- debug:
-    var: dns_zones.stdout
-
 # --- CA certificate validation ---
 - name: Validate CA certificate on 
   command: openssl x509 -in /etc/ipa/ca.crt -noout -text
   register: ca_cert
   changed_when: false
-
-- debug:
-    msg: "{{ ca_cert.stdout }}"
 
 # --- LDAP connectivity check ---
 - name: Test LDAP connectivity on 
@@ -297,16 +251,9 @@
   register: ldap_check
   changed_when: false
 
-- debug:
-    msg: "{{ ldap_check.stdout }}"
-
 # --- LDAPS connectivity check ---
 - name: Test LDAPS connectivity on 
   command: ldapsearch -H ldaps://localhost:636 -D "cn=Directory Manager" -w {{ ipa_dm_password }} -b "" -s base "(objectclass=*)"
   register: ldaps_check
   changed_when: false
   no_log: true
-
-- debug:
-    msg: "{{ ldaps_check.stdout }}"
-

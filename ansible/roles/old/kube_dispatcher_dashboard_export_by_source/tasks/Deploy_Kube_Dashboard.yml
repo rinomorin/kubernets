@@ -1,2 +1,0 @@
-- name: Apply Kubernetes manifests
-  command: kubectl apply -f {{ role_path }}/kubernetes/

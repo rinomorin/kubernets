@@ -19,19 +19,11 @@
   when:
     - "'ca' in group_names or 'ca_intermediate' in group_names"
 
-- debug: msg="{{ ipa_pkg }}"
-  when:
-    - "'ca' in group_names or 'ca_intermediate' in group_names"
 - name: Import IPA status check tasks
   import_tasks: check_ipa.yml
   when:
     - "'ca' in group_names or 'ca_intermediate' in group_names"
     - ipa_pkg.stdout is not search("not installed")
-
-- debug: 
-    msg:
-      - "global_vm_build_state {{ global_vm_build_state}}"
-      - "vm_build_state {{ vm_build_stage }}"
 
 - name: set ipa ca
   block:
@@ -49,7 +41,6 @@
   when: 
     - "'ca' in group_names"
     - vm_build_state in ["scanned","non-compliant","compliant"]
-
 
 # role/ipa_setup/tasks/main.yml
 - name: set ipa ca_intermediate
@@ -84,11 +75,6 @@
     - "'ca' in group_names or 'ca_intermediate' in group_names"
     - vm_build_stage in ["scanned", "non-compliant", "compliant"]
 
-- debug: 
-    msg:
-      - "global_vm_build_state {{ global_vm_build_state}}"
-      - "vm_build_state {{ vm_build_stage }}"
-
 - name: Secure final ipa host
   import_tasks: secops.yml
   when: 
@@ -99,5 +85,3 @@
   set_fact:
     global_vm_build_state: "{{ vm_build_stage }}"
     vm_build_state: "{{ vm_build_stage }}"
-
-

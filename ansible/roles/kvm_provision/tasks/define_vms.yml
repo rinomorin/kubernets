@@ -241,7 +241,11 @@
     tsecops_hash: "{{ lookup('env','secops_hash') }}"
     tsecops_key: "{{ lookup('env','secops_key') }}"
   when: "'helper_nodes' in group_names"
-
+- name: set nat_mac_device
+  set_fact:
+    nat_mac_device: "{{ lookup('env', 'nat_mac_device')| default('52:54:00:79:8d:dd') }}"
+  when: 
+    - net_mac_device is not defined
 
 - name: Generate Kickstart files for new or forced VMs
   template:

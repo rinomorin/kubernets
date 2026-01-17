@@ -66,7 +66,6 @@ cert_csr_path: "/etc/pki/tls/certs/{{ inventory_hostname_short }}.csr"
 cert_crt_path: "/etc/pki/tls/certs/{{ inventory_hostname_short }}.crt"
 cert_ca_chain_path: "/etc/pki/tls/certs/ipa-ca.crt"
 ipa_admin_principal:  "{{ lookup('env', 'ipa_admin_principal')}}"
-nat_ip_device: "{{ lookup('env','nat_ip_device') | default('172.16.0.20',true) }}"
 # default system info
 vcpu: "{{ lookup('env', 'VM_CPU') | default(4,true) }}"
 ram: "{{ lookup('env', 'VM_MEM') | default(4096,true) }}"
@@ -77,3 +76,48 @@ shutdown_max_timeout: 1800
 br_maint: "{{ lookup('env', 'KVM_NETWORK_NAT') | default('br-nat', true) }}"
 br_provision: "{{ lookup('env', 'KVM_NETWORK_CLUSTER') | default('br-cluster', true) }}"
 br_provider: "{{ lookup('env', 'KVM_NETWORK_PROVIDER') | default('default', true) }}"
+
+cloud_dns_zone: "{{ cloud_zone | default(lookup('env', 'cloud_zone')) }}"
+cloud_dns_helper_name: "{{ inventory_hostname.split('.')[0] }}"
+cloud_dns_helper_ip: "{{ cloud_helper_ip | default('172.16.0.20') }}"
+ipa_master: "{{ lookup('env', 'ipa_master')}}"
+nat_ip_device: "{{ lookup('env', 'nat_ip_device') }}"
+
+# Optional future records
+cloud_dns_extra_records: []
+# Example:
+# cloud_dns_extra_records:
+#   - { name: "bootstrap", type: "A", ip: "172.16.0.20" }
+#   - { name: "registry",  type: "A", ip: "172.16.0.30" }
+
+cloud_helper_api_port: 8080
+cloud_helper_api_group: "{{  cloud_helper_user | default('cloud_helper')  }}"
+cloud_helper_registry_path: /var/lib/cloud-helper/node-registry.json
+cloud_helper_api_dir: "{{ cloud_helper_workdir }}/bin/bootstrap-api"
+cloud_helper_butane_dir: "{{ cloud_helper_workdir }}/butane"
+cloud_helper_ignition_dir: "{{ cloud_helper_workdir }}/ignition"
+cloud_helper_api_user: "{{ cloud_helper_user }}"
+
+# Butane template name
+cloud_helper_butane_template: "fcos_node.bu.j2"
+
+# Helper bootstrap URL
+cloud_helper_bootstrap_url: "http://helper.cloud.home.morinsoft.ca:8081/register"
+
+# CRI choice: containerd or crio
+fcos_cri: "containerd"
+
+# rpm-ostree packages to layer
+fcos_k8s_packages:
+  - kubelet
+  - kubeadm
+  - kubectl
+
+fcos_containerd_packages:
+  - containerd
+
+fcos_crio_packages:
+  - cri-o
+
+# kubelet config directory
+fcos_kubelet_dropin_dir: /etc/systemd/system/kubelet.service.d

@@ -1,10 +1,4 @@
 # stage one existence
-- name: Set fact for existing VMs
-  set_fact:
-    vm_host: "{{ inventory_hostname }}"
-    vm_fqdn: >-
-      {{ hostvars[inventory_hostname].hostname
-        | default(inventory_hostname_short + '.' + (ansible_domain | default(lookup('env', 'ipa_domain')|lower)) ) }}
 
 - name: check ips status
   import_tasks: check_system.yml
@@ -15,7 +9,6 @@
     global_vm_build_state: "{{ vm_build_stage }}"
   when: force_rebuild is not defined or force_rebuild is false
 
-- debug: msg="checkout {{ vm_build_stage }}"
 - name: Process new systems 
   when: vm_build_stage not in ["scanned","ready","compliant"]
   block: 

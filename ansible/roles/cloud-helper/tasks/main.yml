@@ -5,20 +5,38 @@
 - import_tasks: users.yml
 - import_tasks: keys.yml
 - import_tasks: https_certs.yml
-- import_tasks: nginx.yml
+# - import_tasks: nginx.yml
 - import_tasks: repo.yml
 - import_tasks: packages.yml
 - import_tasks: podman.yml
 - import_tasks: kubernetes.yml
+- import_tasks: add_zone.yml
+- import_tasks: configure_nginx.yml
+- import_tasks: boot_strap.yml
 - import_tasks: ignition.yml
-- import_tasks: nodes.yml
-# - import_tasks: coreos_installer.yml
-# - import_tasks: wrapper.yml
-# - import_tasks: kvm_host_prep.yml
-# - import_tasks: polkit.yml
-# - import_tasks: ansible_ready.yml
-# - import_tasks: test_connections.yml
-# - import_tasks: test_results.yml
+# ============================================================
+# FCOS-only block
+# ============================================================
+- name: FCOS-only containerd setup
+  block:
+    - name: Include rpm-ostree layering
+      import_tasks: ostree.yml
+    - name: Include CRI setup
+      import_tasks: containerd.yml
+      when: fcos_cri == "containerd"
+    - name: Include kubelet setup
+      import_tasks: kubelet.yml
+  when: >
+    ansible_facts['os_family'] == "RedHat"
+    and ansible_facts['distribution'] == "Fedora CoreOS"
+
+- name: Build nodes
+  import_tasks: nodes.yml
+
+# - name: restart bootstrap api
+#   systemd:
+#     name: cloud-helper-bootstrap-api.service
+    # state: stopped
 
 - name: Show summary
   debug:

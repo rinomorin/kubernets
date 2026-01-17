@@ -85,30 +85,3 @@
           StrictHostKeyChecking accept-new
           IdentityFile ~/.ssh/id_rsa
   delegate_to: helper
-
-# - name: Add SSH config entry for cluster automation
-#   become: yes
-#   become_user: "{{ cloud_helper_user }}"
-#   blockinfile:
-#     path: "~/.ssh/config"
-#     mode: "0600"
-#     create: yes
-#     marker: "# {mark} ANSIBLE MANAGED BLOCK cluster automation"
-#     block: |
-#       Host masters-nodes
-#         Host {{ cloud_zone.split('.')[0] }}.* {{ hostvars[groups['control_nodes'][0]].ansible_host }} 10.* msrlv9*
-#         IdentityFile ~/.ssh/cluster_automation
-#         StrictHostKeyChecking accept-new
-#         User core
-#       Host cluster-nodes
-#         Host {{ cloud_zone.split('.')[0] }}.* {{ hostvars[groups['helpers'][0]].ansible_host.rsplit('.', 1)[0] ~ '.4*' }} 10.* msrlv9*
-#         IdentityFile ~/.ssh/cluster_automation
-#         StrictHostKeyChecking accept-new
-#         User core
-
-#       Host home
-#         Host {{ hostvars[groups['helpers'][0]].ansible_host.rsplit('.', 1)[0] ~ '.*' }} *.{{ ipa_domain }} {{ lookup('env', 'VM_HOST') }} {{ lookup('env', 'VM_HOST').split('.')[0] }}
-
-#         IdentityFile {{ helper_ssh_key_path }}
-#         StrictHostKeyChecking accept-new
-#         User {{ cloud_helper_user }}

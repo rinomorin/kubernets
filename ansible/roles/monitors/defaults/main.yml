@@ -1,4 +1,0 @@
-monitor_target_dir: "{{ playbook_dir }}/../buildMon"
-monitor_refresh: 60
-monitor_title: "Server Build Monitor"
-default_status: "pending"

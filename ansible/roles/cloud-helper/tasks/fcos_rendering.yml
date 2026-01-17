@@ -1,0 +1,18 @@
+- name: Render Butane template
+  template:
+    src: fcos_node.bu.j2
+    dest: "{{ cloud_helper_butane_dir }}/{{ inventory_hostname }}.bu"
+
+- name: Convert Butane → Ignition
+  command: >
+    butane --strict {{ cloud_helper_butane_dir }}/{{ inventory_hostname }}.bu
+  register: ignition_raw
+
+- name: Write Ignition file
+  copy:
+    content: "{{ ignition_raw.stdout }}"
+    dest: "{{ cloud_helper_ignition_dir }}/{{ inventory_hostname }}.ign"
+    mode: '0644'
+
+- name: Restore SELinux context
+  command: "restorecon -Rv {{ cloud_helper_ignition_dir }}"

@@ -1,0 +1,24 @@
+- name: Load registry
+  slurp:
+    src: /var/lib/cloud-helper/node-registry.json
+  register: reg_raw
+  delegate_to: helper
+
+- set_fact:
+    registry: "{{ reg_raw.content | b64decode | from_json }}"
+
+- name: Wait for all nodes to register
+  vars:
+    expected: "{{ groups['fcos_nodes'] }}"
+  until: expected | difference(registry.keys()) | length == 0
+  retries: 60
+  delay: 10
+  delegate_to: helper
+  command: /bin/true
+
+- name: Wait for SSH
+  wait_for:
+    host: "{{ hostvars[item].ansible_host }}"
+    port: 22
+    timeout: 300
+  loop: "{{ groups['fcos_nodes'] }}"
