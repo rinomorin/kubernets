@@ -51,9 +51,9 @@
 
         # Network layout
         cloud_networks:
-          house: "192.168.100.0/24"
-          private: "10.0.0.0/24"
-          nat: "172.16.0.0/24"
+          house: "{{ lookup('env', 'VM_HOST_IP').split('/')[0].split('.')[:3] | join('.')}}.0/24"
+          private: "{{ lookup('env', 'cluster_ip_addr').split('/')[0].split('.')[:3] | join('.')}}.0/24"
+          nat: "{{ lookup('env', 'nat_ip_device').split('/')[0].split('.')[:3] | join('.')}}.0/24"
 
         # Interface mapping
         cloud_interfaces:

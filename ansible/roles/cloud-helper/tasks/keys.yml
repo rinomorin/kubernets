@@ -31,24 +31,24 @@
         state: directory
         mode: '0700'
         owner: "{{ cloud_helper_user }}"
-      delegate_to: kvmdc01.home.morinsoft.ca
+      delegate_to: "{{ VM_HOST }}"
 
     - name: Remove old KVM host entry from helper's known_hosts
       ansible.builtin.known_hosts:
-        name: "kvmdc01.home.morinsoft.ca"
+        name: "{{ VM_HOST }}"
         path: "/home/{{ cloud_helper_user }}/.ssh/known_hosts"
         state: absent
       delegate_to: helper
 
 - name: Get KVM host SSH fingerprint
-  command: "ssh-keyscan -H kvmdc01.home.morinsoft.ca"
+  command: "ssh-keyscan -H {{ VM_HOST }}"
   register: kvm_fingerprint
   delegate_to: helper
   changed_when: false
 
 - name: Update Helper known_hosts with KVM fingerprint
   ansible.builtin.known_hosts:
-    name: "kvmdc01.home.morinsoft.ca"
+    name: "{{ VM_HOST }}"
     key: "{{ item }}"
     path: "/home/{{ cloud_helper_user }}/.ssh/known_hosts"
     state: present
@@ -56,7 +56,7 @@
   delegate_to: helper
 
 - name: Ensure authorized_keys contains NEW helper public key (Native Shell)
-  delegate_to: kvmdc01.home.morinsoft.ca
+  delegate_to: "{{ VM_HOST }}"
   become: true
   shell: |
     set -o pipefail

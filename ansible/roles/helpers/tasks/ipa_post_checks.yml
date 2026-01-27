@@ -1,0 +1,46 @@
+---
+- name: Check IPA related services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+  loop:
+    - ipa.service
+    - "dirsrv@{{ ipa_domain | upper }}"
+    - krb5kdc.service
+    - kadmin.service
+    - pki-tomcatd@pki-tomcat.service
+    - named-pkcs11.service
+  register: ipa_services
+  ignore_errors: true
+
+# - debug:
+#     var: ipa_services.results
+
+# - name: Ensure admin Kerberos ticket exists
+#   expect:
+#     command: kinit admin@{{ ipa_domain | upper }}
+#     responses:
+#       '(?i)Password for admin.*': "{{ ipa_admin_password }}"
+#   register: admin_kinit
+#   # no_log: true
+#   when: ipa_server.stat.exists
+
+- name: Verify DNS zones
+  command: ipa dnszone-find
+  register: dns_zones
+  changed_when: false
+
+- name: Validate CA certificate
+  command: openssl x509 -in /etc/ipa/ca.crt -noout -text
+  register: ca_cert
+  changed_when: false
+
+- name: Test LDAP connectivity
+  command: ldapsearch -H ldap://localhost:389 -x -b "" -s base "(objectclass=*)"
+  register: ldap_check
+  changed_when: false
+
+- name: Test LDAPS connectivity
+  command: ldapsearch -H ldaps://localhost:636 -D "cn=Directory Manager" -w {{ ipa_dm_password }} -b "" -s base "(objectclass=*)"
+  register: ldaps_check
+  changed_when: false
+  no_log: true

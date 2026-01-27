@@ -141,7 +141,7 @@
     state: absent
   loop:
     - "{{ staging_dir }}"
-    # - "{{ dest_dir }}"
+    - "{{ dest_dir }}"
   run_once: true
 
 - name: Find helper temporary files

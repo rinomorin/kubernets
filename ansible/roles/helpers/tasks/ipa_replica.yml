@@ -1,0 +1,38 @@
+---
+- name: Check if IPA is configured on this host
+  stat:
+    path: /etc/ipa/default.conf
+  register: ipa_conf
+
+- name: List active replicas
+  delegate_to: "{{ ipa_master }}"
+  shell: ipa-replica-manage list 2>/dev/null || true
+  register: replica_check
+  changed_when: false
+  when: ipa_conf.stat.exists
+  run_once: true
+
+- name: Remove IPA if not configured
+  become: yes
+  shell: "/usr/sbin/ipa-server-install --uninstall --unattended"
+  when: not ipa_conf.stat.exists
+
+- name: Install IPA replica
+  become: yes
+  shell: |
+    umask 0022 && ipa-replica-install \
+      --unattended \
+      --server={{ ipa_master }}.{{ ipa_domain | lower }} \
+      --domain={{ ipa_domain | lower }} \
+      --realm={{ ipa_domain | upper }} \
+      --admin-password='{{ ipa_admin_password }}' \
+      --hostname={{ inventory_hostname }}.{{ ipa_domain | lower }} \
+      --setup-ca \
+      --setup-kra \
+      --auto-reverse \
+      --auto-forwarders \
+      --setup-dns --force-join
+  when:
+    - not ipa_conf.stat.exists
+    - inventory_hostname not in (replica_check.stdout | default(""))
+  no_log: true

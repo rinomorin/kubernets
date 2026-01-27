@@ -1,0 +1,111 @@
+---
+# ============================================================
+# 0. Admin kinit (idempotent)
+# ============================================================
+
+- name: Check for existing Kerberos ticket
+  command: klist -s
+  register: klist_check
+  ignore_errors: true
+  changed_when: false
+
+- name: Acquire Kerberos ticket for admin
+  expect:
+    command: kinit admin@{{ ipa_domain | upper }}
+    responses:
+      '(?i)Password for admin.*': "{{ ipa_admin_password }}"
+  when: klist_check.rc != 0
+  register: kinit_admin
+  no_log: true
+
+
+# ============================================================
+# 1. Ensure host principals exist in IPA
+# ============================================================
+
+- name: Ensure host principals exist in IPA
+  delegate_to: "{{ ipa_master }}"
+  run_once: false
+  shell: |
+    ipa host-add {{ item }} 2>&1 || true
+  register: ipa_host_add
+  loop: "{{ hostlist }}"
+  when: item | length > 0
+  changed_when: "'Added host' in ipa_host_add.stdout"
+
+- name: Fail if host-add returned a real error
+  delegate_to: "{{ ipa_master }}"
+  run_once: false
+  fail:
+    msg: "ipa host-add failed for {{ item.item }}: {{ item.stderr }}"
+  loop: "{{ ipa_host_add.results }}"
+  when: item.rc not in [0, 1]
+
+
+# ============================================================
+# 1b. Ensure admin manages the host entries
+# ============================================================
+
+- name: Ensure admin manages the host entries
+  delegate_to: "{{ ipa_master }}"
+  run_once: false
+  shell: |
+    ipa host-mod {{ item }} --addattr=managedby=admin 2>&1 || true
+  loop: "{{ hostlist }}"
+  when: item | length > 0
+
+
+# ============================================================
+# 2. Regenerate keytabs (IPA is authoritative)
+# ============================================================
+
+- name: Regenerate keytab on IPA master
+  delegate_to: "{{ ipa_master }}"
+  run_once: false
+  shell: |
+    ipa-getkeytab -s {{ ipa_master }}.{{ ipa_domain | lower }} \
+      -p host/{{ item }} \
+      -k /tmp/{{ item }}.keytab
+  loop: "{{ hostlist }}"
+  when: item | length > 0
+
+- name: Fetch regenerated keytab
+  delegate_to: "{{ ipa_master }}"
+  fetch:
+    src: "/tmp/{{ item }}.keytab"
+    dest: "/tmp/{{ item }}.keytab"
+    flat: yes
+  loop: "{{ hostlist }}"
+  when: item | length > 0
+
+- name: Install refreshed keytab (replace, do not merge)
+  become: true
+  copy:
+    src: "/tmp/{{ item }}.keytab"
+    dest: "/etc/krb5.keytab"
+    owner: root
+    group: root
+    mode: '0600'
+  loop: "{{ hostlist }}"
+  when: item | length > 0
+
+
+# ============================================================
+# 3. Authenticate with each principal (FILE ccache)
+# ============================================================
+
+- name: Authenticate with host principals
+  command: kinit -k host/{{ item }}
+  environment:
+    KRB5CCNAME: /tmp/krb5cc_ansible
+  register: kinit_result
+  changed_when: false
+  loop: "{{ hostlist }}"
+  when: item | length > 0
+
+- name: Fail if any host kinit failed
+  fail:
+    msg: "Kerberos host kinit failed for one or more principals on {{ inventory_hostname }}"
+  when: >
+    kinit_result is defined and
+    (kinit_result.results | selectattr('rc', 'ne', 0) | list | length > 0)

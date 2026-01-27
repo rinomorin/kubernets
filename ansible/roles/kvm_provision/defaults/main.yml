@@ -2,11 +2,11 @@
 # default stages
 build_loops: "{{ bl|default(120)}}"
 existing_vms: false
-kvm_delegate: "{{ kvm_name | default((kvm | default(['kvmdc01.home.morinsoft.ca']))[0]) }}"
+kvm_delegate: "{{ kvm_name | default((kvm | default([VM_HOST]))[0]) }}"
 vm_build_stage: "unknown"
 vm_build_state: "undefined"
 vm_timeout: 0
-
+ip_dns: "{{ lookup('env', 'VM_HOST_IP').split('.')[:3]|join('.')}}.1"
 # default system info
 vcpu: 2
 ram: 4096
@@ -66,8 +66,7 @@ members_map: >-
     }
   }}
   
-
-account_name2: "{{ account_name | default('MorinSoft')}}"
+account_name2: "{{ account_name | default(lookup('env', 'ACCOUNT') )}}"
 ACCOUNT: "{{ account_name2 }}"
 
 sa_templates:
@@ -87,7 +86,7 @@ resolved_sa_group: "{{ sa_group | default('sysadmin') }}"
 resolved_secure_group: "{{ secure_group | default(default_secops_id) }}"
 resolved_awx_group: "{{ awx_group | default(default_ansible_id) }}"
 
-template_map: >-
+template_map: >
   {{
     {
       resolved_sa_group: sa_templates,

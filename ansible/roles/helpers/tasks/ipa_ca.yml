@@ -155,7 +155,7 @@
   become: yes
   command: >
     ipa dnsrecord-add {{ ipa_domain }} {{ ipa_ca_intermediate }} --a-rec={{ ipa_ca_intermediate_ip }}
-    ipa dnsrecord-add {{ ipa_domain }} {{ ipa_helper }} --a-rec={{ ipa_helper_ip }}
+    # ipa dnsrecord-add {{ ipa_domain }} {{ ipa_helper }} --a-rec={{ ipa_helper_ip }}
   register: add_a_intermediate
   changed_when: "'already exists' not in add_a_intermediate.stdout"
   failed_when: false
@@ -212,7 +212,6 @@
   register: add_prt_helper_ip
   changed_when: "'record already exists' not in add_ptr_intermediate.stdout"
   failed_when: false
-
 
 - name: show add_ptr_intermediate
   debug:

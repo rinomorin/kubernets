@@ -1,0 +1,52 @@
+---
+- name: Configure resolv.conf to use IPA DNS
+  become: yes
+  copy:
+    dest: /etc/resolv.conf
+    content: |
+      search {{ ipa_domain }}
+      nameserver {{ ipa_master_ip }}
+    owner: root
+    group: root
+    mode: '0644'
+    force: yes
+
+- name: Fetch ca.crt from IPA master
+  delegate_to: "{{ ipa_master }}"
+  fetch:
+    src: /etc/ipa/ca.crt
+    dest: /tmp/ca.crt
+    flat: yes
+    force: yes
+
+- name: Install CA into trust store
+  become: yes
+  copy:
+    src: /tmp/ca.crt
+    dest: /etc/pki/ca-trust/source/anchors/ca.crt
+    owner: root
+    group: root
+    mode: '0644'
+    force: yes
+
+- name: Install CA into /etc/ipa
+  become: yes
+  copy:
+    src: /tmp/ca.crt
+    dest: /etc/ipa/ca.crt
+    owner: root
+    group: root
+    mode: '0644'
+    force: yes
+
+- name: Update CA trust
+  become: yes
+  command: update-ca-trust
+
+- name: Verify CA trust list contains IPA CA
+  command: trust list
+  register: trust_list
+  changed_when: false
+
+- debug:
+    msg: "{{ trust_list.stdout | regex_search(ipa_domain | upper, ignorecase=True) }}"

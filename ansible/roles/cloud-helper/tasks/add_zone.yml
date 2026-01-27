@@ -149,35 +149,35 @@
   failed_when: false
   changed_when: "'Host added' in add_http_host.stdout"
 
-# ============================================================
-# 8. Keytab handling (safe, idempotent)
-# ============================================================
-- name: Test existing keytab
-  become: yes
-  command: >
-    kinit -kt /etc/krb5.keytab
-    host/{{ cloud_dns_helper_name }}.{{ cloud_zone }}@{{ ipa_domain | upper }}
-  register: keytab_test
-  failed_when: false
-  changed_when: false
+# # ============================================================
+# # 8. Keytab handling (safe, idempotent)
+# # ============================================================
+# - name: Test existing keytab
+#   become: yes
+#   command: >
+#     kinit -kt /etc/krb5.keytab
+#     host/{{ cloud_dns_helper_name }}.{{ cloud_zone }}@{{ ipa_domain | upper }}
+#   register: keytab_test
+#   failed_when: false
+#   changed_when: false
 
-- name: Regenerate keytab only if authentication fails
-  delegate_to: "{{ ipa_master }}"
-  become: yes
-  command: >
-    ipa-getkeytab -s {{ ipa_master }}.{{ ipa_domain }}
-    -p host/{{ cloud_dns_helper_name }}.{{ cloud_zone }}
-    -k /tmp/helper-cloud.keytab
-  when: keytab_test.rc != 0
-  register: new_keytab
-  changed_when: new_keytab.rc == 0
+# - name: Regenerate keytab only if authentication fails
+#   delegate_to: "{{ ipa_master }}"
+#   become: yes
+#   command: >
+#     ipa-getkeytab -s {{ ipa_master }}.{{ ipa_domain }}
+#     -p host/{{ cloud_dns_helper_name }}.{{ cloud_zone }}
+#     -k /tmp/helper-cloud.keytab
+#   when: keytab_test.rc != 0
+#   register: new_keytab
+#   changed_when: new_keytab.rc == 0
 
-- name: Install new keytab if generated
-  become: yes
-  copy:
-    src: /tmp/helper-cloud.keytab
-    dest: /etc/krb5.keytab
-    owner: root
-    group: root
-    mode: '0600'
-  when: keytab_test.rc != 0
+# - name: Install new keytab if generated
+#   become: yes
+#   copy:
+#     src: /tmp/helper-cloud.keytab
+#     dest: /etc/krb5.keytab
+#     owner: root
+#     group: root
+#     mode: '0600'
+#   when: keytab_test.rc != 0

@@ -2,10 +2,20 @@
 # ============================================================
 # 1. Authenticate with host principal (keytab must already exist)
 # ============================================================
-- name: Authenticate with cloud host principal
-  become: true
-  command: >
-    kinit -k host/{{ cloud_dns_helper_name }}.{{ cloud_zone }}
+- name: Ensure admin manages the host entry
+  delegate_to: "{{ ipa_master }}"
+  run_once: false
+  shell: |
+    ipa host-mod {{ item }} --addattr=managedby=admin 2>&1 || true
+  loop:
+    - "{{ inventory_hostname }}.{{ ipa_domain | lower }}"
+  when: item | length > 0
+
+- import_tasks: kinit.yml
+  become: yes
+  vars:
+    hostlist:
+      - "{{ inventory_hostname }}.{{ ipa_domain | lower }}"
 
 # ============================================================
 # 2. Install nginx
@@ -29,12 +39,12 @@
     - fcos
 
 # ============================================================
-# 4. Build SAN config (only if missing)
+# 4. Build SAN config (CN = IPA hostname, SAN = IPA + cloud DNS)
 # ============================================================
 - name: Prepare SAN config file
   become: true
   ansible.builtin.shell: |
-    cat /etc/ssl/openssl.cnf <(printf "\n[SAN]\nsubjectAltName=DNS:{{ cloud_dns_helper_name }}.{{ cloud_zone }}") > /tmp/openssl-san.cnf
+    cat /etc/ssl/openssl.cnf <(printf "\n[SAN]\nsubjectAltName=DNS:{{ inventory_hostname.split('.')[0] }}.{{ ipa_domain | lower }},DNS:{{ cloud_dns_helper_name }}.{{ cloud_zone }}") > /tmp/openssl-san.cnf
   args:
     executable: /bin/bash
     creates: /tmp/openssl-san.cnf
@@ -49,7 +59,7 @@
     creates: /tmp/nginx.key
 
 # ============================================================
-# 6. Generate CSR (only if missing)
+# 6. Generate CSR (CN = IPA hostname, SAN = IPA + cloud DNS)
 # ============================================================
 - name: Generate CSR with SAN
   become: true
@@ -57,25 +67,33 @@
     openssl req -new
     -key /tmp/nginx.key
     -out /tmp/nginx-san.csr
-    -subj "/CN={{ cloud_dns_helper_name }}.{{ cloud_zone }}"
+    -subj "/CN={{ inventory_hostname.split('.')[0] }}.{{ ipa_domain | lower }}"
     -reqexts SAN
     -config /tmp/openssl-san.cnf
   args:
     creates: /tmp/nginx-san.csr
 
 # ============================================================
-# 7. Request certificate (only if cert missing)
+# 7. Request certificate using ONLY the IPA hostname principal
 # ============================================================
-- name: Request IPA Certificate
-  become: true
+- name: Admin kinit for cert operations
+  expect:
+    command: kinit admin@{{ ipa_domain | upper }}
+    responses:
+      '(?i)Password for admin.*': "{{ ipa_admin_password }}"
+  environment:
+    KRB5CCNAME: /tmp/ansible_admin.ccache
+  no_log: true
+
+- name: Request IPA certificate (admin creds, no keytab touch)
   shell: |
     set -o pipefail
     ipa cert-request /tmp/nginx-san.csr \
-      --principal=host/{{ cloud_dns_helper_name }}.{{ cloud_zone }} | \
+      --principal=host/{{ inventory_hostname }}.{{ ipa_domain | lower }} | \
       grep "Serial number" | grep -v hex | awk '{print $NF}'
   register: cert_serno
-  changed_when: cert_serno.rc == 0
-  when: not (ansible_facts['files'] | default({})).get('/tmp/nginx.crt', false)
+  environment:
+    KRB5CCNAME: /tmp/ansible_admin.ccache
 
 # ============================================================
 # 8. Fetch certificate (only if missing)
@@ -89,7 +107,7 @@
   when: cert_serno is defined
 
 # ============================================================
-# 9. Verify modulus match (detect corruption or mismatch)
+# 9. Verify modulus match
 # ============================================================
 - name: Verify Modulus Match
   become: true
@@ -103,7 +121,7 @@
   failed_when: false
 
 # ============================================================
-# 10. Regenerate CSR + cert if modulus mismatch
+# 10. Regenerate CSR + cert if mismatch
 # ============================================================
 - name: Regenerate CSR if modulus mismatch
   become: true
@@ -111,7 +129,7 @@
     openssl req -new
     -key /tmp/nginx.key
     -out /tmp/nginx-san.csr
-    -subj "/CN={{ cloud_dns_helper_name }}.{{ cloud_zone }}"
+    -subj "/CN={{ inventory_hostname.split('.')[0] }}.{{ ipa_domain | lower }}"
     -reqexts SAN
     -config /tmp/openssl-san.cnf
   when: keymatch.rc != 0
@@ -121,7 +139,7 @@
   shell: |
     set -o pipefail
     ipa cert-request /tmp/nginx-san.csr \
-      --principal=host/{{ cloud_dns_helper_name }}.{{ cloud_zone }} | \
+      --principal=host/{{ inventory_hostname }}.{{ ipa_domain | lower }} | \
       grep "Serial number" | grep -v hex | awk '{print $NF}'
   register: cert_serno_new
   when: keymatch.rc != 0
@@ -211,8 +229,60 @@
           location /ignition/ { alias {{ cloud_helper_workdir }}/ignition/; autoindex on;}
           location /fcos/     { alias {{ cloud_helper_workdir }}/fcos/; autoindex on;}
       }
-  notify: restart nginx
+  # notify: restart nginx
 
+# ============================================================
+# Remove default listen directives from nginx.conf and nginx.conf.default
+# ============================================================
+
+- name: Remove default IPv4 listen 80
+  become: true
+  replace:
+    path: "{{ item }}"
+    regexp: '^\s*listen\s+80\s*;'
+    replace: ''
+  loop:
+    - /etc/nginx/nginx.conf
+    - /etc/nginx/nginx.conf.default
+
+- name: Remove default IPv4 listen 443
+  become: true
+  replace:
+    path: "{{ item }}"
+    regexp: '^\s*listen\s+443\s*;'
+    replace: ''
+  loop:
+    - /etc/nginx/nginx.conf
+    - /etc/nginx/nginx.conf.default
+
+- name: Remove default IPv6 listen [::]:80
+  become: true
+  replace:
+    path: "{{ item }}"
+    regexp: '^\s*listen\s+
+
+\[::\]
+
+:80\s*;'
+    replace: ''
+  loop:
+    - /etc/nginx/nginx.conf
+    - /etc/nginx/nginx.conf.default
+
+- name: Remove default IPv6 listen [::]:443
+  become: true
+  replace:
+    path: "{{ item }}"
+    regexp: '^\s*listen\s+
+
+\[::\]
+
+:443\s*;'
+    replace: ''
+  loop:
+    - /etc/nginx/nginx.conf
+    - /etc/nginx/nginx.conf.default
+ 
 # ============================================================
 # 14. Restart nginx
 # ============================================================

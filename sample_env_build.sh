@@ -50,7 +50,7 @@ export ipa_dispatcher_enable_promotion=true
 export iso_path="/var/lib/libvirt/images/ExampleOS-1.0-x86_64.iso"
 
 # ─── Kubernetes Settings ────────────────────────────────────────
-export kubetnet_version="1.30"
+export kubetnet_version="1.34"
 export crictl_version="1.30.0"
 export default_netmask="255.255.255.0"
 export default_net_device="eth0"

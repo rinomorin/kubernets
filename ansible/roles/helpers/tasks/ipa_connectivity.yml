@@ -1,0 +1,37 @@
+---
+- name: Verify IPA master forward DNS
+  command: dig +short {{ ipa_master }}.{{ ipa_domain }} @{{ ipa_master_ip }}
+  register: forward_check
+  changed_when: false
+  failed_when: forward_check.stdout == ""
+
+- name: Verify LDAP connectivity to IPA master
+  command: ldapsearch -H ldap://{{ ipa_master }}.{{ ipa_domain }} -x -b "" -s base "(objectclass=*)"
+  register: ldap_check
+  changed_when: false
+  failed_when: ldap_check.rc != 0
+
+- name: Check Dogtag CA service on master
+  delegate_to: "{{ ipa_master }}"
+  command: systemctl is-active pki-tomcatd@pki-tomcat.service
+  register: ca_service
+  changed_when: false
+  failed_when: ca_service.stdout != "active"
+
+- name: Verify forward DNS for helper
+  command: dig +short {{ ipa_helper }}.{{ ipa_domain }} @{{ ipa_master_ip }}
+  register: forward_check_helper
+  changed_when: false
+  failed_when: forward_check_helper.stdout == ""
+
+- name: Verify reverse DNS for helper
+  command: dig +short -x {{ ipa_helper_ip }} @{{ ipa_master_ip }}
+  register: reverse_check
+  changed_when: false
+  failed_when: reverse_check.stdout == ""
+
+- debug:
+    msg:
+      - "Dogtag CA service: {{ ca_service.stdout }}"
+      - "Forward lookup: {{ forward_check_helper.stdout }}"
+      - "Reverse lookup: {{ reverse_check.stdout }}"

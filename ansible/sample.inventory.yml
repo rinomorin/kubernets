@@ -1,0 +1,113 @@
+all:
+  vars:
+    ansible_user: exampleuser
+
+  hosts:
+    helper:
+      ansible_host: 192.168.50.20
+      hostname: helper.example.local
+      provider_ip: 192.168.50.20
+      provision_ip: 10.10.0.20
+
+    exmast01:
+      ansible_host: 192.168.50.31
+      hostname: exmast01.cloud.example.local
+      provider_ip: 192.168.50.31
+      provision_ip: 10.10.0.31
+
+    exwrk01:
+      ansible_host: 10.10.0.41
+      hostname: exwrk01.cloud.example.local
+      provision_ip: 10.10.0.41
+
+    exwrk02:
+      ansible_host: 10.10.0.42
+      hostname: exwrk02.cloud.example.local
+      provision_ip: 10.10.0.42
+
+    kvmhost01:
+      ansible_host: 192.168.50.3
+      hostname: kvmhost01.example.local
+
+    ipa01:
+      ansible_host: 192.168.50.10
+      hostname: ipa01.example.local
+
+    ipa02:
+      ansible_host: 192.168.50.11
+      hostname: ipa02.example.local
+
+  children:
+    control_nodes:
+      hosts:
+        exmast01:
+
+    helper_nodes:
+      hosts:
+        helper:
+
+    worker_nodes:
+      hosts:
+        exwrk01:
+        exwrk02:
+
+    infrastructure:
+      hosts:
+        kvmhost01:
+        ipa01:
+        ipa02:
+        helper:
+
+    ipa:
+      hosts:
+        ipa01:
+        ipa02:
+
+    cluster_nodes:
+      hosts:
+        helper:
+        exmast01:
+        exwrk01:
+        exwrk02:
+
+    dns:
+      hosts:
+        ipa01:
+        ipa02:
+
+    ldap:
+      hosts:
+        ipa01:
+        ipa02:
+
+    ca:
+      hosts:
+        ipa01:
+
+    ca_intermediate:
+      hosts:
+        ipa02:
+
+    helpers:
+      hosts:
+        helper:
+
+    ipa_servers:
+      hosts:
+        ipa01:
+        ipa02:
+
+    ntp:
+      hosts:
+        ipa01:
+        ipa02:
+
+    kvm:
+      hosts:
+        kvmhost01:
+          libvirt_networks:
+            - name: default
+              cidr: 192.168.50.0/24
+            - name: br-cluster
+              cidr: 10.10.0.0/24
+            - name: br-nat

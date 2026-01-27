@@ -1,0 +1,22 @@
+---
+# ============================================================
+# Ensure Host Administrators role exists (quiet)
+# ============================================================
+- name: Ensure Host Administrators role exists
+  delegate_to: "{{ ipa_master }}"
+  run_once: true
+  shell: |
+    ipa role-add "Host Administrators" 2>&1 || true
+  register: role_add
+  changed_when: "'added' in role_add.stdout"
+
+# ============================================================
+# Ensure admin is a member of Host Administrators (quiet)
+# ============================================================
+- name: Ensure admin is a member of Host Administrators
+  delegate_to: "{{ ipa_master }}"
+  run_once: true
+  shell: |
+    ipa role-add-member "Host Administrators" --users=admin 2>&1 || true
+  register: role_member
+  changed_when: "'added' in role_member.stdout"

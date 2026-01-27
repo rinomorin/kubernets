@@ -1,0 +1,41 @@
+---
+# ============================================================
+# STEADY-STATE KINIT — SAFE TO RE-RUN ANYTIME
+# ============================================================
+
+# 0. Ensure krb5.conf has a default realm
+- name: Verify krb5.conf default realm
+  become: true
+  lineinfile:
+    path: /etc/krb5.conf
+    regexp: '^ *default_realm'
+    line: "  default_realm = {{ ipa_domain | upper }}"
+    insertafter: '^
+
+\[libdefaults\]
+
+'
+  notify: restart_sssd
+
+# 1. Validate keytab exists
+- name: Check for keytab
+  stat:
+    path: /etc/krb5.keytab
+  register: keytab_stat
+
+- name: Fail if keytab missing
+  fail:
+    msg: "/etc/krb5.keytab missing on {{ inventory_hostname }}"
+  when: not keytab_stat.stat.exists
+
+# 2. Validate kinit
+- name: Validate host principal
+  command: kinit -k host/{{ item }}
+  loop: "{{ hostlist }}"
+  register: kinit_result
+  changed_when: false
+
+- name: Fail if kinit failed
+  fail:
+    msg: "Steady-state kinit failed on {{ inventory_hostname }}"
+  when: kinit_result.results | selectattr('rc','ne',0) | list | length > 0

@@ -36,14 +36,14 @@
       - ip_gate is defined
       - root_set is defined
       - admin_set is defined
-    fail_msg: "Missing required extra_vars: ip_addr, ip_mask, net_device, ip_gate"
+    fail_msg: "Missing required extra_vars: ip_dns,ip_addr, ip_mask, net_device, ip_gate"
 
 -  debug:
     msg: "stage is {{ vm_build_stage }}"
 
 - name: Set default DNS if not defined
   set_fact:
-    ip_dns: "{{ ip_dns | default('192.168.100.1,8.8.8.8') }}"
+    ip_dns: "{{ ip_dns | default( lookup('env','VM_HOST_IP').split('.')[:3] | join('.') ~ '.1' , true ) }}"
 
 - name: Convert CIDR to subnet mask
   vars:

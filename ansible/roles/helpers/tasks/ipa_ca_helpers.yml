@@ -107,6 +107,7 @@
   changed_when: false
   failed_when: ca_service.stdout != "active"
 
+
 - name: Verify  forward DNS
   command: dig +short {{ ipa_helper}}.{{ ipa_domain }} @{{ ipa_master_ip }}
   register: forward_check
@@ -220,6 +221,71 @@
 - name: Show IPA service states
   debug:
     var: ipa_services.results
+
+# ============================================================
+# Ensure all required host principals exist in IPA
+# ============================================================
+- name: Ensure host principals exist in IPA
+  command: ipa host-show {{ item }}
+  register: ipa_host_show
+  ignore_errors: true
+  changed_when: false
+  loop:
+    - "{{ inventory_hostname }}.{{ ipa_domain | lower }}"
+- debug: msg="{{ ipa_host_show }}"
+- name: Create host if missing
+  command: ipa host-add {{ item }}
+  when: "'not found' in ipa_host_show.results[0].stderr"
+  loop:
+    - "{{ inventory_hostname }}.{{ ipa_domain | lower }}"
+
+# - name: Ensure host principals exist in IPA
+#   command: ipa host-add {{ item }}
+#   register: ipa_host_add
+#   failed_when: ipa_host_add.rc not in [0, 2]   # 0 = created, 2 = already exists
+#   loop:
+#     - "{{ inventory_hostname }}.{{ ipa_domain | lower }}"
+#     # - "{{ cloud_dns_helper_name }}.{{ cloud_zone }}"
+#   when: 
+#     - ipa_host_show.rc != 0
+#     - ipa_manage_principals | default(true)
+
+
+# ============================================================
+# Ensure keytab contains all required principals
+# ============================================================
+- name: Add principals to keytab
+  command: >
+    ipa-getkeytab -s "{{ ipa_master.split('.')[0] }}.{{ ipa_domain | lower }}"
+    -p host/{{ item }}
+    -k /etc/krb5.keytab
+  loop:
+    - "{{ inventory_hostname }}.{{ ipa_domain | lower }}"
+  when: ipa_manage_principals | default(true)
+
+# ============================================================
+# Authenticate with each principal (only if keytab exists)
+# ============================================================
+- name: Check if keytab exists
+  stat:
+    path: /etc/krb5.keytab
+  register: keytab_stat
+
+- name: Authenticate with host principals
+  command: kinit -k host/{{ item }}
+  register: kinit_result
+  changed_when: false
+  loop:
+    - "{{ inventory_hostname }}.{{ ipa_domain | lower }}"
+  when: keytab_stat.stat.exists
+
+- name: Fail if any host kinit failed
+  fail:
+    msg: "Kerberos host kinit failed for one or more principals on {{ inventory_hostname }}"
+  when: >
+    keytab_stat.stat.exists and
+    (kinit_result.results | selectattr('rc', 'ne', 0) | list | length > 0)
+
 
 # # --- Kerberos host principal check ---
 # - name: Verify Kerberos kinit with host keytab
