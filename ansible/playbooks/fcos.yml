@@ -62,20 +62,28 @@
 - hosts: helper
   # become: true
   gather_facts: false
+  vars: 
+    ansible_user: "{{ cloud_helper_user }}"
   roles:
     - cloud_bootstrap
 
 - hosts: control_nodes
+  vars: 
+    ansible_user: "{{ cloud_helper_user }}"
   gather_facts: false
   roles:
     - k8s_bootstrap
 
 - hosts: worker_nodes
+  vars: 
+    ansible_user: "{{ cloud_helper_user }}"
   gather_facts: false
   roles:
     - k8s_bootstrap
 
 - name: Validate cluster nodes
+  vars: 
+    ansible_user: "{{ cloud_helper_user }}" 
   gather_facts: false
   hosts: control_nodes
   become: true
