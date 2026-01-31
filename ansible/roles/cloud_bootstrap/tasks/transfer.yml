@@ -1,3 +1,5 @@
+- debug: 
+    msg: "ansib;e user is {{ ansible_user }}"
 - name: Copy base image to staging and KVM host
   become: yes
   become_user: "{{ cloud_helper_user }}"
