@@ -12,8 +12,8 @@
 
 - name: Transfer ignition files
   become: false
-  delegate_to: localhost
-  # become_user: "{{ cloud_helper_user }}"
+  # delegate_to: localhost
+  become_user: "{{ cloud_helper_user }}"
   shell: |
     scp {{ cloud_helper_workdir }}/ignition/{{ item }}.ign {{ kvm_host }}:{{ staging_dir }}/{{ item }}.ign
   loop: "{{ groups['control_nodes'] + groups['worker_nodes'] }}"

@@ -1,7 +1,7 @@
 - name: Download FCOS image using coreos_installer
-  become: no
-  # become_user: "{{ cloud_helper_user }}"
-  delegate_to: localhost
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  # delegate_to: localhost
   shell: |
     source ~/.bashrc-awx
     coreos_installer download -p qemu -f qcow2.xz --decompress

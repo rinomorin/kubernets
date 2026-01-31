@@ -1,6 +1,6 @@
 - name: Identify latest FCOS image
-  become: no
-  delegate_to: localhost
+  # become: no
+  # delegate_to: localhost
   ansible.builtin.find:
     paths: "{{ cloud_helper_workdir }}"
     patterns: "fedora-coreos-*-qemu.x86_64.qcow2"
