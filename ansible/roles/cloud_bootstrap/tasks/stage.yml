@@ -1,5 +1,5 @@
 - name: Identify latest FCOS image
-  # become: no
+  become: no
   # delegate_to: localhost
   ansible.builtin.find:
     paths: "{{ cloud_helper_workdir }}"
