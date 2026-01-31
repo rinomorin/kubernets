@@ -1,5 +1,5 @@
 - name: Download FCOS image using coreos_installer
-  # become: yes
+  become: no
   # become_user: "{{ cloud_helper_user }}"
   delegate_to: localhost
   shell: |
