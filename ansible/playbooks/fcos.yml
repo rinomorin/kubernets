@@ -17,11 +17,6 @@
     - name: load environment
       set_fact:
         VM_HOST: "{{ lookup('env','VM_HOST')}}"
-        ipa_domain: "{{ lookup('env', 'ipa_domain') }}"
-        ipa_admin_password: "{{ lookup('env', 'ipa_admin_password') }}"
-        dns_zone: "{{ lookup('env', 'dns_zone') }}"
-        admin_id: "{{ lookup('env', 'admin_id') }}"
-        admin_set: "{{ lookup('env', 'admin_set') }}"
         secops_id: "{{ lookup('env', 'secops_id') }}"
         cloud_id: "{{ lookup('env', 'cloud_id') }}"
         secops_pwd: "{{ lookup('env', 'secops_pwd') }}"
@@ -64,8 +59,32 @@
 #   roles:
 #     - role: cloud-helper
 
-# - hosts: helper
-#   become: true
-#   gather_facts: false
-#   roles:
-#     - cloud_bootstrap
+- hosts: helper
+  become: true
+  gather_facts: false
+  roles:
+    - cloud_bootstrap
+
+- hosts: control_nodes
+  gather_facts: false
+  roles:
+    - k8s_bootstrap
+
+- hosts: worker_nodes
+  gather_facts: false
+  roles:
+    - k8s_bootstrap
+
+- name: Validate cluster nodes
+  gather_facts: false
+  hosts: control_nodes
+  become: true
+  tasks:
+    - name: Get node list
+      command: kubectl get nodes -o wide
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: nodes
+
+    - debug:
+        var: nodes.stdout

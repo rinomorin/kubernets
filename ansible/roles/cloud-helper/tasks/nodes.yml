@@ -84,6 +84,21 @@
       - "{{ br_provision }}"
       - "{{ br_provider }}"
 
+# WAIT FOR MASTERS TO REGISTER BEFORE BUILDING WORKERS
+- name: Wait for master nodes to register with helper API
+  become: true
+  delegate_to: "{{ helper_host | default('helper') }}"
+  vars:
+    expected_masters: "{{ groups['control_nodes'] }}"
+  retries: 60
+  delay: 10
+  until: >
+    (
+      lookup('file', '/var/lib/cloud-helper/node-registry.json')
+      | from_json
+    ).keys() | intersect(expected_masters) | length
+    == expected_masters | length
+
 # Provision Worker Nodes
 - name: Provision Worker Nodes
   include_tasks: deploy.yml

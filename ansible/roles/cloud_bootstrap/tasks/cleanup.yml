@@ -1,0 +1,43 @@
+- name: Cleanup controller temporary files
+  delegate_to: localhost
+  become: false
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  run_once: true
+  loop:
+    - "{{ latest_fcos_img }}"
+    - "/tmp/fcos-base.qcow2"
+    - "{{ staging_dir }}"
+
+- name: Find temporary files on KVM host
+  delegate_to: "{{ kvm_host }}"
+  become: true
+  ansible.builtin.find:
+    paths: "/tmp"
+    patterns:
+      - "fcos*"
+      - "*.ign"
+      - "*.qcow2"
+  register: kvm_tmp_files
+  run_once: true
+
+- name: Remove temporary files on KVM host
+  delegate_to: "{{ kvm_host }}"
+  become: true
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ kvm_tmp_files.files }}"
+  run_once: true
+
+- name: Remove staging and dest dirs on KVM host
+  delegate_to: "{{ kvm_host }}"
+  become: true
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ staging_dir }}"
+    - "{{ dest_dir }}"
+  run_once: true

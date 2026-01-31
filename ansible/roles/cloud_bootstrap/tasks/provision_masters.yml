@@ -1,0 +1,12 @@
+- name: Provision master nodes
+  include_tasks: deploy.yml
+  loop: "{{ groups['control_nodes'] }}"
+  loop_control:
+    loop_var: cluster_node
+  vars:
+    node_ram: "{{ ram_master }}"
+    node_vcpu: "{{ vcpu_master }}"
+    node_networks:
+      - "{{ br_maint }}"
+      - "{{ br_provision }}"
+      - "{{ br_provider }}"

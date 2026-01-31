@@ -30,8 +30,8 @@
     ansible_facts['os_family'] == "RedHat"
     and ansible_facts['distribution'] == "Fedora CoreOS"
 
-- name: Build nodes
-  import_tasks: nodes.yml
+# - name: Build nodes
+#   import_tasks: nodes.yml
 
 # - name: restart bootstrap api
 #   systemd:

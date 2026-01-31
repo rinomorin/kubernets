@@ -1,0 +1,19 @@
+- name: Download FCOS image
+  include_tasks: download.yml
+
+- name: Stage artifacts and detect FCOS image
+  include_tasks: stage.yml
+
+- name: Transfer artifacts to KVM host
+  include_tasks: transfer.yml
+
+- name: Prepare KVM host storage
+  include_tasks: prepare_kvm.yml
+
+# - name: Provision master nodes
+- include_tasks: provision_masters.yml
+- include_tasks: wait_for_masters.yml
+- include_tasks: provision_workers.yml
+
+- name: Cleanup temporary files
+  include_tasks: cleanup.yml

@@ -1,0 +1,8 @@
+- name: Generate join command
+  command: kubeadm token create --print-join-command
+  register: join_cmd
+
+- name: Run join command
+  command: "{{ hostvars[groups['masters'][0]].join_cmd.stdout }}"
+  args:
+    creates: /etc/kubernetes/kubelet.conf

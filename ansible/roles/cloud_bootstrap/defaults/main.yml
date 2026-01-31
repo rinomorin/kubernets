@@ -1,0 +1,25 @@
+# VM sizing
+ram_master: "{{ lookup('env', 'VM_MEM_MAST') | default(8192, true) }}"
+vcpu_master: "{{ lookup('env', 'VM_CPU') | default(4, true) }}"
+
+ram_worker: "{{ lookup('env', 'VM_MEM') | default(4096, true) }}"
+vcpu_worker: "{{ lookup('env', 'VM_CPU_WORK') | default(2, true) }}"
+
+# Helper identity
+cloud_helper_user: "{{ lookup('env', 'CLOUD_HELPER_USER') | default('cloud_helper', true) }}"
+helper_host: "{{ lookup('env', 'HELPER_HOSTNAME') | default('helper', true) }}"
+cloud_helper_workdir: "{{ lookup('env', 'HELPER_WORKDIR') | default('/opt/cloud_helper', true) }}"
+
+# KVM host
+kvm_host: "{{ lookup('env', 'VM_HOST') | default('kvmdc01', true) }}"
+VM_HOST: "{{ lookup('env', 'VM_HOST') | default('kvmdc01', true) }}"
+
+# Networks
+br_maint: "{{ lookup('env', 'KVM_NETWORK_NAT') | default('br-nat', true) }}"
+br_provision: "{{ lookup('env', 'KVM_NETWORK_CLUSTER') | default('br-cluster', true) }}"
+br_provider: "{{ lookup('env', 'KVM_NETWORK_PROVIDER') | default('default', true) }}"
+
+# Paths
+staging_dir: "/tmp/fcos_artifacts"
+dest_dir: "/var/lib/libvirt/images/ignition"
+ignition_src: "{{ cloud_helper_workdir }}/ignition"

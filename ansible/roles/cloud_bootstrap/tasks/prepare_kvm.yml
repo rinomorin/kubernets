@@ -1,0 +1,29 @@
+- debug:
+    msg: 
+      - "Staging directory: {{ staging_dir }}"
+      - "Destination directory: {{ dest_dir }}"
+
+- name: Move artifacts into libvirt directory
+  delegate_to: "{{ VM_HOST }}"
+  become: yes
+  shell: |
+    mkdir -p {{ dest_dir }}
+    mv {{ staging_dir }}/fcos-base.qcow2 {{ dest_dir }}/
+    mv {{ staging_dir }}/*.ign {{ dest_dir }}/
+    chown -R qemu:qemu {{ dest_dir }}
+    chmod 755 {{ dest_dir }}
+    chmod 644 {{ dest_dir }}/*
+
+- name: Apply SELinux labels for Libvirt
+  delegate_to: "{{ VM_HOST }}"
+  become: true
+  community.general.sefcontext:
+    target: "{{ dest_dir }}(/.*)?"
+    setype: virt_content_t
+    state: present
+
+- name: Restorecon
+  delegate_to: "{{ VM_HOST }}"
+  become: yes
+  command: "restorecon -Rv {{ dest_dir }}"
+  changed_when: false

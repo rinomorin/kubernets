@@ -1,0 +1,10 @@
+- name: Identify latest FCOS image
+  ansible.builtin.find:
+    paths: "{{ cloud_helper_workdir }}"
+    patterns: "fedora-coreos-*-qemu.x86_64.qcow2"
+  register: fcos_find
+
+- name: Set latest FCOS image fact
+  ansible.builtin.set_fact:
+    latest_fcos_img: "{{ fcos_find.files | sort(attribute='mtime') | last }}"
+  when: fcos_find.matched > 0

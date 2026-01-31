@@ -1,6 +1,19 @@
 ###############################################################
 # Install podman images
 ###############################################################
+- name: Get UID of cloud_helper_user
+  command: "id -u {{ cloud_helper_user }}"
+  register: cloud_helper_uid
+  changed_when: false
+
+- name: Clean stale Podman runtime dirs
+  file:
+    path: "/tmp/storage-run-{{ cloud_helper_uid.stdout }}/{{ item }}"
+    state: absent
+  loop:
+    - containers
+    - libpod/tmp
+
 
 - name: Pull CoreOS Toolchain Images as cloud_helper_user
   become: yes

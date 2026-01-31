@@ -1,0 +1,25 @@
+- name: Install CRI-O
+  package:
+    name:
+      - cri-o
+      - cri-tools
+    state: present
+
+- name: Enable and start CRI-O
+  systemd:
+    name: crio
+    enabled: true
+    state: started
+
+- name: Install kubeadm, kubelet, kubectl
+  package:
+    name:
+      - kubeadm
+      - kubelet
+      - kubectl
+    state: present
+
+- name: Enable kubelet
+  systemd:
+    name: kubelet
+    enabled: true

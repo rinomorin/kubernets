@@ -1,0 +1,8 @@
+- name: Download FCOS image using coreos_installer
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
+  shell: |
+    source ~/.bashrc-awx
+    coreos_installer download -p qemu -f qcow2.xz --decompress
+  args:
+    chdir: "{{ cloud_helper_workdir }}"
