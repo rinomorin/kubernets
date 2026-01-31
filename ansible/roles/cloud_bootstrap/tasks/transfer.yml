@@ -1,6 +1,6 @@
 - name: Copy base image to staging and KVM host
-  become: no
-  # become_user: "{{ cloud_helper_user }}"
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
   delegate_to: localhost
   shell: |
     cp -f {{ latest_fcos_img.path }} {{ cloud_helper_workdir }}/fcos/fcos-base.qcow2
