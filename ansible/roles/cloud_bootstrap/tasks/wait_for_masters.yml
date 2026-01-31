@@ -1,4 +1,5 @@
 - name: Wait for master nodes to register
+  become: false
   wait_for:
     timeout: 60
 # - name: Wait for master nodes to register
