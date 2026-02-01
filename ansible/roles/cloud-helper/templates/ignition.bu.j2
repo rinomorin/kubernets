@@ -109,6 +109,7 @@ storage:
     # Kubelet systemd unit
     - path: /etc/systemd/system/kubelet.service
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           [Unit]
@@ -128,31 +129,35 @@ storage:
     # Kubelet CRI-O drop-in
     - path: /etc/systemd/system/kubelet.service.d/10-crio.conf
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           [Service]
           Environment="KUBELET_EXTRA_ARGS=--container-runtime-endpoint=unix:///var/run/crio/crio.sock"
 
-    # CRI-O config directory
+    # CRI-O config directory (runtime tuning)
     - path: /etc/crio/crio.conf.d/00-default.conf
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           [crio.runtime]
           conmon_cgroup = "pod"
           cgroup_manager = "systemd"
 
-    # Containers registries config
+    # Containers registries config (overwrite FCOS default)
     - path: /etc/containers/registries.conf
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           [registries.search]
           registries = ["registry.fedoraproject.org", "registry.access.redhat.com", "docker.io"]
 
-    # Containers storage config
+    # Containers storage config (overwrite FCOS default)
     - path: /etc/containers/storage.conf
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           [storage]
@@ -160,9 +165,10 @@ storage:
           runroot = "/run/containers/storage"
           graphroot = "/var/lib/containers/storage"
 
-    # CNI config dir and basic bridge network
+    # CNI config: basic bridge network for CRI-O
     - path: /etc/cni/net.d/10-crio-bridge.conf
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           {
