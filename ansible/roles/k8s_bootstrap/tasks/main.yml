@@ -9,9 +9,9 @@
     msg:
       - "Ansible configured user: {{ ansible_user }}"
 
-# # Install Kubernetes prerequisites (CRI-O, kubelet, kubeadm, kubectl)
-# - name: Install Kubernetes prerequisites
-#   include_tasks: install_prereqs.yml
+# Install Kubernetes prerequisites (CRI-O, kubelet, kubeadm, kubectl)
+- name: Install Kubernetes prerequisites
+  include_tasks: install_prereqs.yml
 
 # Initialize the control plane on the master node(s)
 - name: Initialize Kubernetes control plane

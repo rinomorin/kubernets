@@ -60,32 +60,32 @@
   roles:
     - cloud_bootstrap
 
-- hosts: control_nodes
-  vars: 
-    ansible_user: "core"
-  gather_facts: false
-  roles:
-    - k8s_bootstrap
+# - hosts: control_nodes
+#   vars: 
+#     ansible_user: "core"
+#   gather_facts: false
+#   roles:
+#     - k8s_bootstrap
 
-- hosts: worker_nodes
-  vars: 
-    ansible_user: "core"
-  gather_facts: false
-  roles:
-    - k8s_bootstrap
+# - hosts: worker_nodes
+#   vars: 
+#     ansible_user: "core"
+#   gather_facts: false
+#   roles:
+#     - k8s_bootstrap
 
-- name: Validate cluster nodes
-  vars: 
-    ansible_user: "{{ cloud_helper_user }}" 
-  gather_facts: false
-  hosts: control_nodes
-  become: true
-  tasks:
-    - name: Get node list
-      command: kubectl get nodes -o wide
-      environment:
-        KUBECONFIG: /etc/kubernetes/admin.conf
-      register: nodes
+# - name: Validate cluster nodes
+#   vars: 
+#     ansible_user: "{{ cloud_helper_user }}" 
+#   gather_facts: false
+#   hosts: control_nodes
+#   become: true
+#   tasks:
+#     - name: Get node list
+#       command: kubectl get nodes -o wide
+#       environment:
+#         KUBECONFIG: /etc/kubernetes/admin.conf
+#       register: nodes
 
-    - debug:
-        var: nodes.stdout
+#     - debug:
+#         var: nodes.stdout

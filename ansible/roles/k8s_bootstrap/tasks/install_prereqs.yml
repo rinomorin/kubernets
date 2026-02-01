@@ -1,21 +1,21 @@
 ---
-- name: Layer CRI-O and Kubernetes components using rpm-ostree
-  become: true
-  command: >
-    rpm-ostree install
-    cri-o
-    cri-tools
-    kubelet
-    kubeadm
-    kubectl
-  args:
-    creates: /run/ostree-booted
-  register: ostree_install
+# - name: Layer CRI-O and Kubernetes components using rpm-ostree
+#   become: true
+#   command: >
+#     rpm-ostree install
+#     cri-o
+#     cri-tools
+#     kubelet
+#     kubeadm
+#     kubectl
+#   args:
+#     creates: /run/ostree-booted
+#   register: ostree_install
 
-- name: Reboot after rpm-ostree install
-  become: true
-  reboot:
-  when: ostree_install is changed
+# - name: Reboot after rpm-ostree install
+#   become: true
+#   reboot:
+#   when: ostree_install is changed
 
 - name: Enable CRI-O
   become: true
