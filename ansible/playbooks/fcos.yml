@@ -70,14 +70,14 @@
 - hosts: control_nodes
   vars: 
     ansible_user: "core"
-  gather_facts: false
+  gather_facts: true
   roles:
     - k8s_bootstrap
 
 - hosts: worker_nodes
   vars: 
     ansible_user: "core"
-  gather_facts: false
+  gather_facts: true
   roles:
     - k8s_bootstrap
 
