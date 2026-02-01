@@ -17,6 +17,9 @@
   ansible.builtin.set_fact:
     kubernetes_version_tmp: "{{ lookup('env', 'kubetnet_version') | default(kubernetes_version) }}"   
     api_vip_tmp: "{{ lookup('env', 'api_vip') | default(api_vip) }}"
+    keepalived_vrid_tmp: "{{ lookup('env', 'keepalived_vrid') | default(keepalived_vrid) }}"
+    keepalived_auth_pass_tmp: "{{ lookup('env', 'keepalived_auth_pass') | default(keepalived_auth_pass) }}"
+    
 # 1. Render kubeadm config
 # -----------------------------
 - name: Render kubeadm config for control nodes
@@ -43,6 +46,8 @@
   loop: "{{ groups['control_nodes'] }}"
   vars:
     hostname: "{{ hostvars[item].hostname }}"
+    keepalived_vrid: "{{ keepalived_vrid_tmp }}"
+    keepalived_auth_pass: "{{ keepalived_auth_pass_tmp }}"
     node_ip: "{{ hostvars[item].node_ip }}"
     provider_ip: "{{ hostvars[item].provider_ip }}"
     provision_ip: "{{ hostvars[item].provision_ip }}"
