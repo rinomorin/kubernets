@@ -1,4 +1,5 @@
 - name: Install CRI-O
+  become: true
   package:
     name:
       - cri-o
@@ -6,12 +7,14 @@
     state: present
 
 - name: Enable and start CRI-O
+  become: true
   systemd:
     name: crio
     enabled: true
     state: started
 
 - name: Install kubeadm, kubelet, kubectl
+  become: true
   package:
     name:
       - kubeadm
@@ -20,6 +23,7 @@
     state: present
 
 - name: Enable kubelet
+  become: true
   systemd:
     name: kubelet
     enabled: true
