@@ -84,6 +84,26 @@ storage:
 
 systemd:
   units:
+    # 1. Install Kubernetes prerequisites on first boot
+    - name: k8s-prereqs-install.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Install Kubernetes prerequisites via rpm-ostree
+        ConditionPathExists=!/var/lib/k8s-installed
+        After=network-online.target
+        Wants=network-online.target
+
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/bin/rpm-ostree install cri-o cri-tools kubelet kubeadm kubectl
+        ExecStart=/usr/bin/touch /var/lib/k8s-installed
+        ExecStart=/usr/bin/systemctl reboot
+
+        [Install]
+        WantedBy=multi-user.target
+
+    # 2. Cloud Helper Bootstrap (runs AFTER prereqs are installed)
     - name: cloud-helper-bootstrap.service
       enabled: true
       contents: |
@@ -91,6 +111,7 @@ systemd:
         Description=Cloud Helper Bootstrap Registration
         After=network-online.target
         Wants=network-online.target
+        ConditionPathExists=/var/lib/k8s-installed
 
         [Service]
         Type=oneshot
