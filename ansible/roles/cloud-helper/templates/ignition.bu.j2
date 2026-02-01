@@ -187,6 +187,15 @@ storage:
             }
           }
 
+    # CRI-O network config: point CNI to /opt/cni/bin only
+    - path: /etc/crio/crio.conf.d/01-cni-plugin-dirs.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          [crio.network]
+          plugin_dirs = ["/opt/cni/bin"]
+
     # CNI plugin installer script
     - path: /usr/local/bin/install-cni-plugins.sh
       mode: 0755
