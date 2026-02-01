@@ -35,13 +35,15 @@
         }
       },
 
+{% if provider_ip is defined %}
       {
         "path": "/etc/NetworkManager/system-connections/enp3s0.nmconnection",
         "mode": 384,
         "contents": {
           "inline": "[connection]\nid=enp3s0\ntype=ethernet\ninterface-name=enp3s0\n\n[ipv4]\naddress1={{ provider_ip }}/24\nmethod=manual\n"
         }
-      }
+      },
+{% endif %}
     ]
   },
 
