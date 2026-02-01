@@ -1,20 +1,23 @@
 ---
-# Install Kubernetes prerequisites (CRI-O, kubelet, kubeadm, kubectl)
-- name: Install Kubernetes prerequisites
+# Kubernetes bootstrap with HA control plane
+
+- name: Confirm Kubernetes prereqs are present (Ignition-based)
   include_tasks: install_prereqs.yml
 
-# Initialize the control plane on the master node(s)
-- name: Initialize Kubernetes control plane
+- name: Initialize first control-plane node
   include_tasks: init_master.yml
 
-# Install the CNI plugin (Calico, Cilium, etc.)
+- name: Upload control-plane certificates
+  include_tasks: upload_certs.yml
+
+- name: Join additional control-plane nodes
+  include_tasks: join_control_planes.yml
+
 - name: Install CNI plugin
   include_tasks: install_cni.yml
 
-# Join worker nodes to the cluster
 - name: Join worker nodes
   include_tasks: join_workers.yml
 
-# Validate cluster health
 - name: Validate cluster state
   include_tasks: validate_cluster.yml

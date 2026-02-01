@@ -1,0 +1,14 @@
+---
+# Upload control-plane certs so additional masters can join
+
+- name: Upload control-plane certificates from first master
+  become: yes
+  delegate_to: "{{ groups['control_nodes'][0] }}"
+  run_once: true
+  command: kubeadm init phase upload-certs --upload-certs
+  register: upload_certs_result
+
+- name: Extract certificate key
+  set_fact:
+    kubeadm_certificate_key: "{{ upload_certs_result.stdout_lines | last | trim }}"
+  run_once: true

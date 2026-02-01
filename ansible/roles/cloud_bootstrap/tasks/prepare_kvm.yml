@@ -1,5 +1,5 @@
 - debug:
-    msg: 
+    msg:
       - "Staging directory: {{ staging_dir }}"
       - "Destination directory: {{ dest_dir }}"
 
@@ -7,13 +7,14 @@
   delegate_to: "{{ VM_HOST }}"
   become: yes
   shell: |
+    set -e
     mkdir -p {{ dest_dir }}
-    mv {{ staging_dir }}/fcos-base.qcow2 {{ dest_dir }}/
+    mv {{ staging_dir }}/flatcar-base.qcow2 {{ dest_dir }}/
     mv {{ staging_dir }}/*.ign {{ dest_dir }}/
     chown -R qemu:qemu {{ dest_dir }}
     chmod 755 {{ dest_dir }}
     chmod 644 {{ dest_dir }}/*
-
+    
 - name: Apply SELinux labels for Libvirt
   delegate_to: "{{ VM_HOST }}"
   become: true

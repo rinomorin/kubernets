@@ -1,0 +1,17 @@
+- name: Render Ignition for control nodes
+  template:
+    src: "ignition/control-node.ign.j2"
+    dest: "{{ cloud_helper_workdir }}/ignition/{{ item }}.ign"
+    mode: '0644'
+  loop: "{{ groups['control_nodes'] }}"
+  vars:
+    ssh_public_key_path: "{{ lookup('env', 'SSH_PUB_KEY') | default('~/.ssh/id_rsa.pub', true) }}"
+
+- name: Render Ignition for worker nodes
+  template:
+    src: "ignition/worker-node.ign.j2"
+    dest: "{{ cloud_helper_workdir }}/ignition/{{ item }}.ign"
+    mode: '0644'
+  loop: "{{ groups['worker_nodes'] }}"
+  vars:
+    ssh_public_key_path: "{{ lookup('env', 'SSH_PUB_KEY') | default('~/.ssh/id_rsa.pub', true) }}"

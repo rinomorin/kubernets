@@ -1,0 +1,21 @@
+---
+- name: Wait for all nodes to be Ready
+  delegate_to: "{{ groups['control_nodes'][0] }}"
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  command: kubectl get nodes
+  register: nodes
+  retries: 30
+  delay: 10
+  until: "' Ready ' in nodes.stdout"
+
+- name: Show final node status
+  delegate_to: "{{ groups['control_nodes'][0] }}"
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  command: kubectl get nodes -o wide
+  register: nodes_wide
+
+- debug:
+    var: nodes_wide.stdout_lines
+  run_once: true

@@ -8,25 +8,52 @@ all:
       hostname: helper.home.morinsoft.ca 
       provider_ip: 192.168.100.20
       provision_ip: 10.0.0.20 
+
     msrlv9mast01: 
       ansible_host: 192.168.100.31 
       hostname: msrlv9mast01.cloud.home.morinsoft.ca 
       provider_ip: 192.168.100.31 
-      provision_ip: 10.0.0.31 
+      provision_ip: 10.0.0.31
+      node_ip: 10.0.0.31
+      keepalived_state: MASTER
+      keepalived_priority: 200
+
+    msrlv9mast02: 
+      ansible_host: 192.168.100.32
+      hostname: msrlv9mast02.cloud.home.morinsoft.ca 
+      provider_ip: 192.168.100.32
+      provision_ip: 10.0.0.32
+      node_ip: 10.0.0.32
+      keepalived_state: BACKUP
+      keepalived_priority: 150
+
+    msrlv9mast03: 
+      ansible_host: 192.168.100.33
+      hostname: msrlv9mast03.cloud.home.morinsoft.ca 
+      provider_ip: 192.168.100.33
+      provision_ip: 10.0.0.33
+      node_ip: 10.0.0.33
+      keepalived_state: BACKUP
+      keepalived_priority: 100
+
     msrlv9wrk01: 
       ansible_host: 10.0.0.41 
       hostname: msrlv9wrk01.cloud.home.morinsoft.ca 
       provision_ip: 10.0.0.41 
+
     msrlv9wrk02: 
       ansible_host: 10.0.0.42 
       hostname: msrlv9wrk02.cloud.home.morinsoft.ca 
       provision_ip: 10.0.0.42
+
     kvmdc01:
       ansible_host: 192.168.100.3
       hostname: kvmdc01.home.morinsoft.ca
+
     ipa01:
       ansible_host: 192.168.100.10
       hostname: ipa01.home.morinsoft.ca
+
     ipa02:
       ansible_host: 192.168.100.11
       hostname: ipa02.home.morinsoft.ca
@@ -35,6 +62,8 @@ all:
     control_nodes:
       hosts:
         msrlv9mast01:
+        msrlv9mast02:
+        msrlv9mast03:
 
     helper_nodes:
       hosts:
@@ -61,6 +90,8 @@ all:
       hosts:
         helper:
         msrlv9mast01:
+        msrlv9mast02:
+        msrlv9mast03:
         msrlv9wrk01:
         msrlv9wrk02:
 
@@ -106,4 +137,3 @@ all:
               cidr: 10.0.0.0/24
             - name: br-nat
               cidr: 172.16.0.0/24
-

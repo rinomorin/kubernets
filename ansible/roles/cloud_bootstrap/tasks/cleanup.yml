@@ -6,8 +6,8 @@
     state: absent
   run_once: true
   loop:
-    - "{{ latest_fcos_img }}"
-    - "/tmp/fcos-base.qcow2"
+    - "{{ latest_flatcar_img }}"
+    - "/tmp/flatcar-base.qcow2"
     - "{{ staging_dir }}"
 
 - name: Find temporary files on KVM host
@@ -16,7 +16,7 @@
   ansible.builtin.find:
     paths: "/tmp"
     patterns:
-      - "fcos*"
+      - "flatcar*"
       - "*.ign"
       - "*.qcow2"
   register: kvm_tmp_files

@@ -1,4 +1,7 @@
-- name: Apply Calico manifest
+---
+- name: Install CNI plugin (Calico)
   command: kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
+  delegate_to: "{{ groups['control_nodes'][0] }}"
+  run_once: true

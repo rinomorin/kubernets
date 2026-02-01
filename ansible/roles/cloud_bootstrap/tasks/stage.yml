@@ -1,12 +1,11 @@
-- name: Identify latest FCOS image
+- name: Identify latest Flatcar image
   become: no
-  # delegate_to: localhost
   ansible.builtin.find:
-    paths: "{{ cloud_helper_workdir }}"
-    patterns: "fedora-coreos-*-qemu.x86_64.qcow2"
-  register: fcos_find
+    paths: "{{ cloud_helper_workdir }}/flatcar"
+    patterns: "{{ flatcar_qemu_qcow2_name }}"
+  register: flatcar_find
 
-- name: Set latest FCOS image fact
+- name: Set latest Flatcar image fact
   ansible.builtin.set_fact:
-    latest_fcos_img: "{{ fcos_find.files | sort(attribute='mtime') | last }}"
-  when: fcos_find.matched > 0
+    latest_flatcar_img: "{{ flatcar_find.files | sort(attribute='mtime') | last }}"
+  when: flatcar_find.matched > 0

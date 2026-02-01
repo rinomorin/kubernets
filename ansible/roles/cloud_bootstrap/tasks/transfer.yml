@@ -1,18 +1,18 @@
-- debug: 
-    msg: "ansib;e user is {{ ansible_user }}"
+- debug:
+    msg: "ansible user is {{ ansible_user }}"
+
 - name: Copy base image to staging and KVM host
   become: yes
   become_user: "{{ cloud_helper_user }}"
-  # delegate_to: localhost
   shell: |
-    cp -f {{ latest_fcos_img.path }} {{ cloud_helper_workdir }}/fcos/fcos-base.qcow2
+    set -e
+    cp -f {{ latest_flatcar_img.path }} {{ cloud_helper_workdir }}/flatcar/flatcar-base.qcow2
     ssh {{ kvm_host }} "mkdir -p {{ staging_dir }}"
-    scp {{ latest_fcos_img.path }} {{ kvm_host }}:{{ staging_dir }}/fcos-base.qcow2
+    scp {{ latest_flatcar_img.path }} {{ kvm_host }}:{{ staging_dir }}/flatcar-base.qcow2
   run_once: true
 
 - name: Transfer ignition files
   become: false
-  # delegate_to: localhost
   become_user: "{{ cloud_helper_user }}"
   shell: |
     scp {{ cloud_helper_workdir }}/ignition/{{ item }}.ign {{ kvm_host }}:{{ staging_dir }}/{{ item }}.ign

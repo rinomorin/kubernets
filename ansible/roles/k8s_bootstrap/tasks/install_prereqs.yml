@@ -1,6 +1,2 @@
----
-# FCOS handles all prerequisites via Ignition.
-# Nothing to do here.
-- name: Prerequisites already installed by Ignition
-  debug:
-    msg: "Skipping prereq installation — handled by FCOS Ignition"
+- debug:
+    msg: "Skipping prereq installation — handled by Flatcar Ignition"
