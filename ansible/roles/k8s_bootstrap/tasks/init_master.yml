@@ -1,16 +1,21 @@
 - name: Stop kubelet before kubeadm init
+  become: yes
   raw: systemctl stop kubelet
 
 - name: Enable IPv4 forwarding
+  become: yes
   raw: sysctl -w net.ipv4.ip_forward=1
 
 - name: Persist IPv4 forwarding
+  become: yes
   raw: echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/99-kubernetes-ipforward.conf
 
 - name: Run kubeadm init
+  become: yes
   raw: kubeadm init --pod-network-cidr=10.244.0.0/16 --cri-socket=unix:///var/run/crio/crio.sock
   args:
     creates: /etc/kubernetes/admin.conf
 
 - name: Copy admin.conf to core user
+  become: yes
   raw: cp /etc/kubernetes/admin.conf /home/core/.kube/config && chown core:core /home/core/.kube/config && chmod 600 /home/core/.kube/config
