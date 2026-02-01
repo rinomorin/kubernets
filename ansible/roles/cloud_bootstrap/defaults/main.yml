@@ -34,4 +34,4 @@ dest_dir: "/var/lib/libvirt/images/ignition"
 ignition_src: "{{ cloud_helper_workdir }}/ignition"
 
     
-keepalived_vrid: 51
+# keepalived_vrid: 51

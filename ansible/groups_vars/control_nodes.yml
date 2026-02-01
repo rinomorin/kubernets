@@ -2,9 +2,9 @@
 # api_vip: "{{ vip | default('10.0.0.100') }}"
 
 # Keepalived shared settings
-# keepalived_vrid: 51
+keepalived_vrid: 51
 # keepalived_interface: eth0
-# keepalived_auth_pass: "42secret"
+keepalived_auth_pass: "42secret"
 
 # Kubernetes version
 # kubernetes_version: "v1.34.0"
