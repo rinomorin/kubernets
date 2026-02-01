@@ -1,11 +1,13 @@
 ---
 - name: Ensure ignition output directory exists
+  become: false
   file:
     path: "{{ cloud_helper_workdir }}/ignition"
     state: directory
     mode: '0755'
 
 - name: Ensure kubeadm output directory exists
+  become: false
   file:
     path: "{{ cloud_helper_workdir }}/kubeadm"
     state: directory
@@ -15,6 +17,7 @@
 # 1. Render kubeadm config
 # -----------------------------
 - name: Render kubeadm config for control nodes
+  become: false
   template:
     src: "kubeadm-config.yaml.j2"
     dest: "{{ cloud_helper_workdir }}/kubeadm/{{ item }}-kubeadm.yaml"
@@ -29,6 +32,7 @@
 # 2. Render Ignition for control nodes
 # -----------------------------
 - name: Render Ignition for control nodes
+  become: false
   template:
     src: "ignition/control-node.ign.j2"
     dest: "{{ cloud_helper_workdir }}/ignition/{{ item }}.ign"
@@ -48,6 +52,7 @@
 # 3. Render Ignition for worker nodes
 # -----------------------------
 - name: Render Ignition for worker nodes
+  become: false
   template:
     src: "ignition/worker-node.ign.j2"
     dest: "{{ cloud_helper_workdir }}/ignition/{{ item }}.ign"
