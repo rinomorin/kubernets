@@ -48,6 +48,7 @@
     hostname: "{{ hostvars[item].hostname }}"
     keepalived_vrid: "{{ keepalived_vrid_tmp }}"
     keepalived_auth_pass: "{{ keepalived_auth_pass_tmp }}"
+    api_vip: "{{ api_vip_tmp }}"
     node_ip: "{{ hostvars[item].node_ip }}"
     provider_ip: "{{ hostvars[item].provider_ip }}"
     provision_ip: "{{ hostvars[item].provision_ip }}"
