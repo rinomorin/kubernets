@@ -1,19 +1,40 @@
+---
+# Render Ignition for control-plane nodes (3 NICs, kubeadm, keepalived)
+- name: Ensure ignition output directory exists
+  become: False
+  file:
+    path: "{{ cloud_helper_workdir }}/ignition"
+    state: directory
+    mode: '0755'
+
 - name: Render Ignition for control nodes
-  become: false
+  become: False
   template:
     src: "ignition/control-node.ign.j2"
     dest: "{{ cloud_helper_workdir }}/ignition/{{ item }}.ign"
     mode: '0644'
   loop: "{{ groups['control_nodes'] }}"
   vars:
+    hostname: "{{ hostvars[item].hostname }}"
+    node_ip: "{{ hostvars[item].node_ip }}"
+    provider_ip: "{{ hostvars[item].provider_ip }}"
+    provision_ip: "{{ hostvars[item].provision_ip }}"
+    keepalived_state: "{{ hostvars[item].keepalived_state }}"
+    keepalived_priority: "{{ hostvars[item].keepalived_priority }}"
     ssh_public_key_path: "{{ lookup('env', 'SSH_PUB_KEY') | default('~/.ssh/id_rsa.pub', true) }}"
 
+# Render Ignition for worker nodes (3 NICs, kubeadm prereqs)
+
 - name: Render Ignition for worker nodes
-  become: false
+  become: False
   template:
     src: "ignition/worker-node.ign.j2"
     dest: "{{ cloud_helper_workdir }}/ignition/{{ item }}.ign"
     mode: '0644'
   loop: "{{ groups['worker_nodes'] }}"
   vars:
+    hostname: "{{ hostvars[item].hostname }}"
+    node_ip: "{{ hostvars[item].node_ip }}"
+    provider_ip: "{{ hostvars[item].provider_ip }}"
+    provision_ip: "{{ hostvars[item].provision_ip }}"
     ssh_public_key_path: "{{ lookup('env', 'SSH_PUB_KEY') | default('~/.ssh/id_rsa.pub', true) }}"

@@ -45,24 +45,6 @@
         "contents": {
           "inline": "[connection]\nid=enp3s0\ntype=ethernet\ninterface-name=enp3s0\n\n[ipv4]\naddress1={{ provider_ip }}/24\nmethod=manual\n"
         }
-      },
-
-      /* kubeadm config */
-      {
-        "path": "/etc/kubernetes/kubeadm-config.yaml",
-        "mode": 420,
-        "contents": {
-          "source": "data:text/plain;charset=utf-8,{{ kubeadm_config | to_nice_yaml | urlencode }}"
-        }
-      },
-
-      /* keepalived config */
-      {
-        "path": "/etc/keepalived/keepalived.conf",
-        "mode": 420,
-        "contents": {
-          "source": "data:text/plain;charset=utf-8,{{ keepalived_conf | urlencode }}"
-        }
       }
     ]
   },
@@ -72,7 +54,7 @@
       {
         "name": "install-kubernetes.service",
         "enabled": true,
-        "contents": "[Unit]\nDescription=Install Kubernetes prereqs\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/rpm-ostree install cri-o kubelet kubeadm kubectl keepalived\nExecStart=/usr/bin/systemctl enable crio kubelet keepalived\nRemainAfterExit=yes\n\n[Install]\nWantedBy=multi-user.target"
+        "contents": "[Unit]\nDescription=Install Kubernetes prereqs (worker)\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/rpm-ostree install cri-o kubelet kubeadm kubectl\nExecStart=/usr/bin/systemctl enable crio kubelet\nRemainAfterExit=yes\n\n[Install]\nWantedBy=multi-user.target"
       }
     ]
   },
