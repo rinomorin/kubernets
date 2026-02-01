@@ -8,10 +8,7 @@
   raw: echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/99-kubernetes-ipforward.conf
 
 - name: Run kubeadm init
-  command: >
-    kubeadm init
-    --pod-network-cidr=10.244.0.0/16
-    --cri-socket=unix:///var/run/crio/crio.sock
+  raw: kubeadm init --pod-network-cidr=10.244.0.0/16 --cri-socket=unix:///var/run/crio/crio.sock
   args:
     creates: /etc/kubernetes/admin.conf
 
