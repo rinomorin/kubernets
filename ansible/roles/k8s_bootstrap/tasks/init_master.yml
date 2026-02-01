@@ -1,14 +1,7 @@
 - name: Run kubeadm init
-  command: >
-    kubeadm init
-    --pod-network-cidr=10.244.0.0/16
+  raw: kubeadm init --pod-network-cidr=10.244.0.0/16
   args:
     creates: /etc/kubernetes/admin.conf
 
 - name: Copy admin.conf to core user
-  copy:
-    src: /etc/kubernetes/admin.conf
-    dest: /home/core/.kube/config
-    owner: core
-    group: core
-    mode: 0600
+  raw: cp /etc/kubernetes/admin.conf /home/core/.kube/config && chown core:core /home/core/.kube/config && chmod 600 /home/core/.kube/config
