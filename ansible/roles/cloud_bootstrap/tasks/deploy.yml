@@ -1,5 +1,5 @@
 - debug:
-    msg: "qemu-img create -f qcow2 -b {{ dest_dir }}/flatcar-base.qcow2 -F qcow2 /var/lib/libvirt/images/{{ cluster_node }}.qcow2 40G"
+    msg: "qemu-img create -f qcow2 -b {{ dest_dir }}/flatcar-base.qcow2 -F qcow2 /var/lib/libvirt/images/{{ cluster_node }}.qcow2"
 
 - name: "Provisioning Flatcar VM: {{ cluster_node }}"
   delegate_to: "{{ VM_HOST }}"
@@ -11,7 +11,7 @@
           qemu-img create -f qcow2
           -b {{ dest_dir }}/flatcar-base.qcow2
           -F qcow2
-          /var/lib/libvirt/images/{{ cluster_node }}.qcow2 40G
+          /var/lib/libvirt/images/{{ cluster_node }}.qcow2
         creates: "/var/lib/libvirt/images/{{ cluster_node }}.qcow2"
 
     - name: Fix ownership for libvirt
