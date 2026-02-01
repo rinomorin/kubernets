@@ -13,7 +13,9 @@
     state: directory
     mode: '0755'
 
-# -----------------------------
+- name: set_new version
+  ansible.builtin.set_fact:
+    kubernetes_version_tmp: "{{ lookup('env', 'kubetnet_version') | default(kubernetes_version) }}"   
 # 1. Render kubeadm config
 # -----------------------------
 - name: Render kubeadm config for control nodes
@@ -26,7 +28,7 @@
     hostname: "{{ hostvars[item].hostname }}"
     node_ip: "{{ hostvars[item].node_ip }}"
     api_vip: "{{ api_vip }}"
-    kubernetes_version: "{{ kubernetes_version }}"
+    kubernetes_version: "{{ kubernetes_version_tmp }}"
 
 # -----------------------------
 # 2. Render Ignition for control nodes
