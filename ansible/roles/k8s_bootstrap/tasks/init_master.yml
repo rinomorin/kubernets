@@ -12,7 +12,7 @@
 
 - name: Run kubeadm init
   become: yes
-  raw: kubeadm init --pod-network-cidr=10.244.0.0/16 --cri-socket=unix:///var/run/crio/crio.sock
+  raw: kubeadm init --pod-network-cidr=10.244.0.0/16 --cri-socket=unix:///var/run/crio/crio.sock --v=10
   args:
     creates: /etc/kubernetes/admin.conf
 
