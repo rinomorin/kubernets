@@ -16,6 +16,7 @@
 - name: set_new version
   ansible.builtin.set_fact:
     kubernetes_version_tmp: "{{ lookup('env', 'kubetnet_version') | default(kubernetes_version) }}"   
+    api_vip_tmp: "{{ lookup('env', 'api_vip') | default(api_vip) }}"
 # 1. Render kubeadm config
 # -----------------------------
 - name: Render kubeadm config for control nodes
@@ -27,7 +28,7 @@
   vars:
     hostname: "{{ hostvars[item].hostname }}"
     node_ip: "{{ hostvars[item].node_ip }}"
-    api_vip: "{{ api_vip }}"
+    api_vip: "{{ api_vip_tmp }}"
     kubernetes_version: "{{ kubernetes_version_tmp }}"
 
 # -----------------------------
