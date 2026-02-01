@@ -66,44 +66,229 @@ storage:
           method=manual
 {% endif %}
 
-    # Bootstrap script (corrected)
+    # Cloud Helper Registration Script
     - path: /usr/local/bin/cloud-helper-bootstrap.sh
       mode: 0755
       contents:
         inline: |
           #!/usr/bin/bash
           set -euo pipefail
-
           HOSTNAME=$(hostname)
           IP=$(hostname -I | awk '{print $1}')
-
           curl -X POST \
             -F "hostname=${HOSTNAME}" \
             -F "ip=${IP}" \
             http://172.16.0.20:8081/register
 
+    # Kubernetes v1.34.0 Binary Installer
+    - path: /usr/local/bin/install-k8s-binaries.sh
+      mode: 0755
+      contents:
+        inline: |
+          #!/usr/bin/bash
+          set -euo pipefail
+          VERSION="v1.34.0"
+          ARCH="amd64"
+          BASE_URL="https://dl.k8s.io/release/${VERSION}/bin/linux/${ARCH}"
+          BIN_DIR="/usr/local/bin"
+
+          download() {
+              local bin="$1"
+              curl -L --fail "${BASE_URL}/${bin}" -o "${BIN_DIR}/${bin}"
+              chmod +x "${BIN_DIR}/${bin}"
+          }
+
+          echo "Downloading Kubernetes ${VERSION} binaries..."
+          download kubeadm
+          download kubelet
+          download kubectl
+
+          echo "Kubernetes binaries installed."
+          touch /var/lib/k8s-binaries-installed
+
+    # Kubelet systemd unit
+    - path: /etc/systemd/system/kubelet.service
+      mode: 0644
+      contents:
+        inline: |
+          [Unit]
+          Description=kubelet: The Kubernetes Node Agent
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          ExecStart=/usr/local/bin/kubelet $KUBELET_EXTRA_ARGS
+          Restart=always
+          StartLimitInterval=0
+          RestartSec=10
+
+          [Install]
+          WantedBy=multi-user.target
+
+    # Kubelet CRI-O drop-in
+    - path: /etc/systemd/system/kubelet.service.d/10-crio.conf
+      mode: 0644
+      contents:
+        inline: |
+          [Service]
+          Environment="KUBELET_EXTRA_ARGS=--container-runtime-endpoint=unix:///var/run/crio/crio.sock"
+
+    # CRI-O config directory
+    - path: /etc/crio/crio.conf.d/00-default.conf
+      mode: 0644
+      contents:
+        inline: |
+          [crio.runtime]
+          conmon_cgroup = "pod"
+          cgroup_manager = "systemd"
+
+    # Containers registries config
+    - path: /etc/containers/registries.conf
+      mode: 0644
+      contents:
+        inline: |
+          [registries.search]
+          registries = ["registry.fedoraproject.org", "registry.access.redhat.com", "docker.io"]
+
+    # Containers storage config
+    - path: /etc/containers/storage.conf
+      mode: 0644
+      contents:
+        inline: |
+          [storage]
+          driver = "overlay"
+          runroot = "/run/containers/storage"
+          graphroot = "/var/lib/containers/storage"
+
+    # CNI config dir and basic bridge network
+    - path: /etc/cni/net.d/10-crio-bridge.conf
+      mode: 0644
+      contents:
+        inline: |
+          {
+            "cniVersion": "0.4.0",
+            "name": "crio-bridge",
+            "type": "bridge",
+            "bridge": "cni0",
+            "isGateway": true,
+            "ipMasq": true,
+            "ipam": {
+              "type": "host-local",
+              "subnet": "10.85.0.0/16",
+              "routes": [
+                { "dst": "0.0.0.0/0" }
+              ]
+            }
+          }
+
+    # CNI plugin installer script
+    - path: /usr/local/bin/install-cni-plugins.sh
+      mode: 0755
+      contents:
+        inline: |
+          #!/usr/bin/bash
+          set -euo pipefail
+          VERSION="v1.4.0"
+          URL="https://github.com/containernetworking/plugins/releases/download/${VERSION}/cni-plugins-linux-amd64-${VERSION}.tgz"
+          mkdir -p /opt/cni/bin
+          tmpfile=$(mktemp)
+          curl -L --fail "${URL}" -o "${tmpfile}"
+          tar -C /opt/cni/bin -xzf "${tmpfile}"
+          rm -f "${tmpfile}"
+          touch /var/lib/cni-plugins-installed
+
 systemd:
   units:
-    # 1. Install Kubernetes prerequisites on first boot
-    - name: k8s-prereqs-install.service
+    # 1. Install CRI-O via rpm-ostree (requires reboot)
+    - name: crio-install.service
       enabled: true
       contents: |
         [Unit]
-        Description=Install Kubernetes prerequisites via rpm-ostree
-        ConditionPathExists=!/var/lib/k8s-installed
+        Description=Install CRI-O via rpm-ostree
+        ConditionPathExists=!/var/lib/crio-installed
         After=network-online.target
         Wants=network-online.target
 
         [Service]
         Type=oneshot
-        ExecStart=/usr/bin/rpm-ostree install cri-o cri-tools kubelet kubeadm kubectl
-        ExecStart=/usr/bin/touch /var/lib/k8s-installed
+        ExecStart=/usr/bin/rpm-ostree install cri-o cri-tools
+        ExecStart=/usr/bin/touch /var/lib/crio-installed
         ExecStart=/usr/bin/systemctl reboot
 
         [Install]
         WantedBy=multi-user.target
 
-    # 2. Cloud Helper Bootstrap (runs AFTER prereqs are installed)
+    # 2. Install CNI plugins (after reboot)
+    - name: cni-plugins-install.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Install CNI plugins
+        ConditionPathExists=!/var/lib/cni-plugins-installed
+        After=network-online.target
+        Wants=network-online.target
+
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/local/bin/install-cni-plugins.sh
+
+        [Install]
+        WantedBy=multi-user.target
+
+    # 3. Install Kubernetes v1.34.0 binaries (after reboot)
+    - name: k8s-binaries-install.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Install Kubernetes v1.34.0 binaries
+        ConditionPathExists=!/var/lib/k8s-binaries-installed
+        After=network-online.target
+        Wants=network-online.target
+
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/local/bin/install-k8s-binaries.sh
+
+        [Install]
+        WantedBy=multi-user.target
+
+    # 4. Enable CRI-O after it is installed
+    - name: enable-crio.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Enable CRI-O
+        After=network-online.target
+        Wants=network-online.target
+        ConditionPathExists=/var/lib/crio-installed
+
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/bin/systemctl enable --now crio
+
+        [Install]
+        WantedBy=multi-user.target
+
+    # 5. Enable kubelet after binaries + CRI-O + CNI are present
+    - name: enable-kubelet.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Enable kubelet
+        After=network-online.target
+        Wants=network-online.target
+        ConditionPathExists=/var/lib/k8s-binaries-installed
+        ConditionPathExists=/var/lib/crio-installed
+        ConditionPathExists=/var/lib/cni-plugins-installed
+
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/bin/systemctl enable --now kubelet
+
+        [Install]
+        WantedBy=multi-user.target
+
+    # 6. Cloud Helper Bootstrap (runs last, once node is k8s-ready)
     - name: cloud-helper-bootstrap.service
       enabled: true
       contents: |
@@ -111,7 +296,7 @@ systemd:
         Description=Cloud Helper Bootstrap Registration
         After=network-online.target
         Wants=network-online.target
-        ConditionPathExists=/var/lib/k8s-installed
+        ConditionPathExists=/var/lib/k8s-binaries-installed
 
         [Service]
         Type=oneshot
