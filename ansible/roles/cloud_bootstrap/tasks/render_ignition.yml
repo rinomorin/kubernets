@@ -68,6 +68,9 @@
   loop: "{{ groups['worker_nodes'] }}"
   vars:
     hostname: "{{ hostvars[item].hostname }}"
+    api_vip: "{{ api_vip_tmp }}"
+    keepalived_auth_pass: "{{ keepalived_auth_pass_tmp }}"
+    keepalived_vrid: "{{ keepalived_vrid_tmp }}"
     node_ip: "{{ hostvars[item].node_ip }}"
     provider_ip: "{{ hostvars[item].provider_ip }}"
     provision_ip: "{{ hostvars[item].provision_ip }}"
