@@ -1,4 +1,5 @@
 - name: Render Ignition for control nodes
+  become: false
   template:
     src: "ignition/control-node.ign.j2"
     dest: "{{ cloud_helper_workdir }}/ignition/{{ item }}.ign"
@@ -8,6 +9,7 @@
     ssh_public_key_path: "{{ lookup('env', 'SSH_PUB_KEY') | default('~/.ssh/id_rsa.pub', true) }}"
 
 - name: Render Ignition for worker nodes
+  become: false
   template:
     src: "ignition/worker-node.ign.j2"
     dest: "{{ cloud_helper_workdir }}/ignition/{{ item }}.ign"
