@@ -1,4 +1,10 @@
 ---
+- debug:
+    msg: 
+      - "Ansible user is {{ ansible_user }}"
+      - "Ansible remote user is {{ ansible_ssh_user }}"
+
+
 # Install Kubernetes prerequisites (CRI-O, kubelet, kubeadm, kubectl)
 - name: Install Kubernetes prerequisites
   include_tasks: install_prereqs.yml

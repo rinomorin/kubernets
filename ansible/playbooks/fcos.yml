@@ -69,7 +69,7 @@
 
 - hosts: control_nodes
   vars: 
-    ansible_user: "{{ cloud_helper_user }}"
+    ansible_user: "core"
   gather_facts: false
   roles:
     - k8s_bootstrap
