@@ -1,31 +1,6 @@
 ---
-# - name: Layer CRI-O and Kubernetes components using rpm-ostree
-#   become: true
-#   command: >
-#     rpm-ostree install
-#     cri-o
-#     cri-tools
-#     kubelet
-#     kubeadm
-#     kubectl
-#   args:
-#     creates: /run/ostree-booted
-#   register: ostree_install
-
-# - name: Reboot after rpm-ostree install
-#   become: true
-#   reboot:
-#   when: ostree_install is changed
-
-- name: Enable CRI-O
-  become: true
-  systemd:
-    name: crio
-    enabled: true
-    state: started
-
-- name: Enable kubelet
-  become: true
-  systemd:
-    name: kubelet
-    enabled: true
+# FCOS handles all prerequisites via Ignition.
+# Nothing to do here.
+- name: Prerequisites already installed by Ignition
+  debug:
+    msg: "Skipping prereq installation — handled by FCOS Ignition"

@@ -1,14 +1,4 @@
 ---
-- name: Show current remote user
-  debug:
-    msg:
-      - "Running Kubernetes bootstrap as user: {{ cloud_helper_user }}"
-
-- name: Show remote user
-  debug:
-    msg:
-      - "Ansible configured user: {{ ansible_user }}"
-
 # Install Kubernetes prerequisites (CRI-O, kubelet, kubeadm, kubectl)
 - name: Install Kubernetes prerequisites
   include_tasks: install_prereqs.yml
