@@ -17,5 +17,5 @@
 - include_tasks: wait_for_masters.yml
 - include_tasks: provision_workers.yml
 
-- name: Cleanup temporary files
-  include_tasks: cleanup.yml
+# - name: Cleanup temporary files
+  # include_tasks: cleanup.yml
