@@ -43,6 +43,7 @@
   loop: "{{ groups['control_nodes'] }}"
   vars:
     hostname: "{{ hostvars[item].hostname }}"
+    keepalived_vrid: 51
     node_ip: "{{ hostvars[item].node_ip }}"
     provider_ip: "{{ hostvars[item].provider_ip }}"
     provision_ip: "{{ hostvars[item].provision_ip }}"
@@ -51,7 +52,6 @@
     kubeadm_config: "{{ lookup('file', cloud_helper_workdir + '/kubeadm/' + item + '-kubeadm.yaml') }}"
     ssh_public_key_path: "{{ lookup('env', 'SSH_PUB_KEY') | default('~/.ssh/id_rsa.pub', true) }}"
 
-# -----------------------------
 # 3. Render Ignition for worker nodes
 # -----------------------------
 - name: Render Ignition for worker nodes
