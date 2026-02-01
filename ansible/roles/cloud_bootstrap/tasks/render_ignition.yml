@@ -43,7 +43,6 @@
   loop: "{{ groups['control_nodes'] }}"
   vars:
     hostname: "{{ hostvars[item].hostname }}"
-    keepalived_vrid: 51
     node_ip: "{{ hostvars[item].node_ip }}"
     provider_ip: "{{ hostvars[item].provider_ip }}"
     provision_ip: "{{ hostvars[item].provision_ip }}"

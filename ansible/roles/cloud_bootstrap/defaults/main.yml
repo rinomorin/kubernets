@@ -32,3 +32,6 @@ flatcar_qemu_qcow2_name: "flatcar_production_qemu_image.qcow2"
 staging_dir: "/tmp/fcos_artifacts"
 dest_dir: "/var/lib/libvirt/images/ignition"
 ignition_src: "{{ cloud_helper_workdir }}/ignition"
+
+    
+keepalived_vrid: 51
