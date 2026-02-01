@@ -52,13 +52,6 @@
           private: "enp2s0"
           nat: "enp3s0"
         
-# # Stage 1 prep helper to be able to deploy nodes
-# - name: Configure cloud helper and minimal KVM host changes
-#   hosts: helper
-#   become: true
-#   roles:
-#     - role: cloud-helper
-
 - hosts: helper
   # become: true
   gather_facts: false
