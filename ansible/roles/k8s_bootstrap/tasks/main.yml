@@ -1,9 +1,9 @@
 ---
-- debug:
-    msg: 
-      - "Ansible user is {{ ansible_user }}"
-      - "Ansible remote user is {{ ansible_ssh_user }}"
-
+- name: Show remote user
+  debug:
+    msg:
+      - "Ansible configured user: {{ ansible_user }}"
+      - "Actual remote user: {{ ansible_user_id }}"
 
 # Install Kubernetes prerequisites (CRI-O, kubelet, kubeadm, kubectl)
 - name: Install Kubernetes prerequisites
