@@ -20,7 +20,6 @@
         secops_id: "{{ lookup('env', 'secops_id') }}"
         cloud_id: "{{ lookup('env', 'cloud_id') }}"
         secops_pwd: "{{ lookup('env', 'secops_pwd') }}"
-        kubetnet_version: "{{ lookup('env', 'kubetnet_version') }}"
         cluster_ip_addr: "{{ lookup('env', 'cluster_ip_addr') }}"
         cluster_netmask: "{{ lookup('env', 'cluster_netmask') }}"
         cloud_zone: "{{ lookup('env', 'cloud_zone') }}"
