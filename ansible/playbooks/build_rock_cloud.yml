@@ -56,9 +56,9 @@
       set_fact:
         build_root: "{{ cloud_helper_workdir }}/rocky_build"
         output_dir: "{{ cloud_helper_workdir }}/ignition
-        disk_size: 10G
+        disk_size: "10G"
         kubetnet_version: "{{ lookup('env', 'kubetnet_version') }}"
-        crio_version: "1.34"
+        crio_version: "{{ lookup('env', 'kubetnet_version') }}"
         crio_stream: "stable"
         cloud_helper_shell: "/bin/bash"
 
