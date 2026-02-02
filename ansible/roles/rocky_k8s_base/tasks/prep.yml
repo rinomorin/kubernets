@@ -1,7 +1,7 @@
 ---
 - name: Rocky K8s Base Prep Tasks
   debug:
-    msg: "working in {{ build_root }} folder"
+    msg: "working in {{ build_root }} folder as {{ ansible_user}}"
   
   # Ensure directories exist
 - name: Ensure build directories exist
