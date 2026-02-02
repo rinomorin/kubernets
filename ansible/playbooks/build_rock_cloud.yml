@@ -38,7 +38,7 @@
         helper_node: "{{ groups['helpers'][0] | default([]) }}"
         helper_node_ip: "{{ hostvars[groups['helpers'][0]].ansible_host }}"
         node_list: "{{ groups['control_nodes'] + groups['worker_nodes'] }}"
-        cloud_helper_workdir: "{{ lookup('env','cloud_helper_workdir') | default('/opt/cloud-helper', true) }}"
+        cloud_helper_workdir: "{{ lookup('env','cloud_helper_workdir') | default('/opt/cloud_helper', true) }}"
         cloud_helper_user: "{{ lookup('env', 'CLOUD_HELPER_USER') | default('cloud_helper') }}"
 
 
