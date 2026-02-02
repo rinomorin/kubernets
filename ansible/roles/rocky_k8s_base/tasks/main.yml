@@ -1,12 +1,19 @@
----
-- name: Prepare image build environment
+- name: Run image prep tasks on builder
   import_tasks: prep.yml
+  delegate_to: "{{ builder_host }}"
+  become: true
 
-- name: Build Rocky rootfs with CRI-O + Kubernetes
+- name: Run image build tasks on builder
   import_tasks: build.yml
+  delegate_to: "{{ builder_host }}"
+  become: true
 
-- name: Finalize filesystem and install GRUB
+- name: Run finalize tasks on builder
   import_tasks: finalize.yml
+  delegate_to: "{{ builder_host }}"
+  become: true
 
-- name: Convert raw disk to qcow2
+- name: Convert raw → qcow2 on builder
   import_tasks: convert.yml
+  delegate_to: "{{ builder_host }}"
+  become: true
