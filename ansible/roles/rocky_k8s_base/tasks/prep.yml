@@ -2,7 +2,11 @@
 - name: Rocky K8s Base Prep Tasks
   debug:
     msg: "working in {{ build_root }} folder as {{ ansible_user}}"
-  
+- name: who am I
+  command: whoami
+  register: whoami_out
+- debug:
+    msg: "Current user is {{ whoami_out.stdout }}"
   # Ensure directories exist
 - name: Ensure build directories exist
   become: yes
