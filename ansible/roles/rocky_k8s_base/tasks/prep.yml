@@ -5,6 +5,8 @@
   
   # Ensure directories exist
 - name: Ensure build directories exist
+  become: yes
+  become_user: "{{ ansible_user }}"
   file:
     path: "{{ item }}"
     state: directory
