@@ -1,5 +1,9 @@
 ---
-# Ensure directories exist
+- name: Rocky K8s Base Prep Tasks
+  debug:
+    msg: "working in {{ build_root }} folder"
+  
+  # Ensure directories exist
 - name: Ensure build directories exist
   file:
     path: "{{ item }}"
