@@ -64,7 +64,7 @@
         crio_stream: "stable"
         cloud_helper_shell: "/bin/bash"
 
-- hosts: helper
+- hosts: localhost
   become: false
   gather_facts: false
   vars: 
