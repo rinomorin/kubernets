@@ -1,0 +1,12 @@
+---
+- name: Prepare image build environment
+  import_tasks: prep.yml
+
+- name: Build Rocky rootfs with CRI-O + Kubernetes
+  import_tasks: build.yml
+
+- name: Finalize filesystem and install GRUB
+  import_tasks: finalize.yml
+
+- name: Convert raw disk to qcow2
+  import_tasks: convert.yml

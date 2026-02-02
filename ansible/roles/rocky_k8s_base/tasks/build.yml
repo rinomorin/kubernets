@@ -1,0 +1,56 @@
+---
+###############################################################
+# Install minimal Rocky rootfs with CRI-O + Kubernetes
+###############################################################
+- name: Install Rocky rootfs with CRI-O + Kubernetes
+  command: >
+    dnf --releasever=10 --installroot={{ build_root }}/rootfs
+    --setopt=install_weak_deps=False
+    --nodocs
+    install
+    rocky-release systemd bash coreutils util-linux iproute iputils
+    openssh-server dracut kernel
+    cri-o
+    kubelet-{{ kubernetes_repo_ver }} kubeadm-{{ kubernetes_repo_ver }} kubectl-{{ kubernetes_repo_ver }}
+  args:
+    creates: "{{ build_root }}/rootfs/usr/bin/bash"
+
+###############################################################
+# Enable CRI-O + kubelet
+###############################################################
+- name: Enable CRI-O and kubelet
+  file:
+    src: "/usr/lib/systemd/system/{{ item }}.service"
+    dest: "{{ build_root }}/rootfs/etc/systemd/system/multi-user.target.wants/{{ item }}.service"
+    state: link
+  loop:
+    - crio
+    - kubelet
+
+###############################################################
+# Make it immutable-ish
+###############################################################
+- name: Remove package managers
+  file:
+    path: "{{ build_root }}/rootfs/usr/bin/{{ item }}"
+    state: absent
+  loop:
+    - dnf
+    - yum
+
+- name: Install overlayfs units
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ build_root }}/rootfs/usr/lib/systemd/system/{{ item.dest }}"
+  loop:
+    - { src: "overlay-etc.service.j2", dest: "overlay-etc.service" }
+    - { src: "overlay-var.service.j2", dest: "overlay-var.service" }
+
+- name: Enable overlayfs units
+  file:
+    src: "/usr/lib/systemd/system/{{ item }}"
+    dest: "{{ build_root }}/rootfs/etc/systemd/system/local-fs.target.wants/{{ item }}"
+    state: link
+  loop:
+    - overlay-etc.service
+    - overlay-var.service

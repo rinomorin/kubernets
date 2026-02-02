@@ -1,0 +1,74 @@
+---
+###############################################################
+# Create raw disk
+###############################################################
+- name: Create raw disk
+  command: truncate -s {{ disk_size }} {{ build_root }}/rocky-k8s-base.raw
+  args:
+    creates: "{{ build_root }}/rocky-k8s-base.raw"
+
+###############################################################
+# Partition disk
+###############################################################
+- name: Partition disk (GPT + ESP + root)
+  command: >
+    parted {{ build_root }}/rocky-k8s-base.raw --script
+    mklabel gpt
+    mkpart ESP fat32 1MiB 201MiB
+    set 1 esp on
+    mkpart root ext4 201MiB 100%
+
+###############################################################
+# Map loop device + format
+###############################################################
+- name: Map loop device
+  command: losetup -fP --show {{ build_root }}/rocky-k8s-base.raw
+  register: loopdev
+
+- name: Format ESP
+  command: mkfs.vfat {{ loopdev.stdout }}p1
+
+- name: Format root
+  command: mkfs.ext4 {{ loopdev.stdout }}p2
+
+###############################################################
+# Mount + populate
+###############################################################
+- name: Mount root partition
+  mount:
+    path: "{{ build_root }}/mnt"
+    src: "{{ loopdev.stdout }}p2"
+    fstype: ext4
+    state: mounted
+
+- name: Mount ESP
+  mount:
+    path: "{{ build_root }}/mnt/boot"
+    src: "{{ loopdev.stdout }}p1"
+    fstype: vfat
+    state: mounted
+
+- name: Copy rootfs into disk
+  command: rsync -a {{ build_root }}/rootfs/ {{ build_root }}/mnt/
+
+###############################################################
+# Install GRUB
+###############################################################
+- name: Install GRUB packages into target
+  command: >
+    dnf --installroot={{ build_root }}/mnt
+    --setopt=install_weak_deps=False
+    install grub2-efi-x64 shim-x64
+  args:
+    creates: "{{ build_root }}/mnt/usr/sbin/grub2-install"
+
+- name: Install GRUB bootloader
+  command: >
+    grub2-install --target=x86_64-efi
+    --efi-directory={{ build_root }}/mnt/boot
+    --boot-directory={{ build_root }}/mnt/boot
+    --removable
+    --no-nvram
+
+- name: Generate GRUB config
+  command: grub2-mkconfig -o {{ build_root }}/mnt/boot/grub2/grub.cfg
