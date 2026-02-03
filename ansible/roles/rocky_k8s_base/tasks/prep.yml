@@ -7,10 +7,9 @@
   register: whoami_out
 - debug:
     msg: "Current user is {{ whoami_out.stdout }}"
-  # Ensure directories exist
+
+# Ensure directories exist
 - name: Ensure build directories exist
-  become: yes
-  become_user: "{{ ansible_user }}"
   file:
     path: "{{ item }}"
     state: directory
@@ -33,7 +32,8 @@
     crio_repo_url: "https://download.opensuse.org/repositories/isv:/cri-o:/stable:/v{{ crio_repo_ver }}/rpm/"
     crio_repo_gpg: "https://download.opensuse.org/repositories/isv:/cri-o:/stable:/v{{ crio_repo_ver }}/rpm/repomd.xml.key"
 
-- name: Install CRI‑O repository into installroot
+- name: Install CRI‑O repository into install root
+  
   copy:
     dest: "{{ build_root }}/rootfs/etc/yum.repos.d/crio.repo"
     owner: root

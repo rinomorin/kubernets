@@ -84,7 +84,7 @@
   become: true
   gather_facts: no
   roles:
-    - role: kvm_provision 
+    - role: kvm_provision
 
 - name: Build Stage
   hosts: all
