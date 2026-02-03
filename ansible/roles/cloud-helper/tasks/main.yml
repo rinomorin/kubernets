@@ -30,6 +30,9 @@
     ansible_facts['os_family'] == "RedHat"
     and ansible_facts['distribution'] == "Fedora CoreOS"
 
+- name: add sudoers entry for cloud_helper user
+  import_tasks: render_sudoers_templates.yml
+  
 # - name: Build nodes
 #   import_tasks: nodes.yml
 
