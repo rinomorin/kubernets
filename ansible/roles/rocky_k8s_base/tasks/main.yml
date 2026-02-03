@@ -1,6 +1,6 @@
 - name: Switch to ansible_user
   become: yes
-  become_user: "{{ ansible_user }}"
+  # become_user: "{{ ansible_user }}"
   block:
     - name: Run image prep tasks on builder
       import_tasks: prep.yml

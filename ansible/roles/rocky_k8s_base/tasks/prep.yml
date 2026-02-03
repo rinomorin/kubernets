@@ -32,8 +32,7 @@
     crio_repo_url: "https://download.opensuse.org/repositories/isv:/cri-o:/stable:/v{{ crio_repo_ver }}/rpm/"
     crio_repo_gpg: "https://download.opensuse.org/repositories/isv:/cri-o:/stable:/v{{ crio_repo_ver }}/rpm/repomd.xml.key"
 
-- name: Install CRI‑O repository into install root
-  
+- name: Install CRI‑O repository into install root  
   copy:
     dest: "{{ build_root }}/rootfs/etc/yum.repos.d/crio.repo"
     owner: root
