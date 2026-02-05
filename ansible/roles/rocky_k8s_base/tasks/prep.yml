@@ -86,6 +86,7 @@
 
 - name: Move Rocky 10 repo files into installroot
   command: >
+    chmod 0644 {{ build_root }}/rootfs/etc/yum.repos.d/{{ item | basename }}
   loop: "{{ lookup('fileglob', build_root + '/rootfs/etc/yum.repos.d/*.repo', wantlist=True) }}"
 
 
