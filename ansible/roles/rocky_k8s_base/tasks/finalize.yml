@@ -39,6 +39,7 @@
     path: "{{ build_root }}/mnt"
     src: "{{ loopdev.stdout }}p2"
     fstype: ext4
+    opts: defaults
     state: mounted
 
 - name: Mount ESP
@@ -46,10 +47,11 @@
     path: "{{ build_root }}/mnt/boot"
     src: "{{ loopdev.stdout }}p1"
     fstype: vfat
+    opts: defaults
     state: mounted
 
 - name: Copy rootfs into disk
-  command: rsync -a {{ build_root }}/rootfs/ {{ build_root }}/mnt/
+  command: rsync -aHAX --numeric-ids {{ build_root }}/rootfs/ {{ build_root }}/mnt/
 
 ###############################################################
 # Install GRUB
