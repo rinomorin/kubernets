@@ -27,23 +27,10 @@
     --nodocs
     install -y
     rocky-release systemd bash coreutils util-linux iproute iputils
-    openssh-server dracut kernel podman kubeadm kubectl
+    openssh-server dracut kernel podman kubeadm kubectl 
+    rpm rpm-libs rpm-build sqlite-lib dnf dnf-plugin-core grub2-efi-x64 shim-x64
   args:
     creates: "{{ build_root }}/rootfs/usr/bin/bash"
-
-- name: Install Rocky rootfs with CRI-O + Kubernetes
-  command: >
-    dnf --installroot={{ build_root }}/rootfs \
-        --setopt=install_weak_deps=False \
-        install \
-          rpm \
-          rpm-libs \
-          rpm-build-libs \
-          sqlite-libs \
-          dnf \
-          dnf-plugins-core \
-          grub2-efi-x64 \
-          shim-x64
 
 ###############################################################
 # Install crictl from official GitHub release
