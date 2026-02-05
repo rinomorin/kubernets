@@ -71,6 +71,7 @@
     /tmp/.
 
 - name: set permissions to 644 on copied repo files
+  become: false
   command: >
     chmod 644 /tmp/rocky*.repo
   
