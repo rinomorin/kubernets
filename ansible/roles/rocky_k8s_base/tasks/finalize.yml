@@ -46,25 +46,23 @@
     path: "{{ build_root }}/mnt"
     src: "{{ loopdev.stdout }}p2"
     fstype: ext4
-    opts: defaults
     state: mounted
 
-- name: Ensure /boot exists on ext4
+- name: Create /boot
   file:
     path: "{{ build_root }}/mnt/boot"
     state: directory
 
-- name: Ensure /boot/efi exists
+- name: Create /boot/efi
   file:
     path: "{{ build_root }}/mnt/boot/efi"
     state: directory
 
-- name: Mount ESP at /boot/efi
+- name: Mount ESP correctly
   mount:
     path: "{{ build_root }}/mnt/boot/efi"
     src: "{{ loopdev.stdout }}p1"
     fstype: vfat
-    opts: defaults
     state: mounted
 
 - name: Debug mounts
