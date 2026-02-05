@@ -64,6 +64,7 @@
       gpgkey={{ kubernetes_repo_gpg }}
 
 - name: Copy Rocky 10 repo files from vm_host server
+  become: false
   command: >
     scp -o StrictHostKeyChecking=no
     {{ VM_HOST_IP }}:/etc/yum.repos.d/rocky*.repo
