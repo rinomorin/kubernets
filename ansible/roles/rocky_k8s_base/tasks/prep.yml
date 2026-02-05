@@ -11,57 +11,67 @@
     - "{{ build_root }}/mnt"
     - "{{ build_root }}/rootfs/etc/yum.repos.d"
 
-###############################################################
-# CRI-O Repository (INSIDE INSTALLROOT)
-###############################################################
-- name: Set CRI-O repository versions from environment
-  set_fact:
-    crio_repo_ver: "{{ lookup('env','kubetnet_version') | default('1.34', true) }}"
 
-- name: Set CRI-O repository URLs
-  set_fact:
-    crio_repo_url: "https://download.opensuse.org/repositories/isv:/cri-o:/stable:/v{{ crio_repo_ver }}/rpm/"
-    crio_repo_gpg: "https://download.opensuse.org/repositories/isv:/cri-o:/stable:/v{{ crio_repo_ver }}/rpm/repomd.xml.key"
-
-- name: Install CRI‑O repository into install root  
+- name: Copy all repo files from localhost into installroot
+  become: true
   copy:
-    dest: "{{ build_root }}/rootfs/etc/yum.repos.d/crio.repo"
-    owner: root
-    group: root
+    src: "/etc/yum.repos.d/{{ item }}"
+    dest: "{{ build_root }}/rootfs/etc/yum.repos.d/{{ item }}"
     mode: '0644'
-    content: |
-      [crio]
-      name=CRI-O {{ crio_repo_ver }}
-      baseurl={{ crio_repo_url }}
-      enabled=1
-      gpgcheck=1
-      gpgkey={{ crio_repo_gpg }}
+  loop: "{{ lookup('fileglob', '/etc/yum.repos.d/*.repo', wantlist=True) | map('basename') | list }}"
 
-###############################################################
-# Kubernetes Repository (INSIDE INSTALLROOT)
-###############################################################
-- name: Set Kubernetes repository versions from environment
-  set_fact:
-    kubernetes_repo_ver: "{{ lookup('env','kubetnet_version') | default('1.34', true) }}"
 
-- name: Set Kubernetes repository URLs
-  set_fact:
-    kubernetes_repo_url: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_repo_ver }}/rpm/"
-    kubernetes_repo_gpg: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_repo_ver }}/rpm/repodata/repomd.xml.key"
+# ###############################################################
+# # CRI-O Repository (INSIDE INSTALLROOT)
+# ###############################################################
+# - name: Set CRI-O repository versions from environment
+#   set_fact:
+#     crio_repo_ver: "{{ lookup('env','kubetnet_version') | default('1.34', true) }}"
 
-- name: Install Kubernetes repository into installroot
-  copy:
-    dest: "{{ build_root }}/rootfs/etc/yum.repos.d/kubernetes.repo"
-    owner: root
-    group: root
-    mode: '0644'
-    content: |
-      [kubernetes]
-      name=Kubernetes {{ kubernetes_repo_ver }}
-      baseurl={{ kubernetes_repo_url }}
-      enabled=1
-      gpgcheck=1
-      gpgkey={{ kubernetes_repo_gpg }}
+# - name: Set CRI-O repository URLs
+#   set_fact:
+#     crio_repo_url: "https://download.opensuse.org/repositories/isv:/cri-o:/stable:/v{{ crio_repo_ver }}/rpm/"
+#     crio_repo_gpg: "https://download.opensuse.org/repositories/isv:/cri-o:/stable:/v{{ crio_repo_ver }}/rpm/repomd.xml.key"
+
+# - name: Install CRI‑O repository into install root  
+#   copy:
+#     dest: "{{ build_root }}/rootfs/etc/yum.repos.d/crio.repo"
+#     owner: root
+#     group: root
+#     mode: '0644'
+#     content: |
+#       [crio]
+#       name=CRI-O {{ crio_repo_ver }}
+#       baseurl={{ crio_repo_url }}
+#       enabled=1
+#       gpgcheck=1
+#       gpgkey={{ crio_repo_gpg }}
+
+# ###############################################################
+# # Kubernetes Repository (INSIDE INSTALLROOT)
+# ###############################################################
+# - name: Set Kubernetes repository versions from environment
+#   set_fact:
+#     kubernetes_repo_ver: "{{ lookup('env','kubetnet_version') | default('1.34', true) }}"
+
+# - name: Set Kubernetes repository URLs
+#   set_fact:
+#     kubernetes_repo_url: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_repo_ver }}/rpm/"
+#     kubernetes_repo_gpg: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_repo_ver }}/rpm/repodata/repomd.xml.key"
+
+# - name: Install Kubernetes repository into installroot
+#   copy:
+#     dest: "{{ build_root }}/rootfs/etc/yum.repos.d/kubernetes.repo"
+#     owner: root
+#     group: root
+#     mode: '0644'
+#     content: |
+#       [kubernetes]
+#       name=Kubernetes {{ kubernetes_repo_ver }}
+#       baseurl={{ kubernetes_repo_url }}
+#       enabled=1
+#       gpgcheck=1
+#       gpgkey={{ kubernetes_repo_gpg }}
 
 ###############################################################
 # Refresh metadata inside installroot

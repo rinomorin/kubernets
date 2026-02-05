@@ -12,9 +12,12 @@
 ###############################################################
 # Install minimal Rocky rootfs with CRI-O + Kubernetes
 ###############################################################
+
 - name: Install Rocky rootfs with CRI-O + Kubernetes
   command: >
-    dnf --releasever={{ rocky_major }} --installroot={{ build_root }}/rootfs
+    dnf --releasever={{ rocky_major }}
+    --installroot={{ build_root }}/rootfs
+    --setopt=reposdir={{ build_root }}/rootfs/etc/yum.repos.d
     --setopt=install_weak_deps=False
     --nodocs
     install
