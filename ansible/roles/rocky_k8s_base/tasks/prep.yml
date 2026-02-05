@@ -63,33 +63,6 @@
       gpgcheck=1
       gpgkey={{ kubernetes_repo_gpg }}
 
-- name: Copy Rocky 10 repo files from vm_host server
-  become: false
-  command: >
-    scp -o StrictHostKeyChecking=no
-    {{ VM_HOST_IP }}:/etc/yum.repos.d/rocky*.repo
-    {{ cloud_helper_workdir }}/.
-
-- name: Set permissions on copied repo files
-  become: false
-  file:
-    path: "{{ item }}"
-    mode: '0644'
-  loop: "{{ lookup('fileglob', cloud_helper_workdir + '/*.repo', wantlist=True) }}"
- 
-- name: Move Rocky 10 repo files into installroot
-  become: true
-  command: >
-    mv {{ item }}
-    {{ build_root }}/rootfs/etc/yum.repos.d/
-  loop: "{{ lookup('fileglob', cloud_helper_workdir + '/*.repo', wantlist=True) }}"
-
-- name: Move Rocky 10 repo files into installroot
-  command: >
-    chmod 0644 {{ build_root }}/rootfs/etc/yum.repos.d/{{ item | basename }}
-  loop: "{{ lookup('fileglob', build_root + '/rootfs/etc/yum.repos.d/*.repo', wantlist=True) }}"
-
-
 ###############################################################
 # Refresh metadata inside installroot
 ###############################################################
