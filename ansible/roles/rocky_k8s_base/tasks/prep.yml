@@ -68,16 +68,16 @@
   command: >
     scp -o StrictHostKeyChecking=no
     {{ VM_HOST_IP }}:/etc/yum.repos.d/rocky*.repo
-    /tmp/.
+    .
 
 - name: set permissions to 644 on copied repo files
   become: false
   command: >
-    chmod 644 /tmp/rocky*.repo
+    chmod 644 rocky*.repo
   
 - name: Move Rocky 10 repo files into installroot
   command: >
-    mv /tmp/rocky*.repo
+    mv rocky*.repo
     {{ build_root }}/rootfs/etc/yum.repos.d/
 
 ###############################################################
