@@ -32,7 +32,7 @@
     install -y
     rocky-release systemd bash coreutils util-linux iproute iputils
     openssh-server dracut kernel podman kubeadm kubectl
-    rpm rpm-libs rpm-build-libs sqlite-libs dnf dnf-plugins-core
+    rpm rpm-libs rpm-build-libs dnf dnf-plugins-core
     grub2-efi-x64 shim-x64
   args:
     creates: "{{ build_root }}/rootfs/usr/bin/bash"
