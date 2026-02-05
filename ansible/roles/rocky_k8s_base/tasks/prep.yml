@@ -78,9 +78,11 @@
   loop: "{{ lookup('fileglob', cloud_helper_workdir + '/*.repo', wantlist=True) }}"
  
 - name: Move Rocky 10 repo files into installroot
+  become: true
   command: >
-    mv "{{ cloud_helper_workdir }}/*.repo"
-    "{{ build_root }}/rootfs/etc/yum.repos.d/"
+    mv {{ item }}
+    {{ build_root }}/rootfs/etc/yum.repos.d/
+  loop: "{{ lookup('fileglob', cloud_helper_workdir + '/*.repo', wantlist=True) }}"
 
 ###############################################################
 # Refresh metadata inside installroot
