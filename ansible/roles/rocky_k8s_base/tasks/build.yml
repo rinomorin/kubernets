@@ -1,7 +1,13 @@
 ---
-- name: Detect full Rocky version
+- name: Detect local Rocky version from /etc/os-release
+  delegate_to: localhost
+  become: false
+  shell: "source /etc/os-release && echo $VERSION_ID"
+  register: rocky_version_raw
+
+- name: Set Rocky version fact
   set_fact:
-    rocky_version_full: "{{ ansible_distribution_version }}"
+    rocky_version: "{{ rocky_version_raw.stdout }}"
 
 ###############################################################
 # Install minimal Rocky rootfs with CRI-O + Kubernetes
