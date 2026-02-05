@@ -42,18 +42,23 @@
     opts: defaults
     state: mounted
 
-- name: Mount ESP
-  mount:
+- name: Create /boot directory
+  file:
     path: "{{ build_root }}/mnt/boot"
+    state: directory
+
+- name: Mount ESP at /boot/efi
+  mount:
+    path: "{{ build_root }}/mnt/boot/efi"
     src: "{{ loopdev.stdout }}p1"
     fstype: vfat
     opts: defaults
     state: mounted
 
-- name: Copy rootfs into disk (exclude /boot)
+- name: Copy rootfs into disk (exclude /boot/efi)
   command: >
     rsync -aHAX --numeric-ids
-    --exclude=boot/*
+    --exclude=boot/efi
     {{ build_root }}/rootfs/ {{ build_root }}/mnt/
 
 ###############################################################
