@@ -1,13 +1,4 @@
 ---
-- name: Rocky K8s Base Prep Tasks
-  debug:
-    msg: "working in {{ build_root }} folder as {{ ansible_user}}"
-- name: who am I
-  command: whoami
-  register: whoami_out
-- debug:
-    msg: "Current user is {{ whoami_out.stdout }}"
-
 # Ensure directories exist
 - name: Ensure build directories exist
   file:
@@ -71,6 +62,13 @@
       enabled=1
       gpgcheck=1
       gpgkey={{ kubernetes_repo_gpg }}
+
+- name: Copy Rocky 10 repo files from vm_host server
+  command: >
+    scp -o StrictHostKeyChecking=no
+    {{ VM_HOST_IP }}:/etc/yum.repos.d/rocky*.repo
+    /opt/cloud_helper/rocky_build/rootfs/etc/yum.repos.d/
+
 
 ###############################################################
 # Refresh metadata inside installroot

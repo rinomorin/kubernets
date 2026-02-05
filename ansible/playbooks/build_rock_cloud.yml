@@ -17,6 +17,7 @@
     - name: load environment
       set_fact:
         VM_HOST: "{{ lookup('env','VM_HOST')}}"
+        VM_HOST_IP: "{{ lookup('env','VM_HOST_IP')}}"
         secops_id: "{{ lookup('env', 'secops_id') }}"
         cloud_id: "{{ lookup('env', 'cloud_id') }}"
         secops_pwd: "{{ lookup('env', 'secops_pwd') }}"
