@@ -28,8 +28,8 @@
 - name: Format ESP
   command: mkfs.vfat {{ loopdev.stdout }}p1
 
-- name: Format root
-  command: mkfs.ext4 {{ loopdev.stdout }}p2
+- name: Format root with required ext4 features
+  command: mkfs.ext4 -F -O ^metadata_csum {{ loopdev.stdout }}p2
 
 ###############################################################
 # Mount + populate
