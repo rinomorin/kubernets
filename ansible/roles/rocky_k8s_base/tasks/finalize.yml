@@ -74,11 +74,11 @@
 - debug:
     var: mount_output.stdout_lines
 
-
-- name: Copy rootfs into disk (exclude /boot/efi)
+- name: Copy rootfs into disk (exclude /boot/efi and symvers link)
   command: >
     rsync -aH --numeric-ids
     --exclude=boot/efi
+    --exclude=boot/symvers-*.gz
     {{ build_root }}/rootfs/ {{ build_root }}/mnt/
 
 ###############################################################
