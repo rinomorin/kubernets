@@ -79,11 +79,33 @@
     - { src: "overlay-etc.service.j2", dest: "overlay-etc.service" }
     - { src: "overlay-var.service.j2", dest: "overlay-var.service" }
 
-- name: Enable overlayfs units
+###############################################################
+# Ensure systemd unit directory exists inside rootfs
+###############################################################
+- name: Ensure systemd unit directory exists
   file:
-    src: "/usr/lib/systemd/system/{{ item }}"
-    dest: "{{ build_root }}/rootfs/etc/systemd/system/local-fs.target.wants/{{ item }}"
-    state: link
+    path: "{{ build_root }}/rootfs/usr/lib/systemd/system"
+    state: directory
+    mode: '0755'
+
+###############################################################
+# Install overlayfs units into rootfs
+###############################################################
+- name: Install overlayfs units
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ build_root }}/rootfs/usr/lib/systemd/system/{{ item.dest }}"
+    mode: '0644'
+  loop:
+    - { src: "overlay-etc.service.j2", dest: "overlay-etc.service" }
+    - { src: "overlay-var.service.j2", dest: "overlay-var.service" }
+
+###############################################################
+# Enable overlayfs units inside rootfs
+###############################################################
+- name: Enable overlayfs units inside rootfs
+  command: >
+    chroot {{ build_root }}/rootfs systemctl enable {{ item }}
   loop:
     - overlay-etc.service
     - overlay-var.service
