@@ -82,8 +82,12 @@
   command: >
     mv {{ item }}
     {{ build_root }}/rootfs/etc/yum.repos.d/
-    chmod 644 {{ build_root }}/rootfs/etc/yum.repos.d/$(basename {{ item }})
   loop: "{{ lookup('fileglob', cloud_helper_workdir + '/*.repo', wantlist=True) }}"
+
+- name: Move Rocky 10 repo files into installroot
+  become: true
+  command: >
+  loop: "{{ lookup('fileglob', build_root + '/rootfs/etc/yum.repos.d/*.repo', wantlist=True) }}"
 
 
 ###############################################################
