@@ -85,6 +85,10 @@
     group: root
     recurse: true
 
+- name: Relabel target rootfs for SELinux
+  become: true
+  command: restorecon -R {{ build_root }}/mnt
+
 - name: Rebuild RPM database in target
   become: true
   command: rpm --root {{ build_root }}/mnt --rebuilddb
