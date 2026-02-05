@@ -84,6 +84,16 @@
     {{ build_root }}/rootfs/etc/yum.repos.d/
   loop: "{{ lookup('fileglob', cloud_helper_workdir + '/*.repo', wantlist=True) }}"
 
+- name: change ownership of repo files in installroot
+  become: true
+  file: 
+    path: "{{ build_root }}/rootfs/etc/yum.repos.d/*.repo"
+    owner: root
+    group: root
+    mode: '0644'
+  loop: "{{ lookup('fileglob', build_root + '/rootfs/etc/yum.repos.d/*.repo', wantlist=True) }}" 
+
+
 ###############################################################
 # Refresh metadata inside installroot
 ###############################################################
