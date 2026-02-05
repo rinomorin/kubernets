@@ -76,17 +76,11 @@
     path: "{{ item }}"
     mode: '0644'
   loop: "{{ lookup('fileglob', cloud_helper_workdir + '/*.repo', wantlist=True) }}"
-
-
-# - name: set permissions to 644 on copied repo files
-#   become: false
-#   command: >
-#     chmod 644 {{ cloud_helper_workdir }}/*.repo
-  
+ 
 - name: Move Rocky 10 repo files into installroot
   command: >
-    mv {{ cloud_helper_workdir }}/*.repo
-    {{ build_root }}/rootfs/etc/yum.repos.d/
+    mv "{{ cloud_helper_workdir }}/*.repo"
+    "{{ build_root }}/rootfs/etc/yum.repos.d/"
 
 ###############################################################
 # Refresh metadata inside installroot
