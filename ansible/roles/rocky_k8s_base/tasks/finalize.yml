@@ -50,8 +50,11 @@
     opts: defaults
     state: mounted
 
-- name: Copy rootfs into disk
-  command: rsync -aHAX --numeric-ids {{ build_root }}/rootfs/ {{ build_root }}/mnt/
+- name: Copy rootfs into disk (exclude /boot)
+  command: >
+    rsync -aHAX --numeric-ids
+    --exclude=boot/*
+    {{ build_root }}/rootfs/ {{ build_root }}/mnt/
 
 ###############################################################
 # Install GRUB
