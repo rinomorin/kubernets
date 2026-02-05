@@ -6,6 +6,10 @@
       import_tasks: prep.yml
       delegate_to: localhost
 
+    - name: fix url
+      import_tasks: fix_url.yml
+      delegate_to: localhost  
+
     - name: Run image build tasks on builder
       import_tasks: build.yml
       delegate_to: localhost

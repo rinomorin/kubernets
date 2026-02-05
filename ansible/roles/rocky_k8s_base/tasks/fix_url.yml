@@ -1,0 +1,43 @@
+###############################################################
+# Rewrite Rocky repo files inside installroot (mirrorlist → baseurl)
+###############################################################
+
+- name: Disable mirrorlist entries in Rocky repo files
+  replace:
+    path: "{{ build_root }}/rootfs/etc/yum.repos.d/{{ item }}"
+    regexp: '^mirrorlist=.*$'
+    replace: '#mirrorlist disabled for installroot'
+  loop:
+    - rocky.repo
+    - rocky-extras.repo
+    - rocky-addons.repo
+    - rocky-devel.repo
+
+- name: Uncomment baseurl lines in Rocky repo files
+  replace:
+    path: "{{ build_root }}/rootfs/etc/yum.repos.d/{{ item }}"
+    regexp: '^#baseurl='
+    replace: 'baseurl='
+  loop:
+    - rocky.repo
+    - rocky-extras.repo
+    - rocky-addons.repo
+    - rocky-devel.repo
+
+- name: Fix Rocky BaseOS baseurl
+  replace:
+    path: "{{ build_root }}/rootfs/etc/yum.repos.d/rocky.repo"
+    regexp: 'baseurl=.*BaseOS.*'
+    replace: 'baseurl=https://dl.rockylinux.org/pub/rocky/9/BaseOS/x86_64/os/'
+
+- name: Fix Rocky AppStream baseurl
+  replace:
+    path: "{{ build_root }}/rootfs/etc/yum.repos.d/rocky.repo"
+    regexp: 'baseurl=.*AppStream.*'
+    replace: 'baseurl=https://dl.rockylinux.org/pub/rocky/9/AppStream/x86_64/os/'
+
+- name: Fix Rocky Extras baseurl
+  replace:
+    path: "{{ build_root }}/rootfs/etc/yum.repos.d/rocky-extras.repo"
+    regexp: 'baseurl=.*extras.*'
+    replace: 'baseurl=https://dl.rockylinux.org/pub/rocky/9/extras/x86_64/os/'
