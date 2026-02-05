@@ -91,7 +91,7 @@
 
 - name: Rebuild RPM database in target
   become: true
-  command: rpm -R {{ build_root }}/mnt --rebuilddb
+  command: rpm --root {{ build_root }}/mnt --rebuilddb
 
 - name: Install GRUB packages into target
   command: >
