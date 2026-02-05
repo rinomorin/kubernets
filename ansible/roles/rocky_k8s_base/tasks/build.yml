@@ -25,7 +25,7 @@
     --enablerepo=kubernetes
     --setopt=install_weak_deps=False
     --nodocs
-    install
+    install -y
     rocky-release systemd bash coreutils util-linux iproute iputils
     openssh-server dracut kernel podman kubeadm kubectl
   args:
