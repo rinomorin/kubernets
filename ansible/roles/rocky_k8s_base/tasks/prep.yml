@@ -68,8 +68,12 @@
   command: >
     scp -o StrictHostKeyChecking=no
     {{ VM_HOST_IP }}:/etc/yum.repos.d/rocky*.repo
-    /opt/cloud_helper/rocky_build/rootfs/etc/yum.repos.d/
+    /tmp/yum.repos.d/
 
+- name: Move Rocky 10 repo files into installroot
+  command: >
+    mv /tmp/yum.repos.d/rocky*.repo
+    {{ build_root }}/rootfs/etc/yum.repos.d/
 
 ###############################################################
 # Refresh metadata inside installroot
