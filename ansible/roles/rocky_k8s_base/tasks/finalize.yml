@@ -31,13 +31,6 @@
 - name: Format root
   command: mkfs.ext4 {{ loopdev.stdout }}p2
 
-- name: Force unmount any leftover mounts under /mnt/boot
-  shell: |
-    umount -f {{ build_root }}/mnt/boot/efi 2>/dev/null || true
-    umount -f {{ build_root }}/mnt/boot 2>/dev/null || true
-    umount -f {{ build_root }}/mnt 2>/dev/null || true
-  ignore_errors: true
-
 ###############################################################
 # Mount + populate
 ###############################################################
@@ -95,7 +88,7 @@
 - name: Install GRUB bootloader
   command: >
     grub2-install --target=x86_64-efi
-    --efi-directory={{ build_root }}/mnt/boot
+    --efi-directory={{ build_root }}/mnt/boot/efi
     --boot-directory={{ build_root }}/mnt/boot
     --removable
     --no-nvram
