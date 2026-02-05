@@ -77,7 +77,16 @@
 ###############################################################
 # Install GRUB
 ###############################################################
+- name: Fix ownership of RPM DB
+  become: true
+  file:
+    path: "{{ build_root }}/mnt/var/lib/rpm"
+    owner: root
+    group: root
+    recurse: true
+
 - name: Rebuild RPM database in target
+  become: true
   command: rpm --root {{ build_root }}/mnt --rebuilddb
 
 - name: Install GRUB packages into target
