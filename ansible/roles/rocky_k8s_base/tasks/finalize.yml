@@ -34,6 +34,13 @@
 ###############################################################
 # Mount + populate
 ###############################################################
+- name: Hard reset all mounts under build_root
+  shell: |
+    umount -f {{ build_root }}/mnt/boot/efi 2>/dev/null || true
+    umount -f {{ build_root }}/mnt/boot 2>/dev/null || true
+    umount -f {{ build_root }}/mnt 2>/dev/null || true
+  ignore_errors: true
+
 - name: Mount root partition
   mount:
     path: "{{ build_root }}/mnt"
