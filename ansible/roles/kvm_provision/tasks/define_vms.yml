@@ -2,6 +2,15 @@
   debug:
     msg: "stage is {{ vm_build_stage }}"
 
+- name: Get controller IP
+  delegate_to: localhost
+  become: false
+  shell: "ip -4 route get 1.1.1.1 | awk '{print $7; exit}'"
+  register: controller_ip2
+
+- name: set` controller_ip
+  set_fact:
+    controller_ip: "{{ controller_ip2.stdout }}"
 - name: Ensure Kickstart staging directory in user home
   file:
     path: "/home/kvm_admin/kickstarts"
@@ -241,6 +250,7 @@
     tsecops_hash: "{{ lookup('env','secops_hash') }}"
     tsecops_key: "{{ lookup('env','secops_key') }}"
   when: "'helper_nodes' in group_names"
+
 - name: set nat_mac_device
   set_fact:
     nat_mac_device: "{{ lookup('env', 'nat_mac_device')| default('52:54:00:79:8d:dd') }}"
@@ -284,7 +294,9 @@
     default_net_device: "{{ lookup('env', 'default_net_device') }}"
     cluster_net_device: "{{ lookup('env', 'cluster_net_device') }}"
     nat_net_device: "{{ lookup('env', 'nat_net_device') }}"
-    nat_mac_device: "{{ lookup('env', 'nat_mac_device') }}" 
+    nat_mac_device: "{{ lookup('env', 'nat_mac_device') }}"
+    my_controller_ip: "{{ controller_ip }}"
+    my_os_variant: "{{ os_variant }}"
   no_log: true
 
 - name: Execute virt-install non-interactively and wait for completion
@@ -308,7 +320,6 @@
       --console pty,target_type=serial
       --location {{ iso }}
       --noautoconsole
-
 
 - debug:
     msg: "vm_build_state is {{ vm_build_state }}"

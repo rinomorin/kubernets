@@ -1,6 +1,17 @@
 ---
+- name: who am I
+  command: whoami
+  become: false
+  register: whoami_out
+- debug:
+    msg: "Current user is {{ whoami_out.stdout }}"
+
 # Orchestrator: include focused task files in order
 - import_tasks: preflight.yml
+  vars:
+    ansible_user: "{{ admin_id }}"
+    ansible_ssh_pass: "{{ admin_set }}"
+
 - import_tasks: helper_space.yml
 - import_tasks: users.yml
 - import_tasks: keys.yml
@@ -15,12 +26,19 @@
 - import_tasks: boot_strap.yml
 - import_tasks: ignition.yml
 # ============================================================
-# FCOS-only block
+# rocky-only block
 # ============================================================
+- name: Gather facts manually
+  become: false
+  setup:
+
+- debug:
+    msg: "OS Family: {{ ansible_facts['os_family'] }}, Distribution: {{ ansible_facts['distribution'] }}"
+
 - name: FCOS-only containerd setup
   block:
-    - name: Include rpm-ostree layering
-      import_tasks: ostree.yml
+    # - name: Include rpm-ostree layering
+    #   import_tasks: ostree.yml
     - name: Include CRI setup
       import_tasks: containerd.yml
       when: fcos_cri == "containerd"
@@ -28,11 +46,12 @@
       import_tasks: kubelet.yml
   when: >
     ansible_facts['os_family'] == "RedHat"
-    and ansible_facts['distribution'] == "Fedora CoreOS"
+    and ansible_facts['distribution'] == "Rocky"
 
 - name: add sudoers entry for cloud_helper user
   import_tasks: render_sudoers_templates.yml
-  
+  when: inventory_hostname == helper_node
+
 # - name: Build nodes
 #   import_tasks: nodes.yml
 

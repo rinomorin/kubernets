@@ -13,6 +13,19 @@
     shell: /bin/bash
     state: present
 
+- name: Add {{ cloud_helper_user }} to required groups without losing existing ones
+  become: true
+  user:
+    name: "{{ cloud_helper_user }}"
+    groups: "{{ item }}"
+    append: true
+  loop:
+    - "{{ awx_group }}"
+    - "{{ secure_group }}"
+    - "sshusers"
+
+    - "sshusers"
+
 - name: Pre-create Ansible temporary directory for cloud_helper
   become: true
   file:

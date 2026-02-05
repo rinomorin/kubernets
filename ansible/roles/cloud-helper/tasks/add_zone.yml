@@ -26,7 +26,7 @@
   become: yes
   command: >
     ipa dnszone-add {{ cloud_zone }}
-    --name-server={{ ipa_master }}.{{ ipa_domain }}.
+    --name-server={{ ipa_master.split('.')[0] }}.{{ ipa_domain }}.
   when: zone_check.rc != 0
   register: create_zone
   changed_when: create_zone.rc == 0
@@ -55,7 +55,7 @@
   become: yes
   command: >
     ipa dnszone-add {{ reverse_zone }}
-    --name-server={{ ipa_master }}.{{ ipa_domain }}.
+    --name-server={{ ipa_master.split('.')[0] }}.{{ ipa_domain }}.
   when: rev_check.rc != 0
   register: rev_create
   changed_when: rev_create.rc == 0
@@ -96,7 +96,7 @@
   become: yes
   command: >
     ipa dnsrecord-add {{ cloud_zone }}
-    @ --ns-rec={{ ipa_master }}.{{ ipa_domain }}.
+    @ --ns-rec={{ ipa_master.split('.')[0] }}.{{ ipa_domain }}.
   register: child_ns
   failed_when: false
   changed_when: "'Added record' in child_ns.stdout"

@@ -1,3 +1,17 @@
+- name: who am I
+  command: whoami
+  become: false
+  register: whoami_out
+- debug:
+    msg: "Current user is {{ whoami_out.stdout }}"
+ 
+- name: set vm_host to inventory_hostname if not defined
+  set_fact:
+    vm_host: "{{ inventory_hostname_short }}"
+  when: vm_host is not defined
+  delegate_to: localhost
+  become: false
+
 - name: Create local sudoers staging directory
   become: false
   file:
@@ -7,7 +21,7 @@
     recurse: true
   delegate_to: localhost
 
-- name: Render sudoers template {{ item.1 }} for group {{ item.0.key }}
+- name: Render sudoers template
   template:
     src: "{{ item.1 }}.j2"
     dest: "/tmp/{{ vm_host }}/etc/sudoers.d/{{ item.1 }}"
@@ -18,7 +32,9 @@
   loop: "{{ template_map | dict2items | subelements('value') }}"
   loop_control:
     label: "{{ item.0.key }}/{{ item.1 }}"
-  when: item.0.key in default_groups
+  when: 
+    - item is defined
+    - item.0.key in default_groups
   become: false
   delegate_to: localhost
 
@@ -36,7 +52,7 @@
   delegate_to: localhost
 
 
-- name: Validate sudoers template {{ item.1 }} with visudo
+- name: Validate sudoers template with visudo
   become: false
   command: >
     visudo -cf /tmp/{{ vm_host }}/etc/sudoers.d/{{ item.1 }}
@@ -80,6 +96,14 @@
   delegate_to: localhost
   become: false
 
+- name: Copy validated sudoers file to clean staging path
+  copy:
+    src: "/tmp/{{ vm_host }}/etc/sudoers"
+    dest: "/tmp/{{ vm_host }}/final/etc/sudoers"
+    remote_src: false
+  delegate_to: localhost
+  become: false
+
 - name: Gather staged files from localhost
   slurp:
     src: "{{ item }}"
@@ -93,10 +117,10 @@
     src: "/etc/{{ item | basename }}"
   register: remote_files
   delegate_to: "{{ vm_host }}"
-  vars:
-    ansible_user: "{{ admin_id }}"
-    ansible_ssh_pass: "{{ admin_set }}"
-    ansible_host: "{{ vm_fqdn }}"
+  # vars:
+  #   ansible_user: "{{ admin_id }}"
+  #   ansible_ssh_pass: "{{ admin_set }}"
+  #   ansible_host: "{{ vm_fqdn }}"
   become: true
   loop: "{{ lookup('fileglob', '/tmp/' ~ vm_host ~ '/etc/*', wantlist=True) }}"
 
@@ -159,7 +183,7 @@
 
     - name: Verify sudo shell/su access on guest
       shell: |
-        sudo -l | grep -E '(su|/bin/sh|/usr/bin/sh)' && echo "SUDO_SHELL_OK" || echo "SUDO_SHELL_FAIL"
+        sudo -l | grep -E '(su|/bin/sh|/usr/bin/sh)' 2>/dev/null && echo "SUDO_SHELL_OK" || echo "SUDO_SHELL_FAIL"
       register: sudo_shell_check
       failed_when: "'SUDO_SHELL_OK' not in sudo_shell_check.stdout"
       become: true

@@ -63,7 +63,7 @@
   delegate_to: "{{ ipa_master }}"
   run_once: false
   shell: |
-    ipa-getkeytab -s {{ ipa_master }}.{{ ipa_domain | lower }} \
+    ipa-getkeytab -s {{ ipa_master.split('.')[0] }}.{{ ipa_domain | lower }} \
       -p host/{{ item }} \
       -k /tmp/{{ item }}.keytab
   loop: "{{ hostlist }}"

@@ -44,4 +44,4 @@
       when: ostree_k8s.changed or ostree_cri.changed
   when: >
     ansible_facts['os_family'] == "RedHat"
-    and ansible_facts['distribution'] == "Fedora CoreOS"
+    and ansible_facts['distribution'] == "Rocky"

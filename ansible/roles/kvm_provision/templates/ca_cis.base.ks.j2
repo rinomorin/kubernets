@@ -1,7 +1,14 @@
 #version=RHEL9
 #url --url=file:///run/install/repo
-url --mirrorlist={{ kickstart_baseos_url | default('https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=BaseOS-9.6') }}
-repo --name=AppStream --mirrorlist={{ kickstart_appstream_url | default('https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=AppStream-9.6') }}
+url --mirrorlist={{ kickstart_baseos_url | default('https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=BaseOS-9.7') }}
+repo --name=AppStream --mirrorlist={{ kickstart_appstream_url | default('https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=AppStream-9.7') }}
+#{% set controller_ip = my_controller_ip %}
+#{% set rocky_version = my_os_variant %}
+#{% set baseos_url = "http://" ~ controller_ip ~ "/rocky/9.7/BaseOS" %}
+#{% set appstream_url = "http://" ~ controller_ip ~ "/rocky/9.7/AppStream" %}
+
+#url --url={{ baseos_url }}
+#repo --name=AppStream --baseurl={{ appstream_url }}
 
 lang {{ lang | default('en_CA.UTF-8') }}
 keyboard --vckeymap={{ keyboard_vckeymap | default('us') }} --xlayouts='{{ keyboard_xlayouts | default("us") }}'

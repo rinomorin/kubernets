@@ -100,4 +100,4 @@
       nmcli con up enp3s0
     fi
   when: "'helper_nodes' in group_names or 'cluster_nodes' in group_names"
-  no_log: true
+  # no_log: true

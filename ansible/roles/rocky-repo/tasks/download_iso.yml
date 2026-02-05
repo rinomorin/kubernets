@@ -1,0 +1,22 @@
+- name: Ensure local Rocky repo directory exists
+  file:
+    path: "{{ iso_repo }}"
+    state: directory
+    mode: '0755'
+
+- name: Ensure rsync is installed
+  package:
+    name: rsync
+    state: present
+
+- name: Mirror Rocky repository via rsync
+  command: >
+    rsync -avz --delete
+    --exclude="isos/"
+    --exclude="*/aarch64/"
+    --exclude="*/ppc64le/"
+    --exclude="*/s390x/"
+    rsync://mirrors.ocf.berkeley.edu/rocky/{{ rocky_major }}/
+    {{ iso_repo }}/repo/
+  args:
+    creates: "{{ iso_repo }}/.treeinfo"

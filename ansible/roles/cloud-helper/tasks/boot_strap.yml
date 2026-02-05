@@ -1,11 +1,24 @@
 ---
 - name: Ensure API directory exists
+  become: true
   file:
     path: "{{ cloud_helper_api_dir }}"
     state: directory
     owner: "{{ cloud_helper_api_user }}"
     group: "{{ cloud_helper_api_group }}"
     mode: '0755'
+
+- name: Ensure helper working directories exist
+  become: true
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ cloud_helper_api_user }}"
+    group: "{{ cloud_helper_api_group }}"
+    mode: '0755'
+  loop:
+    - /opt/cloud_helper
+    - /opt/cloud_helper/bin
 
 - name: Copy requirements file to final_vm_order
   copy:

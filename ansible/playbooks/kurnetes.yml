@@ -61,6 +61,17 @@
           private: "enp2s0"
           nat: "enp3s0"
 
+# prep controller for role images
+- hosts: localhost
+  connection: ssh
+  gather_facts: false
+  vars:
+    ansible_remote_tmp: "{{ iso_repo }}/repo/.ansible/tmp"
+    ansible_user: "{{ lookup('env', 'secops_id') }}"
+    ansible_password: "{{ lookup('env', 'secops_pwd') }}"
+  roles:
+    - rocky-repo
+
 
 # display which sys being processed
 - name: Info VMs from KVM host

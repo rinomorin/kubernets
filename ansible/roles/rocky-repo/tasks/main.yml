@@ -1,0 +1,14 @@
+# - name: Detect latest Rocky version
+#   include_tasks: detect_version.yml
+
+- name: Setup Rocky Linux repository
+  become: yes
+  block:
+    - name: Download Rocky ISO
+      include_tasks: download_iso.yml
+
+    - name: Mount ISO with SELinux context
+      include_tasks: mount_img.yml
+
+    - name: Configure Apache HTTPS repo
+      include_tasks: apache.yml

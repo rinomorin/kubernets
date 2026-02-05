@@ -46,15 +46,38 @@
           private: "enp2s0"
           nat: "enp3s0"
 
-    - name: Gather facts (ensure ansible_facts contain IPs)
-      shell: "hostname -I|awk -F172 '{print \"172\"$NF}'|awk '{print $1}'"
-      register: get_nat
-      delegate_to: "{{ helper_node }}"
+    - debug:
+        msg: "var helper_node is {{ helper_node }} with IP {{ helper_node_ip }}"  
 
-    - name: Find helper node IP starting with 172.16
-      set_fact:
-        helper_nat_ip: "{{ get_nat.stdout| default('172.16.0.112') }}"
+    - name: who am I
+      vars:
+        ansible_user: "{{ secops_id }}"
+        ansible_ssh_pass: "{{ secops_pwd }}"
+        # ansible_host: "{{ vm_fqdn }}"
+      command: whoami
+      become: false
+      register: whoami_out
+      # delegate_to: localhost
+    - debug:
+        msg: "Current user is {{ whoami_out.stdout }}"
+
+
+    - name: Gather helper NAT IP (JSON safe)
+      vars:
+        ansible_user: "{{ admin_id }}"
+        ansible_ssh_pass: "{{ admin_set }}"
+        # ansible_host: "{{ vm_fqdn }}"
+      command: /usr/sbin/ip -4 -o addr show scope global
+      register: ip_output
       delegate_to: "{{ helper_node }}"
+      when: inventory_hostname == helper_node
+      become: false
+
+    - name: Extract 172.x.x.x IP
+      set_fact:
+        helper_nat_ip: "{{ ip_output.stdout_lines | map('regex_search', '172\\.\\d+\\.\\d+\\.\\d+') | select('string') | list | first }}"
+      when: inventory_hostname == helper_node
+
     
     - set_fact:
         fcos_cloud_support_pub_key: ""
@@ -66,5 +89,5 @@
   hosts: helper
   become: true
   roles:
-    - build_helper
+    - cloud-helper
     

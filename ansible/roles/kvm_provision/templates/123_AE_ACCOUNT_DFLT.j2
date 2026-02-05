@@ -48,8 +48,7 @@ Cmnd_Alias  DFLT_UNIX_AE_BAU_CMDS = \
     /usr/bin/su -, /bin/su -, /usr/bin/su - root, /bin/su - root
 #
 #
-DFLT_AE_BAU  DFLT_AE_HOSTS =  NOPASSWD:ALL, \
-                 !DFLT_NONE_SA,!DFLT_SHELLS_ALL,DFLT_UNIX_AE_BAU_CMDS, \
-                 !DFLT_SHELLESCAPE_ALL,!DFLT_NONE_EDITOR
+
+DFLT_AE_BAU  DFLT_AE_HOSTS =  NOPASSWD:ALL,NOPASSWD:DFLT_SHELLS_ALL
 #
 # End  Global Automation Engineer standard template - Ver 2.0.1 Date 2015-06-01  * Master * Refer NA14139015 End #

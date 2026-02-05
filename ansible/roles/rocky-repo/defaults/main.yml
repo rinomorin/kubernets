@@ -1,0 +1,6 @@
+iso_repo: "{{ lookup('env','ISO_REPO') | default('/opt/iso', true) }}"
+web_repo: "{{ lookup('env','WEB_REPO') | default('/var/www/html/rocky', true) }}"
+controller_ip: "{{ lookup('env','CONTROLLER_IP') | default(ansible_default_ipv4.address, true) }}"
+rocky_major: "9"
+rocky_variant: "dvd"
+rocky_iso: ""
