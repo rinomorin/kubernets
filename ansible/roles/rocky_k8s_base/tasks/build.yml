@@ -18,6 +18,12 @@
     dnf --releasever={{ rocky_major }}
     --installroot={{ build_root }}/rootfs
     --setopt=reposdir={{ build_root }}/rootfs/etc/yum.repos.d
+    --disablerepo="*"
+    --enablerepo="baseos"
+    --enablerepo="appstream"
+    --enablerepo="extras"
+    --enablerepo="cri-o"
+    --enablerepo="kubernetes"
     --setopt=install_weak_deps=False
     --nodocs
     install
