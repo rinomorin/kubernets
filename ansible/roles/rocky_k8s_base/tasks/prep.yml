@@ -70,6 +70,11 @@
     {{ VM_HOST_IP }}:/etc/yum.repos.d/rocky*.repo
     /tmp/.
 
+- name: wait_for copy Rocky 10 repo files
+  wait_for:
+    timeout: 2
+  
+
 - name: Move Rocky 10 repo files into installroot
   command: >
     mv /tmp/rocky*.repo
