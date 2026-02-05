@@ -42,12 +42,29 @@
     opts: defaults
     state: mounted
 
-- name: Create /boot directory
+- name: Ensure /boot exists on rootfs
+  file:
+    path: "{{ build_root }}/mnt/boot"
+    state: directory
+
+# IMPORTANT: make sure ESP is NOT mounted directly on /boot
+- name: Unmount any ESP accidentally mounted on /boot
+  mount:
+    path: "{{ build_root }}/mnt/boot"
+    state: unmounted
+  ignore_errors: true
+
+- name: Ensure /boot is still a directory on ext4
   file:
     path: "{{ build_root }}/mnt/boot"
     state: directory
 
 - name: Mount ESP at /boot/efi
+  file:
+    path: "{{ build_root }}/mnt/boot/efi"
+    state: directory
+
+- name: Mount ESP
   mount:
     path: "{{ build_root }}/mnt/boot/efi"
     src: "{{ loopdev.stdout }}p1"
@@ -57,7 +74,7 @@
 
 - name: Copy rootfs into disk (exclude /boot/efi)
   command: >
-    rsync -aHAX --numeric-ids
+    rsync -aH --numeric-ids
     --exclude=boot/efi
     {{ build_root }}/rootfs/ {{ build_root }}/mnt/
 
