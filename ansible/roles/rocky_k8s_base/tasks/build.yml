@@ -1,20 +1,20 @@
 ---
-- name: Detect local Rocky version from /etc/os-release
+- name: Detect Rocky major version
   delegate_to: localhost
   become: false
-  shell: "source /etc/os-release && echo $VERSION_ID"
-  register: rocky_version_raw
+  shell: "source /etc/os-release && echo ${VERSION_ID%%.*}"
+  register: rocky_major_raw
 
-- name: Set Rocky version fact
+- name: Set Rocky major version fact
   set_fact:
-    rocky_version: "{{ rocky_version_raw.stdout }}"
+    rocky_major: "{{ rocky_major_raw.stdout }}"
 
 ###############################################################
 # Install minimal Rocky rootfs with CRI-O + Kubernetes
 ###############################################################
 - name: Install Rocky rootfs with CRI-O + Kubernetes
   command: >
-    dnf --releasever={{ rocky_version }} --installroot={{ build_root }}/rootfs
+    dnf --releasever={{ rocky_major }} --installroot={{ build_root }}/rootfs
     --setopt=install_weak_deps=False
     --nodocs
     install
