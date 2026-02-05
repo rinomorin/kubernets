@@ -14,7 +14,7 @@
 ###############################################################
 - name: Install Rocky rootfs with CRI-O + Kubernetes
   command: >
-    dnf --releasever={{ rocky_version_full }} --installroot={{ build_root }}/rootfs
+    dnf --releasever={{ rocky_version }} --installroot={{ build_root }}/rootfs
     --setopt=install_weak_deps=False
     --nodocs
     install
