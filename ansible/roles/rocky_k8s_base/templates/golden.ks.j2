@@ -4,12 +4,11 @@
 url --mirrorlist={{ 'https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=BaseOS-' ~ my_os_variant }}
 repo --name=AppStream --mirrorlist={{ 'https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=AppStream-' ~ my_os_variant }}
 
-lang en_CA.UTF-8    
+lang en_CA.UTF-8
 keyboard  --vckeymap=us --xlayouts='us'
 timezone UTC,UTCS
-
 # NIC 1 — NAT (always enp0s1)
-network --bootproto=dhcp --device=enp1s0 --activate
+network --bootproto=dhcp --device=enp1s0 --activate  --hostname={{ hostname | default(inventory_hostname) }}
 
 # ------------------------------------------------------------
 # System basics
@@ -70,6 +69,9 @@ openssh-clients
 mkdir -p /home/core/.ssh
 chmod 700 /home/core/.ssh
 
+cat << 'EOF' >> /etc/sudoers 
+core ALL=(ALL) NOPASSWD: ALL
+EOF
 cat << 'EOF' > /home/core/.ssh/authorized_keys
 {{ core_ssh_key }}
 EOF
