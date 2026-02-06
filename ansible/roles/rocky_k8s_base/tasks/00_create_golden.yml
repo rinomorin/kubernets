@@ -109,11 +109,9 @@
   register: whoami_out
 - debug:
     msg: "Current user is {{ whoami_out.stdout }}"
- 
-
 
 - name: Generate Kickstart files for new or forced VMs
-  become: yes
+  become: false
   template:
     src: "golden-base.ks.j2"
     dest: "/home/kvm_admin/kickstarts/golden-base.ks"
