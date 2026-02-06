@@ -5,6 +5,7 @@
 #     creates: "{{ image_path }}"
 
 - name: Get VM status from virsh list
+  delegate_to: localhost
   become: yes
   become_user: "{{ cloud_helper_user }}"
   shell: |
