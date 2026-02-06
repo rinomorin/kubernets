@@ -102,7 +102,8 @@
 - debug:
     msg: "helper_ssh_key is {{ helper_ssh_key }}"
  
-
+- debug:  
+    msg: "cloud_helper_user is {{ cloud_helper_user }}"
 - name: who am I
   command: whoami
   become: false
