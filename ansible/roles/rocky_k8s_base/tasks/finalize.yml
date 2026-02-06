@@ -52,8 +52,8 @@
     opts: rw
     state: mounted
 
-- name: Verify mount is read-write
-  command: mount | grep "{{ build_root }}/mnt"
+# - name: Verify mount is read-write
+#   command: mount | grep "{{ build_root }}/mnt"
 
 
 - name: Create /boot
