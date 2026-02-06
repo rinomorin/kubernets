@@ -115,8 +115,8 @@
 - name: Generate Kickstart files for new or forced VMs
   become: true
   template:
-    src: "golden-base.ks.j2"
-    dest: "/home/kvm_admin/kickstarts/golden-base.ks"
+    src: "golden.ks.j2"
+    dest: "/home/{{ cloud_helper_user }}/kickstarts/golden-base.ks"
   when: 
     - not existing_vms
     - "'kvm' in group_names"
