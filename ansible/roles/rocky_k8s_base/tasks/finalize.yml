@@ -41,19 +41,20 @@
     umount -f {{ build_root }}/mnt 2>/dev/null || true
   ignore_errors: true
 
-- name: Run fsck on root partition
-  command: fsck.ext4 -y {{ loopdev.stdout }}p2
+- name: Format root
+  command: mkfs.xfs -f {{ loopdev.stdout }}p2
 
 - name: Mount root partition read-write
   mount:
     path: "{{ build_root }}/mnt"
     src: "{{ loopdev.stdout }}p2"
-    fstype: ext4
+    fstype: xfs
     opts: rw
     state: mounted
 
 - name: Verify mount is read-write
   command: mount | grep "{{ build_root }}/mnt"
+
 
 - name: Create /boot
   file:
