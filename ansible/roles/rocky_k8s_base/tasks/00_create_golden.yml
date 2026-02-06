@@ -105,8 +105,7 @@
 
 - name: who am I
   command: whoami
-  become: yes
-  become_user: "{{ cloud_helper_user }}"
+  become: false
   register: whoami_out
 - debug:
     msg: "Current user is {{ whoami_out.stdout }}"
