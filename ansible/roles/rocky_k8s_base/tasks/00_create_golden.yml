@@ -172,7 +172,7 @@
     tpwd_hash: "{{ lookup('env','admin_hash') }}"
     tsecops_hash: "{{ lookup('env','secops_hash') }}"
     tsecops_key: "{{ lookup('env','secops_key') }}"
-    tos_variant: local_os_id.stdout
+    tos_variant: "{{  local_os_id.stdout | default('9.7') }}"
     
 - name: Execute virt-install non-interactively and wait for completion
   when: 
