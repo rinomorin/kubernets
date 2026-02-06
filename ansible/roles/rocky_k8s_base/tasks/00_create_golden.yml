@@ -156,6 +156,8 @@
   no_log: true
 
 - name: get local os version id
+  delegate_to: localhost
+  become: false
   command: cat /etc/os-release | grep '^ID=' | cut -d'=' -f2 | tr -d '"'
   register: local_os_id
   
