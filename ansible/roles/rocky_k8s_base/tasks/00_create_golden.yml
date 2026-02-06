@@ -4,6 +4,21 @@
 #   args:
 #     creates: "{{ image_path }}"
 
+- name: Get VM status from virsh list
+  shell: |
+    if virsh list --all | sed 's/shut off/shutdown/' | grep -q '{{ vm_host }}'; then
+      virsh list --all | sed 's/shut off/shutdown/' | awk '/{{ vm_host }}/ { if ($NF != "-") print $NF; else print "undefined" }'
+    else
+      echo "undefined"
+    fi
+  register: vm_status
+  changed_when: false
+
+- name: Set fact for existing VMs
+  set_fact:
+    existing_vms: true
+  when: "'undefined' not in (vm_status.stdout | trim)"
+
 - name: set ip_addr
   set_fact:
     ip_addr: "{{ ansible_host }}"
@@ -49,8 +64,6 @@
           | join('.')
       }}
   when: ip_cid is defined
-
-
 
 - name: Generate Kickstart files for new or forced VMs
   template:

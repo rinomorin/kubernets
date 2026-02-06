@@ -13,17 +13,18 @@
 - name: Set VM shutdown poll start time
   set_fact:
     vm_shutdown_start: "{{ global_epoch }}"
-- debug: msg="status {{vm_stage_map[vm_host]}}"
+
 - name: Trigger build if needed
   include_tasks: define_vms.yml
-  when: vm_stage_map[vm_host] in ['build', 'building']
+  # when: vm_stage_map[vm_host] in ['build', 'building']
 
 - name: Calculate wait time in minutes
   set_fact:
     wait_time_to_shutdown_or_fail: "{{ ((build_loops | int) * 10 // 60) }}"
 
 - name: Probe VM with echo until vm shutdown
-  when: vm_stage_map[vm_host] in ['build', 'building'] and  vm_build_stage | trim != "present"
+  # when: vm_stage_map[vm_host] in ['build', 'building'] and  vm_build_stage | trim != "present"
+  # when: vm_stage_map[vm_host] in ['build', 'building'] and  vm_build_stage | trim != "present"
   shell: |
     virsh list --all | sed 's/shut off/shutdown/' | grep -i "^.*{{ vm_host }}.*" | awk '{print $NF}'
   register: vm_state
