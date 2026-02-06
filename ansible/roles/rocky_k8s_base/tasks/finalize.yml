@@ -91,7 +91,7 @@
 # Install GRUB
 ###############################################################
 - name: Fix ownership of RPM DB
-  become: true
+  # become: true
   file:
     path: "{{ build_root }}/mnt/var/lib/rpm"
     owner: root
@@ -99,11 +99,11 @@
     recurse: true
 
 - name: Relabel target rootfs for SELinux
-  become: true
+  # become: true
   command: restorecon -R {{ build_root }}/mnt
 
 - name: Rebuild RPM database in target
-  become: true
+  # become: true
   command: rpm --root {{ build_root }}/mnt --rebuilddb
 
 - name: Install GRUB packages into target
