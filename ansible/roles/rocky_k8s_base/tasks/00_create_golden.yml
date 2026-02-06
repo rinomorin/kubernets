@@ -120,7 +120,7 @@
     force: true
   when: 
     - not existing_vms
-    - "'kvm' in group_names"
+    - "'kvm' not in group_names"
   vars:
     hostname: "golden-base"
     disk_size: "{{ tdisk_size }}"
