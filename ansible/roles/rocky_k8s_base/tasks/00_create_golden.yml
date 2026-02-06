@@ -116,14 +116,14 @@
   # become: true
   template:
     src: "golden.ks.j2"
-    dest: "/home/{{ cloud_helper_user }}/golden-base.ks"
+    dest: "/home/{{ cloud_helper_user }}/{{ inventory_hostname_short }}.ks"
     force: true
   when: 
     - not existing_vms
     - "'kvm' not in group_names"
     - "'helper' not in group_names"
   vars:
-    hostname: "golden-base"
+    hostname: "{{ inventory_hostname_short }}"
     disk_size: "{{ tdisk_size }}"
     vcpu_count: "{{ tcpu_count }}"
     ram_size: "{{ tram_size }}"
@@ -153,21 +153,22 @@
     nat_mac_device: "{{ lookup('env', 'nat_mac_device') }}"
     my_controller_ip: "{{ controller_ip }}"
     my_os_variant: "{{ os_variant }}"
-  # no_log: true
+  no_log: true
 
 - name: Execute virt-install non-interactively and wait for completion
   when: 
     - not existing_vms
-    - kickstart_template is defined
     - "'kvm' not in group_names"
+    - "'helper' not in group_names"
+  become: true
   command: >
     virt-install
-      --name {{ vm_host }}
+      --name {{ inventory_hostname_short }}
       --ram {{ tram_size }}
       --vcpus {{ tcpu_count }}
-      --initrd-inject="/home/kvm_admin/kickstarts/{{ vm_host }}.ks"
-      --extra-args="inst.ks=file:/{{ vm_host }}.ks console=ttyS0,115200n8"
-      --disk path=/var/lib/libvirt/images/{{ vm_host }}.qcow2,size={{ tdisk_size }},bus=sata
+        --initrd-inject="/home/{{ cloud_helper_user }}/{{ inventory_hostname_short }}.ks"
+      --extra-args="inst.ks=file:/{{ inventory_hostname_short }}.ks console=ttyS0,115200n8"
+      --disk path=/var/lib/libvirt/images/{{ inventory_hostname_short }}.qcow2,size={{ tdisk_size }},bus=sata
       --os-variant {{ os_variant }}
       # NIC 1 — NAT (always enp0s1)
       --network network=br-nat,mac={{ nat_mac_device }}
