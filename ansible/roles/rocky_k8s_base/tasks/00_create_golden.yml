@@ -112,6 +112,33 @@
 - debug:
     msg: "Current user is {{ whoami_out.stdout }}"
 
+- name: get local os version id
+  delegate_to: localhost
+  become: false
+  shell: |
+    cat /etc/os-release|grep VERSION_ID|sed 's/"//g' |awk -F= '{print $NF}'
+  register: local_os_id
+
+- name: get local os  id
+  delegate_to: localhost
+  become: false
+  shell: |
+    cat /etc/os-release|grep ^ID=|sed 's/"//g' |awk -F= '{print $NF}'
+  register: local_os_name
+  
+- name: set vm variables
+  set_fact:
+    tdisk_size: 50
+    tcpu_count: 2
+    tram_size: 4096
+    tvg_name: "vg_{{ inventory_hostname_short }}"
+    tvg_short: "{{ inventory_hostname_short }}"
+    tpwd_hash: "{{ lookup('env','admin_hash') }}"
+    tsecops_hash: "{{ lookup('env','secops_hash') }}"
+    tsecops_key: "{{ lookup('env','secops_key') }}"
+    tos_variant: "{{  local_os_id.stdout | default('9.7') }}"
+    tos_name: "{{  local_os_name.stdout | default('rocky') }}"  
+
 - name: Generate Kickstart files for new or forced VMs
   # become: true
   template:
@@ -152,36 +179,8 @@
     nat_net_device: "{{ lookup('env', 'nat_net_device') }}"
     nat_mac_device: "{{ lookup('env', 'nat_mac_device') }}"
     my_controller_ip: "{{ controller_ip }}"
-    my_os_variant: "{{ os_variant }}"
+    my_os_variant: "{{ tos_variant }}"
   no_log: true
-
-- name: get local os version id
-  delegate_to: localhost
-  become: false
-  shell: |
-    cat /etc/os-release|grep VERSION_ID|sed 's/"//g' |awk -F= '{print $NF}'
-  register: local_os_id
-
-- name: get local os  id
-  delegate_to: localhost
-  become: false
-  shell: |
-    cat /etc/os-release|grep ^ID=|sed 's/"//g' |awk -F= '{print $NF}'
-  register: local_os_name
-
-  
-- name: set vm variables
-  set_fact:
-    tdisk_size: 50
-    tcpu_count: 2
-    tram_size: 4096
-    tvg_name: "vg_{{ inventory_hostname_short }}"
-    tvg_short: "{{ inventory_hostname_short }}"
-    tpwd_hash: "{{ lookup('env','admin_hash') }}"
-    tsecops_hash: "{{ lookup('env','secops_hash') }}"
-    tsecops_key: "{{ lookup('env','secops_key') }}"
-    tos_variant: "{{  local_os_id.stdout | default('9.7') }}"
-    tos_name: "{{  local_os_name.stdout | default('rocky') }}"  
 
 - name: Execute virt-install non-interactively and wait for completion
   when: 
