@@ -5,6 +5,7 @@
 #     creates: "{{ image_path }}"
 
 - name: Get VM status from virsh list
+  delegate_to: "{{ VM_HOST_IP }}"
   shell: |
     if virsh list --all | sed 's/shut off/shutdown/' | grep -q '{{ vm_host }}'; then
       virsh list --all | sed 's/shut off/shutdown/' | awk '/{{ vm_host }}/ { if ($NF != "-") print $NF; else print "undefined" }'
@@ -39,12 +40,7 @@
       - ip_mask is defined
       - net_device is defined
       - ip_gate is defined
-      - root_set is defined
-      - admin_set is defined
     fail_msg: "Missing required extra_vars: ip_dns,ip_addr, ip_mask, net_device, ip_gate"
-
--  debug:
-    msg: "stage is {{ vm_build_stage }}"
 
 - name: Set default DNS if not defined
   set_fact:
@@ -64,6 +60,25 @@
           | join('.')
       }}
   when: ip_cid is defined
+
+- name: Calculate CIDR from subnet mask
+  set_fact:
+    ip_cid: >-
+      {{
+        ip_mask.split('.') |
+        map('int') |
+        map('regex_replace', '255', '8') |
+        map('regex_replace', '254', '7') |
+        map('regex_replace', '252', '6') |
+        map('regex_replace', '248', '5') |
+        map('regex_replace', '240', '4') |
+        map('regex_replace', '224', '3') |
+        map('regex_replace', '192', '2') |
+        map('regex_replace', '128', '1') |
+        map('regex_replace', '0', '0') |
+        map('int') |
+        sum
+      }}
 
 - name: Generate Kickstart files for new or forced VMs
   template:
