@@ -94,11 +94,19 @@
         sum
       }}
 
+- name: get default cloud_helper keys
+  become: true
+  become_user: "{{ cloud_helper_user }}"
+  set_fact:
+    helper_ssh_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+- debug:
+    msg: "helper_ssh_key is {{ helper_ssh_key }}"
+ 
 - name: Generate Kickstart files for new or forced VMs
   become: yes
   template:
-    src: "{{ kickstart_template }}"
-    dest: "/home/kvm_admin/kickstarts/{{ vm_host }}.ks"
+    src: "golden-base.ks.j2"
+    dest: "/home/kvm_admin/kickstarts/golden-base.ks"
   when: 
     - not existing_vms
     - kickstart_template is defined
@@ -114,13 +122,11 @@
     pwd_hash: "{{ tpwd_hash }}"
     ipa_host: "{{ vm_fqdn }}"
     ip_address: "{{ ip_addr }}"
-    hostname: "{{ vm_fqdn }}"
     gateway: "{{ ip_gate }}"
     dns: "{{ ip_dns }}"
     net_device: "{{ net_device }}"
     ip_mask: "{{ ip_mask }}"
     ip_cid: "{{ ip_cid }}"
-    root_pwd: "{{ root_set }}"
     admin_pwd: "{{ admin_set }}"
     install_disk: "sda"
     dns_01: "8.8.8.8"
