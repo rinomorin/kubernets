@@ -5,6 +5,8 @@
 #     creates: "{{ image_path }}"
 
 - name: Get VM status from virsh list
+  become: yes
+  become_user: "{{ cloud_helper_user }}"
   shell: |
     if virsh -c qemu+ssh://{{ cloud_helper_user}}@{{ VM_HOST_IP}}/system 'list --all' | sed 's/shut off/shutdown/' | grep -q 'golden-base'; then
       virsh -c qemu+ssh://{{ cloud_helper_user}}@{{ VM_HOST_IP}}/system 'list --all' | sed 's/shut off/shutdown/' | awk '/golden-base/ { if ($NF != "-") print $NF; else print "undefined" }'
