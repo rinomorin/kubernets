@@ -6,30 +6,9 @@ repo --name=AppStream --mirrorlist={{ 'https://mirrors.rockylinux.org/mirrorlist
 
 lang en_CA.UTF-8
 keyboard  --vckeymap=us --xlayouts='us'
-timezone UTC,UTC
-
-# ------------------------------------------------------------
-# Networking — 3 NICs
-# ------------------------------------------------------------
-
+timezone UTC,UTCS
 # NIC 1 — NAT (always enp0s1)
 network --bootproto=dhcp --device=enp0s1 --activate  --hostname={{ hostname | default(inventory_hostname) }}
-# NIC 2 — Cluster (always enp2s1)
-network --bootproto=static \
-  --device=enp2s1 \
-  --ip={{ mycluster_ip_addr }} \
-  --netmask={{ cluster_netmask }} \
-  --gateway={{ cluster_gateway }} \
-  --activate
-# NIC 3 — Default (only on control nodes)
-{% if 'control_nodes' in group_names %}
-network --bootproto=static \
-  --device=enp3s1 \
-  --ip={{ ip_addr }} \
-  --netmask={{ ip_mask }} \
-  --gateway={{ ip_gate }} \
-  --activate
-{% endif %}
 
 # ------------------------------------------------------------
 # System basics
@@ -95,6 +74,22 @@ chown -R core:core /home/core/.ssh
 # Disable root SSH login (FCOS-style)
 sed -i 's/^#PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
 sed -i 's/^PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+
+nmcli con modify enp2s0 ipv4.addresses {{ cluster_ip_addr }}/{{ ip_cid }}
+nmcli con modify enp2s0 ipv4.gateway {{ cluster_gateway }}
+nmcli con modify enp2s0 ipv4.method manual
+nmcli con modify enp2s0 ipv4.never-default yes
+nmcli con modify enp2s0 ipv6.method ignore
+nmcli con modify enp2s0 connection.autoconnect yes
+nmcli con up enp2s0
+
+nmcli con modify enp3s0 ipv4.addresses {{ ip_address }}/{{ ip_cid }}
+nmcli con modify enp3s0 ipv4.gateway {{ ip_gate }}
+nmcli con modify enp3s0 ipv4.method manual
+nmcli con modify enp3s0 ipv4.never-default yes
+nmcli con modify enp3s0 ipv6.method ignore
+nmcli con modify enp3s0 connection.autoconnect yes
+nmcli con up enp3s0
 
 # Enable chrony
 systemctl enable chronyd
