@@ -6,9 +6,9 @@
       import_tasks: 00_create_golden.yml
       delegate_to: "{{ VM_HOST_IP }}"
 
-    - name: wait for power down
-      import_tasks: 01_wait_for_shutdown.yml
-      delegate_to: "{{ VM_HOST_IP }}"
+    # - name: wait for power down
+    #   import_tasks: 01_wait_for_shutdown.yml
+    #   delegate_to: "{{ VM_HOST_IP }}"
 
     # - name: fix url
     #   import_tasks: fix_url.yml
