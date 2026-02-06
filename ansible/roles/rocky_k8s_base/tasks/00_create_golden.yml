@@ -23,7 +23,7 @@
   when: "'undefined' not in (vm_status.stdout | trim)"
 
 - debug:
-    msg: "existing_vms {{ existing_vms  }}"
+    msg: "existing_vms missing"
   when: 
       - not existing_vms
   
