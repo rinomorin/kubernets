@@ -1,0 +1,152 @@
+#version=RHEL9
+# Minimal Rocky 9 base image for post-install provisioning + immutable conversion
+
+url --mirrorlist={{ kickstart_baseos_url | default('https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=BaseOS-9.7') }}
+repo --name=AppStream --mirrorlist={{ kickstart_appstream_url | default('https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=AppStream-9.7') }}
+
+lang en_US.UTF-8
+keyboard us
+timezone UTC --utc
+
+# ------------------------------------------------------------
+# Networking — 3 NICs
+# ------------------------------------------------------------
+
+# NIC 1 — NAT (always enp0s1)
+network --bootproto=dhcp \
+        --device=enp0s1 \
+        --activate
+
+# NIC 2 — Cluster (always enp2s1)
+network --bootproto=static \
+        --device=enp2s1 \
+        --ip={{ cluster_ip_addr }} \
+        --netmask={{ cluster_netmask }} \
+        --gateway={{ cluster_gateway }} \
+        --activate
+
+# NIC 3 — Default (only on control nodes)
+{% if 'control_nodes' in group_names %}
+network --bootproto=static \
+        --device=enp3s1 \
+        --ip={{ ip_addr }} \
+        --netmask={{ default_netmask }} \
+        --gateway={{ gateway }} \
+        --nameserver={{ dns_01 }},{{ dns_02 }} \
+        --hostname={{ hostname }} \
+        --activate
+{% endif %}
+
+# ------------------------------------------------------------
+# System basics
+# ------------------------------------------------------------
+
+rootpw --lock
+user --name=cloud --groups=wheel --password={{ admin_pwd }} --plaintext
+
+firewall --enabled --service=ssh
+selinux --enforcing
+services --enabled=sshd
+
+bootloader --location=mbr --boot-drive={{ install_disk }} --append="crashkernel=auto"
+
+# ------------------------------------------------------------
+# Disk layout: EFI + /boot + XFS root
+# ------------------------------------------------------------
+
+zerombr
+clearpart --all --initlabel
+
+part /boot/efi --fstype=vfat --size=600 --fsoptions="umask=0077,shortname=winnt"
+part /boot     --fstype=xfs  --size=1024
+part /         --fstype=xfs  --size=1 --grow
+
+skipx
+text
+
+# ------------------------------------------------------------
+# Minimal package set
+# ------------------------------------------------------------
+
+%packages
+@core
+bash-completion
+vim-enhanced
+tar
+gzip
+bzip2
+xz
+curl
+wget
+rsync
+chrony
+%end
+
+# ------------------------------------------------------------
+# Post-install configuration
+# ------------------------------------------------------------
+
+%post --log=/root/ks-post.log
+
+# Enable chrony
+systemctl enable chronyd
+
+# Clean machine identity so clones diverge
+rm -f /etc/machine-id
+: > /etc/machine-id
+
+# Remove SSH host keys so they regenerate on first boot
+rm -f /etc/ssh/ssh_host_*
+
+# ------------------------------------------------------------
+# First-boot provisioning hook (Stage 2 will fill this in)
+# ------------------------------------------------------------
+
+cat >/usr/local/sbin/firstboot-provision.sh << 'EOF'
+#!/bin/bash
+set -euo pipefail
+
+# Regenerate machine-id if empty
+if [ ! -s /etc/machine-id ]; then
+  systemd-machine-id-setup
+fi
+
+# Regenerate SSH host keys if missing
+if ! ls /etc/ssh/ssh_host_*key >/dev/null 2>&1; then
+  /usr/libexec/openssh/sshd-keygen || ssh-keygen -A
+fi
+
+# Placeholder for next stage:
+# - configure correct repos
+# - install CRI-O, kubelet, kubeadm, kubectl
+# - apply hardening
+# - validate services
+# - prepare for read-only root
+# - run kubeadm init/join logic
+
+# Disable after successful run
+systemctl disable firstboot-provision.service
+EOF
+
+chmod 0755 /usr/local/sbin/firstboot-provision.sh
+
+cat >/etc/systemd/system/firstboot-provision.service << 'EOF'
+[Unit]
+Description=First boot provisioning for Kubernetes node
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/firstboot-provision.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl enable firstboot-provision.service
+
+%end
+
+reboot

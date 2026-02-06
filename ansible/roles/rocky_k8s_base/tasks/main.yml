@@ -2,22 +2,26 @@
   become: yes
   # become_user: "{{ ansible_user }}"
   block:
-    - name: Run image prep tasks on builder
-      import_tasks: prep.yml
-      delegate_to: localhost
+    - name: Build Rocky Linux base image
+      import_tasks: 00_create_golden.yml
+      delegate_to: "{{ VM_HOST_IP }}"
 
-    - name: fix url
-      import_tasks: fix_url.yml
-      delegate_to: localhost  
+    - name: wait for power down
+      import_tasks: 01_wait_for_shutdown.yml
+      delegate_to: "{{ VM_HOST_IP }}"
 
-    - name: Run image build tasks on builder
-      import_tasks: build.yml
-      delegate_to: localhost
+    # - name: fix url
+    #   import_tasks: fix_url.yml
+    #   delegate_to: localhost  
 
-    - name: Run finalize tasks on builder
-      import_tasks: finalize.yml
-      delegate_to: localhost
+    # - name: Run image build tasks on builder
+    #   import_tasks: build.yml
+    #   delegate_to: localhost
 
-    - name: Convert raw → qcow2 on builder
-      import_tasks: convert.yml
-      delegate_to: localhost
+    # - name: Run finalize tasks on builder
+    #   import_tasks: finalize.yml
+    #   delegate_to: localhost
+
+    # - name: Convert raw → qcow2 on builder
+    #   import_tasks: convert.yml
+    #   delegate_to: localhost

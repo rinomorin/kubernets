@@ -1,0 +1,98 @@
+- name: Create qcow2 disk
+  command: >
+    qemu-img create -f qcow2 {{ image_path }} {{ image_size }}
+  args:
+    creates: "{{ image_path }}"
+
+- name: Generate Kickstart files for new or forced VMs
+  template:
+    src: "{{ kickstart_template }}"
+    dest: "/home/kvm_admin/kickstarts/{{ vm_host }}.ks"
+  when: 
+    - not existing_vms
+    - kickstart_template is defined
+    - "'kvm' not in group_names"
+  vars:
+    disk_size: "{{ tdisk_size }}"
+    vcpu_count: "{{ tcpu_count }}"
+    ram_size: "{{ tram_size }}"
+    vg_name:  "{{ tvg_name }}"  
+    vg_short: "{{ tvg_short }}"
+    secops_hash: "{{ tsecops_hash }}"
+    pwd_hash: "{{ tpwd_hash }}"
+    ipa_host: "{{ vm_fqdn }}"
+    ip_address: "{{ ip_addr }}"
+    hostname: "{{ vm_fqdn }}"
+    gateway: "{{ ip_gate }}"
+    dns: "{{ ip_dns }}"
+    net_device: "{{ net_device }}"
+    ip_mask: "{{ ip_mask }}"
+    ip_cid: "{{ ip_cid }}"
+    root_pwd: "{{ root_set }}"
+    admin_pwd: "{{ admin_set }}"
+    install_disk: "sda"
+    dns_01: "8.8.8.8"
+    dns_02: "{{ ip_gate }}"
+    cluster_ip_addr: "{{ lookup('env', 'cluster_ip_addr') }}"
+    cloud_master_ip: "{{ hostvars[groups['control_nodes'][0]].ansible_host }}"
+    cluster_netmask: "{{ lookup('env', 'cluster_netmask') }}"
+    cluster_gateway: "{{ lookup('env', 'cluster_gateway') }}"
+    default_netmask: "{{ lookup('env', 'default_netmask') }}"
+    default_net_device: "{{ lookup('env', 'default_net_device') }}"
+    cluster_net_device: "{{ lookup('env', 'cluster_net_device') }}"
+    nat_net_device: "{{ lookup('env', 'nat_net_device') }}"
+    nat_mac_device: "{{ lookup('env', 'nat_mac_device') }}"
+    my_controller_ip: "{{ controller_ip }}"
+    my_os_variant: "{{ os_variant }}"
+  no_log: true
+
+- name: Execute virt-install non-interactively and wait for completion
+  when: 
+    - not existing_vms
+    - kickstart_template is defined
+    - "'kvm' not in group_names"
+  command: >
+    virt-install
+      --name {{ vm_host }}
+      --ram {{ tram_size }}
+      --vcpus {{ tcpu_count }}
+      --initrd-inject="/home/kvm_admin/kickstarts/{{ vm_host }}.ks"
+      --extra-args="inst.ks=file:/{{ vm_host }}.ks console=ttyS0,115200n8"
+      --disk path=/var/lib/libvirt/images/{{ vm_host }}.qcow2,size={{ tdisk_size }},bus=sata
+      --os-variant {{ os_variant }}
+      # NIC 1 — NAT (always enp0s1)
+      --network network=br-nat,mac={{ nat_mac_device }}
+      # NIC 2 — Cluster (always enp2s1)
+      --network network=br-cluster
+      # NIC 3 — Default (only on control nodes)
+      {{ '--network network=default' if 'control_nodes' in group_names else '' }}
+      --graphics none
+      --console pty,target_type=serial
+      --location {{ iso }}
+      --noautoconsole
+
+
+---
+# 00_build_base_vm.yml
+# Creates qcow2 disk + launches installer + waits for OS to boot
+
+- name: Create qcow2 disk for VM
+  command: >
+    qemu-img create -f qcow2 {{ image_path }} {{ image_size }}
+  args:
+    creates: "{{ image_path }}"
+
+- name: Wait for VM to boot after installation
+  wait_for:
+    host: "{{ vm_ip }}"
+    port: 22
+    delay: 10
+    timeout: 900
+
+- name: Verify VM is reachable
+  ansible.builtin.shell: uname -a
+  register: uname_out
+
+- debug:
+    var: uname_out.stdout
+
