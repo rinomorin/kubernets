@@ -21,7 +21,9 @@
   set_fact:
     existing_vms: true
   when: "'undefined' not in (vm_status.stdout | trim)"
-
+- debug:
+    msg: "existing_vms {{ existing_vms  }}"
+    
 - name: set ip_addr
   set_fact:
     ip_addr: "{{ ansible_host }}"
