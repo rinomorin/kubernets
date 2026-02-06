@@ -13,23 +13,12 @@ timezone UTC --utc
 # ------------------------------------------------------------
 
 # NIC 1 — NAT (always enp0s1)
-network --bootproto=dhcp \
-        --device=enp0s1 \
-        --activate
-
+network --bootproto=dhcp --device=enp0s1 --activate
 # NIC 2 — Cluster (always enp2s1)
-network --bootproto=static \
-        --device=enp2s1 \
-        --ip={{ cluster_ip_addr }} \
-        --netmask={{ cluster_netmask }} \
-        --gateway={{ cluster_gateway }} \
-        --activate
-
+network --bootproto=static --device=enp2s1 --ip={{ cluster_ip_addr }} --netmask={{ cluster_netmask }} --gateway={{ cluster_gateway }} --activate
 # NIC 3 — Default (only on control nodes)
 {% if 'control_nodes' in group_names %}
-network --bootproto=dhcp \
-        --device=enp0s1 \
-        --activate
+network --bootproto=dhcp --device=enp0s1 --activate
 {% endif %}
 
 # ------------------------------------------------------------
@@ -37,7 +26,7 @@ network --bootproto=dhcp \
 # ------------------------------------------------------------
 
 rootpw --lock
-user --name=cloud --groups=wheel --password={{ admin_pwd }} --plaintext
+user --name=core --groups=wheel --lock
 
 firewall --enabled --service=ssh
 selinux --enforcing
@@ -82,6 +71,20 @@ chrony
 # ------------------------------------------------------------
 
 %post --log=/root/ks-post.log
+
+mkdir -p /home/core/.ssh
+chmod 700 /home/core/.ssh
+
+cat << 'EOF' > /home/core/.ssh/authorized_keys
+{{ core_ssh_key }}
+EOF
+
+chmod 600 /home/core/.ssh/authorized_keys
+chown -R core:core /home/core/.ssh
+
+# Disable root SSH login (FCOS-style)
+sed -i 's/^#PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
+sed -i 's/^PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
 
 # Enable chrony
 systemctl enable chronyd
@@ -143,5 +146,4 @@ EOF
 systemctl enable firstboot-provision.service
 
 %end
-
-reboot
+shutdown
