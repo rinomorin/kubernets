@@ -15,7 +15,12 @@ timezone UTC --utc
 # NIC 1 — NAT (always enp0s1)
 network --bootproto=dhcp --device=enp0s1 --activate
 # NIC 2 — Cluster (always enp2s1)
-network --bootproto=static --device=enp2s1 --ip={{ cluster_ip_addr }} --netmask={{ cluster_netmask }} --gateway={{ cluster_gateway }} --activate
+network --bootproto=static \
+  --device=enp2s1 \
+  --ip={{ cluster_ip_addr }} \
+  --netmask={{ cluster_netmask }} \
+  --gateway={{ cluster_gateway }} \
+  --activate
 # NIC 3 — Default (only on control nodes)
 {% if 'control_nodes' in group_names %}
 network --bootproto=dhcp --device=enp0s1 --activate

@@ -140,7 +140,7 @@
     install_disk: "sda"
     dns_01: "8.8.8.8"
     dns_02: "{{ ip_gate }}"
-    cluster_ip_addr: "{{ lookup('env', 'cluster_ip_addr').split('.')[:3] | join('.') ~ '.29' }}"
+    cluster_ip_addr: "{{ hostvars[groups['control_nodes'][0]].ansible_host }}"
     cloud_master_ip: "{{ hostvars[groups['control_nodes'][0]].ansible_host }}"
     cluster_netmask: "{{ lookup('env', 'cluster_netmask') }}"
     cluster_gateway: "{{ lookup('env', 'cluster_gateway') }}"
