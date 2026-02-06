@@ -5,6 +5,7 @@
 #     creates: "{{ image_path }}"
 
 - name: Get VM status from virsh list
+  become: yes
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
     if virsh list --all | sed 's/shut off/shutdown/' | grep -q '{{ vm_host }}'; then
