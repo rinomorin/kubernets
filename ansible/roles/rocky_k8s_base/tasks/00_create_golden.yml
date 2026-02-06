@@ -150,9 +150,9 @@
     - "'kvm' not in group_names"
     - "'helper' not in group_names"
   vars:
-    hostname: "{{ inventory_hostname_short }}"
+    hostname: "{{ inventory_hostname_short }}.{{{ cloud_zone | default(ansible_domain) }}}"
     disk_size: "{{ tdisk_size }}"
-    vcpu_count: "{{ tcpu_count }}"
+    vcpu_count: "{{ tcpu_count }}" 
     ram_size: "{{ tram_size }}"
     vg_name:  "{{ tvg_name }}"  
     vg_short: "{{ tvg_short }}"
