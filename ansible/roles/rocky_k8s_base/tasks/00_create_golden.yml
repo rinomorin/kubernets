@@ -116,7 +116,7 @@
   become: true
   template:
     src: "golden.ks.j2"
-    dest: "/home/{{ cloud_helper_user }}/kickstarts/golden-base.ks"
+    dest: "/home/{{ cloud_helper_user }}/golden-base.ks"
   when: 
     - not existing_vms
     - "'kvm' in group_names"
