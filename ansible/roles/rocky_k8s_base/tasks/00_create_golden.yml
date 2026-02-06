@@ -113,7 +113,7 @@
     msg: "Current user is {{ whoami_out.stdout }}"
 
 - name: Generate Kickstart files for new or forced VMs
-  become: true
+  # become: true
   template:
     src: "golden.ks.j2"
     dest: "/home/{{ cloud_helper_user }}/golden-base.ks"
