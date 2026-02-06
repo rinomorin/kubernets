@@ -17,7 +17,7 @@ network --bootproto=dhcp --device=enp0s1 --activate  --hostname={{ hostname | de
 # NIC 2 — Cluster (always enp2s1)
 network --bootproto=static \
   --device=enp2s1 \
-  --ip={{ cluster_ip_addr }} \
+  --ip={{ mycluster_ip_addr }} \
   --netmask={{ cluster_netmask }} \
   --gateway={{ cluster_gateway }} \
   --activate
