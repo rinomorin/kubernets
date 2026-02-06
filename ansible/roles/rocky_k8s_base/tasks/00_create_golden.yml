@@ -109,7 +109,6 @@
     dest: "/home/kvm_admin/kickstarts/golden-base.ks"
   when: 
     - not existing_vms
-    - kickstart_template is defined
     - "'kvm' in group_names"
   vars:
     hostname: "golden-base"
