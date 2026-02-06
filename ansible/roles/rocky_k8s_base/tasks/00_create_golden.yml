@@ -16,9 +16,10 @@
     fi
   register: vm_status
   changed_when: false
+
 - name: show status
   debug:
-    msg: "golden-base state is {{ vm_status.stdout }} or {{ vm_status.stderr
+    msg: "golden-base state is {{ vm_status.stdout }} or {{ vm_status.stderr }}"
 
 - name: Set fact for existing VMs
   set_fact:
