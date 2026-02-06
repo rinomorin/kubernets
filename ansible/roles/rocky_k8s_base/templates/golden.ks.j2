@@ -13,7 +13,7 @@ timezone UTC --utc
 # ------------------------------------------------------------
 
 # NIC 1 — NAT (always enp0s1)
-network --bootproto=dhcp --device=enp0s1 --activate
+network --bootproto=dhcp --device=enp0s1 --activate  --hostname={{ hostname | default(inventory_hostname) }}
 # NIC 2 — Cluster (always enp2s1)
 network --bootproto=static \
   --device=enp2s1 \
