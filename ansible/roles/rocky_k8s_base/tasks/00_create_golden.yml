@@ -132,7 +132,7 @@
     secops_hash: "{{ tsecops_hash }}"
     pwd_hash: "{{ tpwd_hash }}"
     ipa_host: "{{ vm_fqdn }}"
-    ip_address: "{{ ip_addr }}"
+    ip_address: "{{ ansible_host }}"
     gateway: "{{ ip_gate }}"
     dns: "{{ ip_dns }}"
     net_device: "{{ net_device }}"
