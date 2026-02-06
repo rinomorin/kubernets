@@ -27,13 +27,8 @@ network --bootproto=static \
 
 # NIC 3 — Default (only on control nodes)
 {% if 'control_nodes' in group_names %}
-network --bootproto=static \
-        --device=enp3s1 \
-        --ip={{ ip_addr }} \
-        --netmask={{ default_netmask }} \
-        --gateway={{ gateway }} \
-        --nameserver={{ dns_01 }},{{ dns_02 }} \
-        --hostname={{ hostname }} \
+network --bootproto=dhcp \
+        --device=enp0s1 \
         --activate
 {% endif %}
 

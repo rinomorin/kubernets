@@ -1,8 +1,56 @@
-- name: Create qcow2 disk
-  command: >
-    qemu-img create -f qcow2 {{ image_path }} {{ image_size }}
-  args:
-    creates: "{{ image_path }}"
+# - name: Create qcow2 disk
+#   command: >
+#     qemu-img create -f qcow2 {{ image_path }} {{ image_size }}
+#   args:
+#     creates: "{{ image_path }}"
+
+- name: set ip_addr
+  set_fact:
+    ip_addr: "{{ ansible_host }}"
+  when: ansible_host is defined and ansible_host|length > 0
+
+- name: set defauts ip info
+  set_fact:
+    ip_addr: "{{ ansible_host }}"
+    ip_mask: "{{ default_netmask }}"
+    ip_gate: "{{ ansible_host.split('.')[:3] | join('.') }}.1"
+    net_device: "{{ default_net_device }}"
+  when: ansible_host is defined
+
+- name: Validate required extra_vars
+  assert:
+    that:
+      - ip_addr is defined
+      - ip_mask is defined
+      - net_device is defined
+      - ip_gate is defined
+      - root_set is defined
+      - admin_set is defined
+    fail_msg: "Missing required extra_vars: ip_dns,ip_addr, ip_mask, net_device, ip_gate"
+
+-  debug:
+    msg: "stage is {{ vm_build_stage }}"
+
+- name: Set default DNS if not defined
+  set_fact:
+    ip_dns: "{{ ip_dns | default( lookup('env','VM_HOST_IP').split('.')[:3] | join('.') ~ '.1' , true ) }}"
+
+- name: Convert CIDR to subnet mask
+  vars:
+    cidr: 24
+  set_fact:
+    ip_mask: >-
+      {{
+        [ (['1'] * cidr + ['0'] * (32 - cidr))
+          | join('')
+          | regex_replace('(.{8})', '\\1 ')
+          | split()
+          | map('int', 2)
+          | join('.')
+      }}
+  when: ip_cid is defined
+
+
 
 - name: Generate Kickstart files for new or forced VMs
   template:
@@ -11,8 +59,9 @@
   when: 
     - not existing_vms
     - kickstart_template is defined
-    - "'kvm' not in group_names"
+    - "'kvm' in group_names"
   vars:
+    hostname: "golden-base"
     disk_size: "{{ tdisk_size }}"
     vcpu_count: "{{ tcpu_count }}"
     ram_size: "{{ tram_size }}"
@@ -33,7 +82,7 @@
     install_disk: "sda"
     dns_01: "8.8.8.8"
     dns_02: "{{ ip_gate }}"
-    cluster_ip_addr: "{{ lookup('env', 'cluster_ip_addr') }}"
+    cluster_ip_addr: "{{ lookup('env', 'cluster_ip_addr').split('.')[:3] | join('.') ~ '.2' }}"
     cloud_master_ip: "{{ hostvars[groups['control_nodes'][0]].ansible_host }}"
     cluster_netmask: "{{ lookup('env', 'cluster_netmask') }}"
     cluster_gateway: "{{ lookup('env', 'cluster_gateway') }}"
