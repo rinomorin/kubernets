@@ -102,6 +102,16 @@
 - debug:
     msg: "helper_ssh_key is {{ helper_ssh_key }}"
  
+
+- name: who am I
+  command: whoami
+  become: false
+  register: whoami_out
+- debug:
+    msg: "Current user is {{ whoami_out.stdout }}"
+ 
+
+
 - name: Generate Kickstart files for new or forced VMs
   become: yes
   template:
