@@ -197,5 +197,5 @@
       {{ '--network network=default' if 'control_nodes' in group_names else '' }}
       --graphics none
       --console pty,target_type=serial
-      --location {{ iso }}
+      --location {{ iso_path }}
       --noautoconsole
