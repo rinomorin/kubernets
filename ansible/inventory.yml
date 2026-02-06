@@ -1,6 +1,6 @@
 all:
   vars:
-    ansible_user: secops
+    ansible_user: cloud_helper
 
   hosts:
     helper: 
