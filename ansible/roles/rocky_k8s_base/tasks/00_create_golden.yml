@@ -5,11 +5,9 @@
 #     creates: "{{ image_path }}"
 
 - name: Get VM status from virsh list
-  become: yes
-  delegate_to: "{{ VM_HOST_IP }}"
   shell: |
-    if virsh list --all | sed 's/shut off/shutdown/' | grep -q '{{ vm_host }}'; then
-      virsh list --all | sed 's/shut off/shutdown/' | awk '/{{ vm_host }}/ { if ($NF != "-") print $NF; else print "undefined" }'
+    if virsh -c qemu+ssh://{{ cloud_helper_user}}@{{ VM_HOST_IP}}/system 'list --all' | sed 's/shut off/shutdown/' | grep -q '{{ vm_host }}'; then
+      virsh -c qemu+ssh://{{ cloud_helper_user}}@{{ VM_HOST_IP}}/system 'list --all' | sed 's/shut off/shutdown/' | awk '/{{ vm_host }}/ { if ($NF != "-") print $NF; else print "undefined" }'
     else
       echo "undefined"
     fi
