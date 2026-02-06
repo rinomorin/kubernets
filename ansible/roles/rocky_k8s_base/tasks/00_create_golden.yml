@@ -121,6 +121,7 @@
   when: 
     - not existing_vms
     - "'kvm' not in group_names"
+    - "'helper' not in group_names"
   vars:
     hostname: "golden-base"
     disk_size: "{{ tdisk_size }}"
