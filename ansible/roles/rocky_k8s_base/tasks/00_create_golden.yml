@@ -6,8 +6,8 @@
 
 - name: Get VM status from virsh list
   shell: |
-    if virsh -c qemu+ssh://{{ cloud_helper_user}}@{{ VM_HOST_IP}}/system 'list --all' | sed 's/shut off/shutdown/' | grep -q '{{ vm_host }}'; then
-      virsh -c qemu+ssh://{{ cloud_helper_user}}@{{ VM_HOST_IP}}/system 'list --all' | sed 's/shut off/shutdown/' | awk '/{{ vm_host }}/ { if ($NF != "-") print $NF; else print "undefined" }'
+    if virsh -c qemu+ssh://{{ cloud_helper_user}}@{{ VM_HOST_IP}}/system 'list --all' | sed 's/shut off/shutdown/' | grep -q 'golden-base'; then
+      virsh -c qemu+ssh://{{ cloud_helper_user}}@{{ VM_HOST_IP}}/system 'list --all' | sed 's/shut off/shutdown/' | awk '/golden-base/ { if ($NF != "-") print $NF; else print "undefined" }'
     else
       echo "undefined"
     fi
