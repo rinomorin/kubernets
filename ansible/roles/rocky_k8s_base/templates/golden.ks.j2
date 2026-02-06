@@ -8,7 +8,7 @@ lang en_CA.UTF-8
 keyboard  --vckeymap=us --xlayouts='us'
 timezone UTC,UTCS
 # NIC 1 — NAT (always enp0s1)
-network --bootproto=dhcp --device=enp0s1 --activate  --hostname={{ hostname | default(inventory_hostname) }}
+network --bootproto=dhcp --device=enp0s1 --activate
 
 # ------------------------------------------------------------
 # System basics
