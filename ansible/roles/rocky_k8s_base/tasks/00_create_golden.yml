@@ -106,7 +106,7 @@
     msg: "cloud_helper_user is {{ cloud_helper_user }}"
 - name: set ansible_user for later delegation
   set_fact:
-    ansible_user: "{{ cloud_helper_user }}"
+    ansible_ssh_user: "{{ cloud_helper_user }}"
 
 - name: who am I
   command: whoami
