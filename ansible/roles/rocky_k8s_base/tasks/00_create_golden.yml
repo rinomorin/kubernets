@@ -155,6 +155,17 @@
     my_os_variant: "{{ os_variant }}"
   no_log: true
 
+- name: set vm variables
+  set_fact:
+    tdisk_size: 50
+    tcpu_count: 2
+    tram_size: 4096
+    tvg_name: "vg_{{ inventory_hostname_short }}"
+    tvg_short: "{{ inventory_hostname_short }}"
+    tpwd_hash: "{{ lookup('env','admin_hash') }}"
+    tsecops_hash: "{{ lookup('env','secops_hash') }}"
+    tsecops_key: "{{ lookup('env','secops_key') }}"
+
 - name: Execute virt-install non-interactively and wait for completion
   when: 
     - not existing_vms
