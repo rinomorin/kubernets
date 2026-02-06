@@ -1,8 +1,8 @@
 #version=RHEL9
 # Minimal Rocky 9 base image for post-install provisioning + immutable conversion
 
-url --mirrorlist={{ kickstart_baseos_url | default('https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=BaseOS-' ~ my_os_variant) }}
-repo --name=AppStream --mirrorlist={{ kickstart_appstream_url | default('https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=AppStream-' ~ my_os_variant) }}
+url --mirrorlist={{ 'https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=BaseOS-' ~ my_os_variant }}
+repo --name=AppStream --mirrorlist={{ 'https://mirrors.rockylinux.org/mirrorlist?arch=x86_64&repo=AppStream-' ~ my_os_variant }}
 
 lang en_US.UTF-8
 keyboard us
