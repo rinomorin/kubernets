@@ -190,7 +190,7 @@
       --disk path=/var/lib/libvirt/images/{{ inventory_hostname_short }}.qcow2,size={{ tdisk_size }},bus=sata
       --os-variant {{ tos_variant.split('.')[0] }}
       # NIC 1 — NAT (always enp0s1)
-      --network network=br-nat,mac={{ nat_mac_device }}
+      {{ '--network network=br-nat,mac=' ~ nat_mac_device if nat_mac_device is defined else '--network network=br-nat' }}
       # NIC 2 — Cluster (always enp2s1)
       --network network=br-cluster
       # NIC 3 — Default (only on control nodes)
