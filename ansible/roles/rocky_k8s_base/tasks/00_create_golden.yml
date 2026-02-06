@@ -104,11 +104,11 @@
  
 
 - name: who am I
-  vars: 
-    ansible_user: "{{ cloud_helper_user }}"
   command: whoami
   become: false
   register: whoami_out
+  vars:
+    ansible_ssh_user: "{{ cloud_helper_user }}"
 - debug:
     msg: "Current user is {{ whoami_out.stdout }}"
 
