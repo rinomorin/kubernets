@@ -189,11 +189,8 @@
       --extra-args="inst.ks=file:/{{ inventory_hostname_short }}.ks console=ttyS0,115200n8"
       --disk path=/var/lib/libvirt/images/{{ inventory_hostname_short }}.qcow2,size={{ tdisk_size }},bus=sata
       --os-variant {{ tos_variant.split('.')[0] }}
-      # NIC 1 — NAT (always enp0s1)
       {{ '--network network=br-nat,mac=' ~ nat_mac_device if nat_mac_device is defined else '--network network=br-nat' }}
-      # NIC 2 — Cluster (always enp2s1)
       --network network=br-cluster
-      # NIC 3 — Default (only on control nodes)
       {{ '--network network=default' if 'control_nodes' in group_names else '' }}
       --graphics none
       --console pty,target_type=serial
