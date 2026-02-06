@@ -1,6 +1,6 @@
 all:
   vars:
-    ansible_user: secops
+    ansible_user: cloud_helper
 
   hosts:
     helper: 
@@ -47,7 +47,7 @@ all:
       hostname: msrlv9wrk02.cloud.home.morinsoft.ca 
       provision_ip: 10.0.0.42
       node_ip: 10.0.42
-      
+
     kvmdc01:
       ansible_host: 192.168.100.3
       hostname: kvmdc01.home.morinsoft.ca
