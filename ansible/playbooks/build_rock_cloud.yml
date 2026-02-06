@@ -65,10 +65,10 @@
         crio_stream: "stable"
         cloud_helper_shell: "/bin/bash"
 
-- hosts: helper
+- hosts: kvm
   become: false
   gather_facts: false
-  vars: 
-    ansible_user: "{{ cloud_helper_user }}"
+  # vars: 
+  #   ansible_user: "{{ cloud_helper_user }}"
   roles:
     - rocky_k8s_base
