@@ -83,6 +83,7 @@
       }}
 
 - name: Generate Kickstart files for new or forced VMs
+  become: yes
   template:
     src: "{{ kickstart_template }}"
     dest: "/home/kvm_admin/kickstarts/{{ vm_host }}.ks"
@@ -123,7 +124,7 @@
     nat_mac_device: "{{ lookup('env', 'nat_mac_device') }}"
     my_controller_ip: "{{ controller_ip }}"
     my_os_variant: "{{ os_variant }}"
-  no_log: true
+  # no_log: true
 
 - name: Execute virt-install non-interactively and wait for completion
   when: 
