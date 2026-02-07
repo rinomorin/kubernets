@@ -177,8 +177,7 @@
 - name: Execute virt-install non-interactively and wait for completion
   when: 
     - not existing_vms
-    - "'kvm' not in group_names"
-    - "'helper' not in group_names"
+    - "'kvm' in group_names"
   become: true
   command: >
     virt-install
