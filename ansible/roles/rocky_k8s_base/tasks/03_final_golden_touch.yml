@@ -11,22 +11,16 @@
 - name: Install podman
   become: true
   delegate_to: "{{ golden_ip }}"
-  package:
-    name: podman
-    state: present
-
+  shell: |
+    dnf install -y podman
 # --------------------------------------------------------
 # Install kubeadm, kubelet, kubectl
 # --------------------------------------------------------
 - name: Install kubeadm, kubelet, kubectl
   become: true
   delegate_to: "{{ golden_ip }}"
-  package:
-    name:
-      - kubeadm
-      - kubelet
-      - kubectl
-    state: present
+  shell: |
+    dnf install -y kubeadm kubelet   kubectl
 
 # --------------------------------------------------------
 # Install crictl
