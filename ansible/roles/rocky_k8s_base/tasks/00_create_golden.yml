@@ -3,11 +3,6 @@
 #     qemu-img create -f qcow2 {{ image_path }} {{ image_size }}
 #   args:
 #     creates: "{{ image_path }}"
-- name: Initialize existing_vms 
-  set_fact: 
-    existing_vms: false
-    vm_host: "golden-base"
-
 - name: Get VM status from virsh list
   become: yes
   become_user: "{{ cloud_helper_user }}"

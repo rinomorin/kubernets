@@ -1,7 +1,14 @@
+
 - debug:
     msg: "Current node is {{ inventory_hostname }} in group(s) {{ group_names }}" 
+- name: Initialize existing_vms 
+  set_fact: 
+    existing_vms: false
+    vm_host: "golden-base"
+
 - name: Build Rocky Linux base image
   block:
+
   - name: Build Rocky Linux base image
     import_tasks: 00_create_golden.yml
     delegate_to: "{{ VM_HOST_IP }}"

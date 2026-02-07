@@ -1,3 +1,7 @@
+- name: Wait for SSH on golden-base 
+  wait_for: 
+    timeout: 15
+
 - name: Start golden-base VM
   shell: virsh start golden-base
   # delegate_to: "{{ KVM_HOST_IP }}"
@@ -6,7 +10,7 @@
   shell: |
     virsh list --all | grep golden-base | awk '{print $NF}'
   register: vm_state
-  # delegate_to: "{{ KVM_HOST_IP }}"
+  delegate_to: "{{ KVM_HOST_IP }}"
   failed_when: false
   changed_when: false
   until: vm_state.stdout == "running"
