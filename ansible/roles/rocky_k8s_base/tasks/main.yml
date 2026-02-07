@@ -12,7 +12,9 @@
   - name: wait for power down
     import_tasks: 01_wait_for_shutdown.yml
     delegate_to: "{{ VM_HOST_IP }}"
-  when: inventory_hostname_short == groups['kvm']
+  when: 
+    - "'kvm' in group_names"
+
 
     # - name: fix url
     #   import_tasks: fix_url.yml
