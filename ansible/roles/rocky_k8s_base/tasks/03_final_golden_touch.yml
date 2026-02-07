@@ -80,7 +80,7 @@
 - name: Validate crictl
   become: false
   delegate_to: localhost
-  command: sudo core@"{{ golden_ip }}" "crictl --version"
+  command: ssh core@"{{ golden_ip }}" "crictl --version"
   register: crictl_check
   changed_when: false
   failed_when: crictl_check.rc != 0
