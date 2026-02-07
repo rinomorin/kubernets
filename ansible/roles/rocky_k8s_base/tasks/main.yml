@@ -27,7 +27,7 @@
     delegate_to: localhost
 
   - name: clone golden image
-    import_tasks: 04_cloning_golden
+    import_tasks: 04_cloning_golden.yml
     delegate_to: "{{ VM_HOST_IP }}"
   when: 
     - "'kvm' in group_names"
