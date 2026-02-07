@@ -66,21 +66,21 @@ openssh-clients
 
 %post --log=/root/ks-post.log
 
-nmcli con modify enp2s0 ipv4.addresses {{ cluster_ip_addr }}/{{ ip_cid }}
-nmcli con modify enp2s0 ipv4.gateway {{ cluster_gateway }}
-nmcli con modify enp2s0 ipv4.method manual
-nmcli con modify enp2s0 ipv4.never-default yes
-nmcli con modify enp2s0 ipv6.method ignore
-nmcli con modify enp2s0 connection.autoconnect yes
-nmcli con up enp2s0
+# nmcli con modify enp2s0 ipv4.addresses {{ cluster_ip_addr }}/{{ ip_cid }}
+# nmcli con modify enp2s0 ipv4.gateway {{ cluster_gateway }}
+# nmcli con modify enp2s0 ipv4.method manual
+# nmcli con modify enp2s0 ipv4.never-default yes
+# nmcli con modify enp2s0 ipv6.method ignore
+# nmcli con modify enp2s0 connection.autoconnect yes
+# nmcli con up enp2s0
 
-nmcli con modify enp3s0 ipv4.addresses {{ ip_address }}/{{ ip_cid }}
-nmcli con modify enp3s0 ipv4.gateway {{ ip_gate }}
-nmcli con modify enp3s0 ipv4.method manual
-nmcli con modify enp3s0 ipv4.never-default yes
-nmcli con modify enp3s0 ipv6.method ignore
-nmcli con modify enp3s0 connection.autoconnect yes
-nmcli con up enp3s0
+# nmcli con modify enp3s0 ipv4.addresses {{ ip_address }}/{{ ip_cid }}
+# nmcli con modify enp3s0 ipv4.gateway {{ ip_gate }}
+# nmcli con modify enp3s0 ipv4.method manual
+# nmcli con modify enp3s0 ipv4.never-default yes
+# nmcli con modify enp3s0 ipv6.method ignore
+# nmcli con modify enp3s0 connection.autoconnect yes
+# nmcli con up enp3s0
 
 mkdir -p /home/core/.ssh
 chmod 700 /home/core/.ssh

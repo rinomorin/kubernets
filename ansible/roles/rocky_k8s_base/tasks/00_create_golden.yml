@@ -6,7 +6,7 @@
 - name: Initialize existing_vms 
   set_fact: 
     existing_vms: false
-    vm_host: "{{ inventory_hostname_short }}"
+    vm_host: "golden-base"
 
 - name: Get VM status from virsh list
   delegate_to: localhost
@@ -37,12 +37,12 @@
   
 - name: set ip_addr
   set_fact:
-    ip_addr: "{{ ansible_host }}"
+    ip_addr: "{{ ansible_host.split('.')[:3] | join('.') }}.30 }}"
   when: ansible_host is defined and ansible_host|length > 0
 
 - name: set defauts ip info
   set_fact:
-    ip_addr: "{{ ansible_host }}"
+    ip_addr: "{{ ansible_host.split('.')[:3] | join('.') }}.30 }}"
     ip_mask: "{{ default_netmask }}"
     ip_gate: "{{ ansible_host.split('.')[:3] | join('.') }}.1"
     net_device: "{{ default_net_device }}"
@@ -125,8 +125,8 @@
     tdisk_size: 50
     tcpu_count: 2
     tram_size: 4096
-    tvg_name: "vg_{{ inventory_hostname_short }}"
-    tvg_short: "{{ inventory_hostname_short }}"
+    tvg_name: "vg_{{ vm_host }}"
+    tvg_short: "{{ vm_host }}"
     tpwd_hash: "{{ lookup('env','admin_hash') }}"
     tsecops_hash: "{{ lookup('env','secops_hash') }}"
     tsecops_key: "{{ lookup('env','secops_key') }}"
@@ -137,14 +137,14 @@
   # become: true
   template:
     src: "golden.ks.j2"
-    dest: "/home/{{ cloud_helper_user }}/{{ inventory_hostname_short }}.ks"
+    dest: "/home/{{ cloud_helper_user }}/{{ vm_host }}.ks"
     force: true
   when: 
     - not existing_vms
     - "'kvm' not in group_names"
     - "'helper' not in group_names"
   vars:
-    hostname: "{{ inventory_hostname_short }}.{{ cloud_zone | default(ansible_domain) }}"
+    hostname: "{{ vm_host }}.{{ cloud_zone | default(ansible_domain) }}"
     disk_size: "{{ tdisk_size }}"
     vcpu_count: "{{ tcpu_count }}" 
     ram_size: "{{ tram_size }}"
@@ -184,12 +184,12 @@
   become: true
   command: >
     virt-install
-      --name {{ inventory_hostname_short }}
+      --name {{ vm_host }}
       --ram {{ tram_size }}
       --vcpus {{ tcpu_count }}
-      --initrd-inject="/home/{{ cloud_helper_user }}/{{ inventory_hostname_short }}.ks"
-      --extra-args="inst.ks=file:/{{ inventory_hostname_short }}.ks console=ttyS0,115200n8"
-      --disk path=/var/lib/libvirt/images/{{ inventory_hostname_short }}.qcow2,size={{ tdisk_size }},bus=sata
+      --initrd-inject="/home/{{ cloud_helper_user }}/{{ vm_host }}.ks"
+      --extra-args="inst.ks=file:/{{ vm_host }}.ks console=ttyS0,115200n8"
+      --disk path=/var/lib/libvirt/images/{{ vm_host }}.qcow2,size={{ tdisk_size }},bus=sata
       --os-variant {{ tos_name}}{{ tos_variant.split('.')[0] }}
       {{ '--network network=br-nat,mac=' ~ nat_mac_device if nat_mac_device is defined else '--network network=br-nat' }}
       --network network=br-cluster

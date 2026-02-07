@@ -1,14 +1,17 @@
-- name: Switch to ansible_user
-  become: yes
-  # become_user: "{{ ansible_user }}"
+# - name: Switch to ansible_user
+#   become: yes
+#   # become_user: "{{ ansible_user }}"
+- name: Build Rocky Linux base image
   block:
-    - name: Build Rocky Linux base image
-      import_tasks: 00_create_golden.yml
-      delegate_to: "{{ VM_HOST_IP }}"
-
-    - name: wait for power down
-      import_tasks: 01_wait_for_shutdown.yml
-      delegate_to: "{{ VM_HOST_IP }}"
+  - name: Build Rocky Linux base image
+    import_tasks: 00_create_golden.yml
+    delegate_to: "{{ VM_HOST_IP }}"
+  
+  - name: wait for power down
+    import_tasks: 01_wait_for_shutdown.yml
+    delegate_to: "{{ VM_HOST_IP }}"
+  
+  when: inventory_hostname_short == groups['control_nodes'][0]
 
     # - name: fix url
     #   import_tasks: fix_url.yml
