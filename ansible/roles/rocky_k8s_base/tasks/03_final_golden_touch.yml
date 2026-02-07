@@ -35,11 +35,16 @@
     url: "https://github.com/kubernetes-sigs/cri-tools/releases/download/v{{ crictl_version }}/crictl-v{{ crictl_version }}-linux-amd64.tar.gz"
     dest: "/tmp/crictl.tar.gz"
 
-- name: Download crictl
+- name: upload crictl to goldebase and extract
   become: False
   delegate_to: localhost
   shell: |
     scp /tmp/crictl-{{ crictl_version }}.tar.gz core@{{ golden_ip }}:/tmp/crictl.tar.gz
+
+- name: Install crictl on golden-base
+  become: false
+  delegate_to: localhost
+  shell: |
     ssh core@"{{ golden_ip }}" sudo tar xzf /tmp/crictl.tar.gz -C /usr/local/bin/
     ssh core@"{{ golden_ip }}" sudo chmod 755 /usr/local/bin/crictl
     ssh core@"{{ golden_ip }}" mkdir -p /home/core/.kube && sudo chown core:core /home/core/.kube
