@@ -9,7 +9,6 @@
     vm_host: "golden-base"
 
 - name: Get VM status from virsh list
-  delegate_to: localhost
   become: yes
   become_user: "{{ cloud_helper_user }}"
   shell: |
