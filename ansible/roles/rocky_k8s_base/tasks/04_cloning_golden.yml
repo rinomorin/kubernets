@@ -1,0 +1,98 @@
+---
+# ============================================================
+# 04_cloning_golden.yml — TASKS ONLY (role‑compatible)
+# ============================================================
+
+# Golden image is always the same
+- name: Set golden image variables
+  set_fact:
+    golden_vm: "golden-base"
+    golden_disk: "/var/lib/libvirt/images/golden-base.qcow2"
+
+# Build clone list from inventory groups
+- name: Build clone node list (control + worker)
+  set_fact:
+    clone_nodes: "{{ groups['control_nodes'] + groups['worker_nodes'] }}"
+
+- name: Show clone targets
+  debug:
+    msg: "Cloning nodes: {{ clone_nodes }} from golden image {{ golden_vm }}"
+
+# ------------------------------------------------------------
+# Ensure golden-base is powered off
+# ------------------------------------------------------------
+- name: Check golden-base power state
+  shell: sudo virsh domstate "{{ golden_vm }}"
+  register: golden_state
+  delegate_to: "{{ VM_HOST_IP }}"
+
+- name: Shutdown golden-base if running
+  when: golden_state.stdout == "running"
+  shell: sudo virsh shutdown "{{ golden_vm }}"
+  delegate_to: "{{ VM_HOST_IP }}"
+
+- name: Wait for golden-base to be shut off
+  shell: sudo virsh domstate "{{ golden_vm }}"
+  register: golden_wait
+  until: golden_wait.stdout == "shut off"
+  retries: 30
+  delay: 2
+  delegate_to: "{{ VM_HOST_IP }}"
+
+# ------------------------------------------------------------
+# Clone disks using qemu-img
+# ------------------------------------------------------------
+- name: Clone disks from golden-base
+  loop: "{{ clone_nodes }}"
+  loop_control:
+    loop_var: node
+  shell: |
+    sudo qemu-img create -f qcow2 -b "{{ golden_disk }}" "{{ hostvars[node].disk }}"
+  args:
+    creates: "{{ hostvars[node].disk }}"
+  delegate_to: "{{ VM_HOST_IP }}"
+
+# ------------------------------------------------------------
+# Define cloned VMs using virt-clone
+# ------------------------------------------------------------
+- name: Define cloned VMs
+  loop: "{{ clone_nodes }}"
+  loop_control:
+    loop_var: node
+  shell: |
+    sudo virt-clone \
+      --original "{{ golden_vm }}" \
+      --name "{{ node }}" \
+      --file "{{ hostvars[node].disk }}" \
+      --auto-clone
+  args:
+    creates: "/etc/libvirt/qemu/{{ node }}.xml"
+  delegate_to: "{{ VM_HOST_IP }}"
+
+
+# ------------------------------------------------------------
+# Remove default NAT NIC from worker nodes (keep only br-*)
+# ------------------------------------------------------------
+- name: Remove default network interface from worker nodes
+  loop: "{{ groups['worker_nodes'] }}"
+  loop_control:
+    loop_var: node
+  shell: |
+    # Find the NIC attached to the default network (usually 'default')
+    nic=$(sudo virsh domiflist "{{ node }}" | awk '/default/ {print $1}')
+    if [ -n "$nic" ]; then
+      sudo virsh detach-interface "{{ node }}" network --mac $(sudo virsh domiflist "{{ node }}" | awk '/default/ {print $5}') --persistent
+    fi
+  delegate_to: "{{ VM_HOST_IP }}"
+
+
+# ------------------------------------------------------------
+# Start cloned VMs
+# ------------------------------------------------------------
+- name: Start cloned VMs
+  loop: "{{ clone_nodes }}"
+  loop_control:
+    loop_var: node
+  shell: sudo virsh start "{{ node }}"
+  delegate_to: "{{ VM_HOST_IP }}"
+
