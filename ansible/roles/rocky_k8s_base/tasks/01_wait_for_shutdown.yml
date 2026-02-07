@@ -31,7 +31,8 @@
   shell: |
     sudo virsh list --all | sed 's/shut off/shutdown/' | grep -i "^.*{{ vm_host }}.*" | awk '{print $NF}'
   register: vm_state
-  
+  vars: 
+    ansible_loop_var: verbose
   delegate_to: "{{ VM_HOST_IP }}"
   failed_when: false
   changed_when: false
