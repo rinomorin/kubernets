@@ -155,6 +155,7 @@
     ip_mask: "{{ ip_mask }}"
     ip_cid: "{{ ip_cid }}"
     crio_repo_ver: "{{ crio_version }}"
+    kubernetes_version: "{{ kubernetes_version }}"
     core_ssh_key: "{{ helper_ssh_key }}"
     install_disk: "sda"
     dns_01: "8.8.8.8"
