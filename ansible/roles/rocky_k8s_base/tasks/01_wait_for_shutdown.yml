@@ -9,6 +9,7 @@
 - name: Set global epoch fact
   set_fact:
     global_epoch: "{{ epoch_result.stdout | int }}"
+    vm_host: "{{ inventory_hostname_short }}"
 
 - name: Set VM shutdown poll start time
   set_fact:
