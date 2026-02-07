@@ -14,8 +14,8 @@
   set_fact:
     vm_shutdown_start: "{{ global_epoch }}"
 
-- name: Trigger build if needed
-  include_tasks: define_vms.yml
+# - name: Trigger build if needed
+#   include_tasks: define_vms.yml
   # when: vm_stage_map[vm_host] in ['build', 'building']
 
 - name: Calculate wait time in minutes
