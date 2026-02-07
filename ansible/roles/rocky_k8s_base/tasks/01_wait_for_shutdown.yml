@@ -27,17 +27,29 @@
   debug:
     msg: "This will wait up to {{ wait_time_to_shutdown_or_fail }} minutes before resuming to next tasks"
 
-- name: Probe VM with vish until vm power down
+# - name: Probe VM with vish until vm power down
+#   shell: |
+#     sudo virsh list --all | sed 's/shut off/shutdown/' | grep -i "^.*{{ vm_host }}.*" | awk '{print $NF}' 2>&1
+#   register: vm_state
+#   vars: 
+#     ansible_loop_var: verbose
+#   delegate_to: "{{ VM_HOST_IP }}"
+#   failed_when: false
+#   changed_when: false
+#   until: (vm_state.stdout | default('')) == "shutdown"
+#   retries: "{{ build_loops|int }}"
+#   delay: 10          # 10 seconds between attempts
+
+
+- name: Probe VM with virsh until VM powers down
   shell: |
-    sudo virsh list --all | sed 's/shut off/shutdown/' | grep -i "^.*{{ vm_host }}.*" | awk '{print $NF}' 2>&1
+    state=$(sudo virsh list --all | sed 's/shut off/shutdown/' | grep -i "^.*{{ vm_host }}.*" | awk '{print $NF}')
+    echo -e "\033[1;33m[{{ vm_host }}] VM state: $state\033[0m"
+    echo "$state"
   register: vm_state
-  vars: 
-    ansible_loop_var: verbose
   delegate_to: "{{ VM_HOST_IP }}"
   failed_when: false
   changed_when: false
-  until: (vm_state.stdout | default('')) == "shutdown"
+  until: vm_state.stdout_lines[-1] == "shutdown"
   retries: "{{ build_loops|int }}"
-  delay: 10          # 10 seconds between attempts
-
-
+  delay: 10
