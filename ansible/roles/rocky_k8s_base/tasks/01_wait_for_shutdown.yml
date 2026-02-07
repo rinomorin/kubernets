@@ -27,7 +27,7 @@
   # when: vm_stage_map[vm_host] in ['build', 'building'] and  vm_build_stage | trim != "present"
   # when: vm_stage_map[vm_host] in ['build', 'building'] and  vm_build_stage | trim != "present"
   shell: |
-    virsh list --all | sed 's/shut off/shutdown/' | grep -i "^.*{{ vm_host }}.*" | awk '{print $NF}'
+    virsh -c qemu+ssh://{{ cloud_helper_user}}@{{ VM_HOST_IP}}/system 'list --all' | sed 's/shut off/shutdown/'  | grep -i "^.*{{ vm_host }}.*" | awk '{print $NF}'
   register: vm_state
   vars:
   delegate_to: "{{ VM_HOST_IP }}"
@@ -36,3 +36,4 @@
   until: (vm_state.stdout | default('')) == "shutdown"
   retries: "{{ build_loops|int }}"
   delay: 10          # 10 seconds between attempts
+
