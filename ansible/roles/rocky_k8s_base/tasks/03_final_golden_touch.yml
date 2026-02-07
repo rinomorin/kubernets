@@ -115,7 +115,9 @@
   become: false
   delegate_to: localhost
   ignore_errors: true
-  shell: |
+  failed_when: false
+  changed_when: false
+    shell: |
     ssh core@"{{ golden_ip }}" sudo shutdown -h now
 
 # --------------------------------------------------------
@@ -124,6 +126,8 @@
 - name: Power off golden image
   shell: sudo virsh shutdown golden-base
   delegate_to: "{{ VM_HOST_IP }}"
+  failed_when: false
+  changed_when: false
   ignore_errors: true
 
 - name: Wait for golden image to be powered off
