@@ -30,73 +30,84 @@
     crictl_version: "{{ lookup('env','crictl_version') | default('1.34.0', true) }}"
 
 - name: Download crictl
-  become: false
+  become: False
   delegate_to: localhost
   shell: |
-    curl -L -o /tmp/crictl.tar.gz \
+    ssh core@"{{ golden_ip }}" curl -L -o /tmp/crictl.tar.gz 
     "https://github.com/kubernetes-sigs/cri-tools/releases/download/v{{ crictl_version }}/crictl-v{{ crictl_version }}-linux-amd64.tar.gz"
+    ssh core@"{{ golden_ip }}" sudo tar xzf /tmp/crictl.tar.gz -C /usr/local/bin/
+    ssh core@"{{ golden_ip }}" sudo chmod 755 /usr/local/bin/crictl
+    ssh core@"{{ golden_ip }}" mkdir -p /home/core/.kube && sudo chown core:core /home/core/.kube
+    ssh core@"{{ golden_ip }}" chmod 750 /home/core/.kube
+    ssh core@"{{ golden_ip }}" echo "kubeconfig will be populated after cluster bootstrap" > /home/core/.kube/config
+    ssh core@"{{ golden_ip }}" sudo chown core:core /home/core/.kube/config
+    ssh core@"{{ golden_ip }}" sudo chmod 600 /home/core/.kube/config  
 
-- name: Extract crictl
-  become: true
-  delegate_to: "{{ golden_ip }}"
-  unarchive:
-    src: "/tmp/crictl.tar.gz"
-    dest: "/usr/local/bin"
-    remote_src: true
+# - name: Extract crictl
+#   become: true
+#   delegate_to: "{{ golden_ip }}"
+#   unarchive:
+#     src: "/tmp/crictl.tar.gz"
+#     dest: "/usr/local/bin"
+#     remote_src: true
 
-- name: Ensure crictl permissions
-  become: true
-  delegate_to: "{{ golden_ip }}"
-  file:
-    path: "/usr/local/bin/crictl"
-    mode: "0755"
+# - name: Ensure crictl permissions
+#   become: true
+#   delegate_to: "{{ golden_ip }}"
+#   file:
+#     path: "/usr/local/bin/crictl"
+#     mode: "0755"
 
 # --------------------------------------------------------
 # Prepare directories
 # --------------------------------------------------------
-- name: Ensure .kube directory exists
-  become: true
-  delegate_to: "{{ golden_ip }}"
-  file:
-    path: "/home/core/.kube"
-    state: directory
-    owner: "core"
-    group: "core"
-    mode: "0750"
+# - name: Ensure .kube directory exists
+#   become: true
+#   delegate_to: "{{ golden_ip }}"
+#   file:
+#     path: "/home/core/.kube"
+#     state: directory
+#     owner: "core"
+#     group: "core"
+#     mode: "0750"
 
-- name: Create kubeconfig placeholder
-  become: true
-  delegate_to: "{{ golden_ip }}"
-  copy:
-    dest: "/home/core/.kube/config"
-    content: |
-      # kubeconfig will be populated after cluster bootstrap
-    owner: "core"
-    group: "core"
-    mode: "0600"
-    force: no
+# - name: Create kubeconfig placeholder
+#   become: true
+#   delegate_to: "{{ golden_ip }}"
+#   copy:
+#     dest: "/home/core/.kube/config"
+#     content: |
+#       # kubeconfig will be populated after cluster bootstrap
+#     owner: "core"
+#     group: "core"
+#     mode: "0600"
+#     force: no
 
 # --------------------------------------------------------
 # Validate binaries
 # --------------------------------------------------------
 - name: Validate kubeadm
   become: false
-  delegate_to: "{{ golden_ip }}"
-  command: kubeadm version
+  delegate_to: localhost
+  shell: |
+    ssh core@"{{ golden_ip }}" kubeadm version
   register: kubeadm_check
   changed_when: false
   failed_when: kubeadm_check.rc != 0
 
 - name: Validate kubectl
   become: false
-  delegate_to: "{{ golden_ip }}"
-  command: kubectl version --client=true
+  delegate_to: localhost
+  shell: |
+    ssh core@"{{ golden_ip }}" kubectl version --client=true
   register: kubectl_check
   changed_when: false
   failed_when: kubectl_check.rc != 0
 
 - name: Validate crictl
-  command: crictl --version
+  become: false
+  delegate_to: localhost
+  command: sudo core@{{ golden_ip }} crictl --version
   register: crictl_check
   changed_when: false
   failed_when: crictl_check.rc != 0
@@ -106,26 +117,30 @@
 # --------------------------------------------------------
 - name: Clean machine-id
   become: true
-  delegate_to: "{{ golden_ip }}"
+  delegate_to: localhost
   shell: |
-    rm -f /etc/machine-id
-    touch /etc/machine-id
+    ssh core@"{{ golden_ip }}" sudo rm -f /etc/machine-id
+    ssh core@"{{ golden_ip }}" sudo touch /etc/machine-id
 
 - name: Clear logs
   become: true
-  delegate_to: "{{ golden_ip }}"
+  delegate_to: localhost
   shell: |
-    rm -rf /var/log/*
+    ssh core@"{{ golden_ip }}" sudo rm -rf /var/log/*
 
 - name: Clear dnf cache
   become: true
-  delegate_to: "{{ golden_ip }}"
-  shell: dnf clean all
+  delegate_to: localhost
+  shell: |
+    ssh core@"{{ golden_ip }}" sudo dnf clean all
+  
 
 # --------------------------------------------------------
 # Power off the golden image
 # --------------------------------------------------------
 - name: Power off golden image
   become: true
-  delegate_to: "{{ golden_ip }}"
-  shell: shutdown -h now
+  delegate_to: localhost
+  shell: |
+    ssh core@"{{ golden_ip }}" sudo shutdown -h now
+  
