@@ -43,7 +43,7 @@
     ssh core@"{{ golden_ip }}" sudo tar xzf /tmp/crictl.tar.gz -C /usr/local/bin/
     ssh core@"{{ golden_ip }}" sudo chmod 755 /usr/local/bin/crictl
     
-- name: setp kube config permissions and placeholder
+- name: setup kube config permissions and placeholder
   become: false
   delegate_to: localhost
   shell: |
