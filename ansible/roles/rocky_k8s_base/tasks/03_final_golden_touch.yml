@@ -89,20 +89,20 @@
 # Clean dynamic state before freezing image
 # --------------------------------------------------------
 - name: Clean machine-id
-  become: true
+  become: false
   delegate_to: localhost
   shell: |
     ssh core@"{{ golden_ip }}" sudo rm -f /etc/machine-id
     ssh core@"{{ golden_ip }}" sudo touch /etc/machine-id
 
 - name: Clear logs
-  become: true
+  become: false
   delegate_to: localhost
   shell: |
     ssh core@"{{ golden_ip }}" sudo rm -rf /var/log/*
 
 - name: Clear dnf cache
-  become: true
+  become: false 
   delegate_to: localhost
   shell: |
     ssh core@"{{ golden_ip }}" sudo dnf clean all
@@ -112,8 +112,15 @@
 # Power off the golden image
 # --------------------------------------------------------
 - name: Power off golden image
-  become: true
+  become: false
   delegate_to: localhost
   shell: |
     ssh core@"{{ golden_ip }}" sudo shutdown -h now
   
+- name: rm local downloaded crictl archive
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/tmp/crictl-{{ crictl_version }}.tar.gz"
+    - "/tmp/crictl.tar.gz"
