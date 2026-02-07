@@ -126,9 +126,6 @@
     tram_size: 4096
     tvg_name: "vg_{{ vm_host }}"
     tvg_short: "{{ vm_host }}"
-    tpwd_hash: "{{ lookup('env','admin_hash') }}"
-    tsecops_hash: "{{ lookup('env','secops_hash') }}"
-    tsecops_key: "{{ lookup('env','secops_key') }}"
     tos_variant: "{{  local_os_id.stdout | default('9.7') }}"
     tos_name: "{{  local_os_name.stdout | default('rocky') }}"  
 
@@ -157,6 +154,7 @@
     net_device: "{{ net_device }}"
     ip_mask: "{{ ip_mask }}"
     ip_cid: "{{ ip_cid }}"
+    crio_repo_ver: "{{ crio_version }}"
     core_ssh_key: "{{ helper_ssh_key }}"
     install_disk: "sda"
     dns_01: "8.8.8.8"
