@@ -30,11 +30,17 @@
     crictl_version: "{{ lookup('env','crictl_version') | default('1.34.0', true) }}"
 
 - name: Download crictl
+  become: false
+  delegate_to: "{{ golden_ip }}"
+  get_url:
+    url: "https://github.com/kubernetes-sigs/cri-tools/releases/download/v{{ crictl_version }}/crictl-v{{ crictl_version }}-linux-amd64.tar.gz"
+    dest: "/tmp/crictl.tar.gz"
+
+- name: Download crictl
   become: False
   delegate_to: localhost
   shell: |
-    ssh core@"{{ golden_ip }}" curl -L -o /tmp/crictl.tar.gz 
-    "https://github.com/kubernetes-sigs/cri-tools/releases/download/v{{ crictl_version }}/crictl-v{{ crictl_version }}-linux-amd64.tar.gz"
+    scp /tmp/crictl-{{ crictl_version }}.tar.gz core@{{ golden_ip }}:/tmp/crictl.tar.gz
     ssh core@"{{ golden_ip }}" sudo tar xzf /tmp/crictl.tar.gz -C /usr/local/bin/
     ssh core@"{{ golden_ip }}" sudo chmod 755 /usr/local/bin/crictl
     ssh core@"{{ golden_ip }}" mkdir -p /home/core/.kube && sudo chown core:core /home/core/.kube
