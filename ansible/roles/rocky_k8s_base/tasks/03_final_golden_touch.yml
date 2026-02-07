@@ -47,11 +47,10 @@
   shell: |
     ssh core@"{{ golden_ip }}" sudo tar xzf /tmp/crictl.tar.gz -C /usr/local/bin/
     ssh core@"{{ golden_ip }}" sudo chmod 755 /usr/local/bin/crictl
-    ssh core@"{{ golden_ip }}" mkdir -p /home/core/.kube && sudo chown core:core /home/core/.kube
+    ssh core@"{{ golden_ip }}" mkdir -p /home/core/.kube
     ssh core@"{{ golden_ip }}" chmod 750 /home/core/.kube
     ssh core@"{{ golden_ip }}" echo "kubeconfig will be populated after cluster bootstrap" > /home/core/.kube/config
-    ssh core@"{{ golden_ip }}" sudo chown core:core /home/core/.kube/config
-    ssh core@"{{ golden_ip }}" sudo chmod 600 /home/core/.kube/config  
+    ssh core@"{{ golden_ip }}" chmod 600 /home/core/.kube/config  
 
 # - name: Extract crictl
 #   become: true
