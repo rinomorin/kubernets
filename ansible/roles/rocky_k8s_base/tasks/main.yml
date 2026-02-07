@@ -10,17 +10,17 @@
 - name: Build Rocky Linux base image
   block:
 
-  - name: Build Rocky Linux base image
-    import_tasks: 00_create_golden.yml
-    delegate_to: "{{ VM_HOST_IP }}"
+  # - name: Build Rocky Linux base image
+  #   import_tasks: 00_create_golden.yml
+  #   delegate_to: "{{ VM_HOST_IP }}"
   
-  - name: wait for power down
-    import_tasks: 01_wait_for_shutdown.yml
-    delegate_to: "{{ VM_HOST_IP }}"
+  # - name: wait for power down
+  #   import_tasks: 01_wait_for_shutdown.yml
+  #   delegate_to: "{{ VM_HOST_IP }}"
 
-  - name: wait for power up
-    import_tasks: 02_wait_for_poweron.yml
-    delegate_to: "{{ VM_HOST_IP }}"
+  # - name: wait for power up
+  #   import_tasks: 02_wait_for_poweron.yml
+  #   delegate_to: "{{ VM_HOST_IP }}"
 
   - name: finalize golden image
     import_tasks: 03_final_golden_touch.yml

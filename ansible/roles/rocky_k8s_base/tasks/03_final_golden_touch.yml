@@ -114,9 +114,27 @@
 - name: Power off golden image
   become: false
   delegate_to: localhost
+  ignore_errors: true
   shell: |
     ssh core@"{{ golden_ip }}" sudo shutdown -h now
-  
+
+# --------------------------------------------------------
+# Power off the golden image (via KVM host, not SSH)
+# --------------------------------------------------------
+- name: Power off golden image
+  shell: virsh shutdown golden-base
+  delegate_to: "{{ inventory_hostname }}"
+  ignore_errors: true
+
+- name: Wait for golden image to be powered off
+  shell: virsh domstate golden-base
+  register: golden_power
+  until: golden_power.stdout == "shut off"
+  retries: 30
+  delay: 2
+  delegate_to: "{{ inventory_hostname }}"
+
+
 - name: rm local downloaded crictl archive
   file:
     path: "{{ item }}"
