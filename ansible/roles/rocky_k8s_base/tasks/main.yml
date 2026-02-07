@@ -1,6 +1,8 @@
 # - name: Switch to ansible_user
 #   become: yes
 #   # become_user: "{{ ansible_user }}"
+- debug:
+    msg: "Current node is {{ inventory_hostname }}" 
 - name: Build Rocky Linux base image
   block:
   - name: Build Rocky Linux base image
