@@ -42,6 +42,8 @@
     scp /tmp/crictl-{{ crictl_version }}.tar.gz core@{{ golden_ip }}:/tmp/crictl.tar.gz
     ssh core@"{{ golden_ip }}" sudo tar xzf /tmp/crictl.tar.gz -C /usr/local/bin/
     ssh core@"{{ golden_ip }}" sudo chmod 755 /usr/local/bin/crictl
+    ssh core@"{{ golden_ip }}" sudo ln -s /usr/local/bin/crictl /usr/bin/crictl
+    ssh core@"{{ golden_ip }}" rm -f /tmp/crictl.tar.gz
     
 - name: setup kube config permissions and placeholder
   become: false
@@ -52,47 +54,7 @@
     - "mkdir -p /home/core/.kube"
     - "chmod 750 /home/core/.kube"
     - "echo 'kubeconfig will be populated after cluster bootstrap' > /home/core/.kube/config"
-    - "chmod 600 /home/core/.kube/config"
-    
-# - name: Extract crictl
-#   become: true
-#   delegate_to: "{{ golden_ip }}"
-#   unarchive:
-#     src: "/tmp/crictl.tar.gz"
-#     dest: "/usr/local/bin"
-#     remote_src: true
-
-# - name: Ensure crictl permissions
-#   become: true
-#   delegate_to: "{{ golden_ip }}"
-#   file:
-#     path: "/usr/local/bin/crictl"
-#     mode: "0755"
-
-# --------------------------------------------------------
-# Prepare directories
-# --------------------------------------------------------
-# - name: Ensure .kube directory exists
-#   become: true
-#   delegate_to: "{{ golden_ip }}"
-#   file:
-#     path: "/home/core/.kube"
-#     state: directory
-#     owner: "core"
-#     group: "core"
-#     mode: "0750"
-
-# - name: Create kubeconfig placeholder
-#   become: true
-#   delegate_to: "{{ golden_ip }}"
-#   copy:
-#     dest: "/home/core/.kube/config"
-#     content: |
-#       # kubeconfig will be populated after cluster bootstrap
-#     owner: "core"
-#     group: "core"
-#     mode: "0600"
-#     force: no
+    - "chmod 600 /home/core/.kube/config"    
 
 # --------------------------------------------------------
 # Validate binaries
