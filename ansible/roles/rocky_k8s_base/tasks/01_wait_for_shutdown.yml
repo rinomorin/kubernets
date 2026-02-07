@@ -23,27 +23,20 @@
   set_fact:
     wait_time_to_shutdown_or_fail: "{{ ((build_loops | int) * 10 // 60) }}"
 
-- name: who am I
-  command: whoami
-  become: false
-  register: whoami_out
-- debug:
-    msg: "Current user is {{ whoami_out.stdout }}"
+- name: Display wait time
+  debug:
+    msg: "This will wait up to {{ wait_time_to_shutdown_or_fail }} minutes before resuming to next tasks"
 
-- name: Probe VM with echo until vm shutdown
-  # when: vm_stage_map[vm_host] in ['build', 'building'] and  vm_build_stage | trim != "present"
-  # when: vm_stage_map[vm_host] in ['build', 'building'] and  vm_build_stage | trim != "present"
+- name: Probe VM with vish until vm power down
   shell: |
-    #virsh -c qemu+ssh://{{ cloud_helper_user}}@{{ VM_HOST_IP}}/system 'list --all' 
-    #| sed 's/shut off/shutdown/'  | grep -i "^.*{{ vm_host }}.*" | awk '{print $NF}'
     sudo virsh list --all | sed 's/shut off/shutdown/' | grep -i "^.*{{ vm_host }}.*" | awk '{print $NF}'
   register: vm_state
-  become: yes
-  vars:
+  
   delegate_to: "{{ VM_HOST_IP }}"
   failed_when: false
   changed_when: false
   until: (vm_state.stdout | default('')) == "shutdown"
   retries: "{{ build_loops|int }}"
   delay: 10          # 10 seconds between attempts
+
 

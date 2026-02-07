@@ -106,13 +106,6 @@
 - debug:  
     msg: "cloud_helper_user is {{ cloud_helper_user }}"
 
-- name: who am I
-  command: whoami
-  become: false
-  register: whoami_out
-- debug:
-    msg: "Current user is {{ whoami_out.stdout }}"
-
 - name: get local os version id
   delegate_to: localhost
   become: false
