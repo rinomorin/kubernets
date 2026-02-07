@@ -1,7 +1,7 @@
 - name: set ssh user for golden-base
   set_fact:
     ansible_ssh_user: "core"
-    
+
 # ============================================================
 # PLAY 2 — Provision Golden Image (runs inside VM)
 # ============================================================
@@ -10,10 +10,9 @@
 # --------------------------------------------------------
 - name: Install podman
   become: true
-  package:
-    name: podman
-    state: present
-
+  shell: |
+    sudo dnf -y install podman --nobest --refresh
+  
 # --------------------------------------------------------
 # Install kubeadm, kubelet, kubectl
 # --------------------------------------------------------
