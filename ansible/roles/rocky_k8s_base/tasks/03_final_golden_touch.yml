@@ -35,7 +35,7 @@
     url: "https://github.com/kubernetes-sigs/cri-tools/releases/download/v{{ crictl_version }}/crictl-v{{ crictl_version }}-linux-amd64.tar.gz"
     dest: "/tmp/crictl.tar.gz"
 
-- name: upload crictl to goldebase and extract
+- name: upload crictl to golden-base and extract
   become: False
   delegate_to: localhost
   shell: |
