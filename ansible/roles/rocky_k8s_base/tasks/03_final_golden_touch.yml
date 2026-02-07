@@ -145,5 +145,4 @@
     path: "{{ item }}"
     state: absent
   loop:
-    - "/tmp/crictl-{{ crictl_version }}.tar.gz"
     - "/tmp/crictl.tar.gz"
