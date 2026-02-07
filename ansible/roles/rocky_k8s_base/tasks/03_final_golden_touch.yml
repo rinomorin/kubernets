@@ -117,7 +117,7 @@
   ignore_errors: true
   failed_when: false
   changed_when: false
-    shell: |
+  shell: |
     ssh core@"{{ golden_ip }}" sudo shutdown -h now
 
 # --------------------------------------------------------
