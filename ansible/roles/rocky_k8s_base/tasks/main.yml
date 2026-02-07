@@ -1,6 +1,3 @@
-# - name: Switch to ansible_user
-#   become: yes
-#   # become_user: "{{ ansible_user }}"
 - debug:
     msg: "Current node is {{ inventory_hostname }} in group(s) {{ group_names }}" 
 - name: Build Rocky Linux base image
@@ -12,6 +9,15 @@
   - name: wait for power down
     import_tasks: 01_wait_for_shutdown.yml
     delegate_to: "{{ VM_HOST_IP }}"
+
+  - name: wait for power up
+    import_tasks: 02_wait_for_powerup.yml
+    delegate_to: "{{ VM_HOST_IP }}"
+
+  - name: finalize golden image
+    import_tasks: 03_finalize_golden.yml
+    delegate_to: "{{ golden_ip }}"
+
   when: 
     - "'kvm' in group_names"
 

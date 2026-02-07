@@ -190,6 +190,7 @@
       {{ '--network network=br-nat,mac=' ~ nat_mac_device if nat_mac_device is defined else '--network network=br-nat' }}
       --network network=br-cluster
       {{ '--network network=default' if 'control_nodes' in group_names else '' }}
+      {{ '--network network=default' if 'kvm' in group_names else '' }}
       --graphics none
       --console pty,target_type=serial
       --location {{ iso_path }}
