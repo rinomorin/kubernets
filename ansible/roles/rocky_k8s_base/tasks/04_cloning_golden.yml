@@ -42,17 +42,17 @@
 # ------------------------------------------------------------
 # Clone disks using qemu-img
 # ------------------------------------------------------------
-- name: Clone disks from golden-base
-  loop: "{{ clone_nodes }}"
-  loop_control:
-    loop_var: node
-  shell: |
-    sudo qemu-img create -f qcow2 -b "{{ golden_disk }}" -F qcow2 "/var/lib/libvirt/images/{{ node }}.qcow2"
-    sudo chown qemu:qemu  "/var/lib/libvirt/images/{{ node }}.qcow2"
-    sudo chmod 600  "/var/lib/libvirt/images/{{ node }}.qcow2"
-  args:
-    creates: "/var/lib/libvirt/images/{{ node }}.qcow2"
-  delegate_to: "{{ VM_HOST_IP }}"
+# - name: Clone disks from golden-base
+#   loop: "{{ clone_nodes }}"
+#   loop_control:
+#     loop_var: node
+#   shell: |
+#     sudo qemu-img create -f qcow2 -b "{{ golden_disk }}" -F qcow2 "/var/lib/libvirt/images/{{ node }}.qcow2"
+#     sudo chown qemu:qemu  "/var/lib/libvirt/images/{{ node }}.qcow2"
+#     sudo chmod 600  "/var/lib/libvirt/images/{{ node }}.qcow2"
+#   args:
+#     creates: "/var/lib/libvirt/images/{{ node }}.qcow2"
+#   delegate_to: "{{ VM_HOST_IP }}"
 
 # ------------------------------------------------------------
 # Define cloned VMs using virt-clone
@@ -70,7 +70,6 @@
   args:
     creates: "/etc/libvirt/qemu/{{ node }}.xml"
   delegate_to: "{{ VM_HOST_IP }}"
-
 
 # ------------------------------------------------------------
 # Remove default NAT NIC from worker nodes (keep only br-*)
