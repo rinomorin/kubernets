@@ -29,7 +29,7 @@
 
 - name: Probe VM with vish until vm power down
   shell: |
-    sudo virsh list --all | sed 's/shut off/shutdown/' | grep -i "^.*{{ vm_host }}.*" | awk '{print $NF}'
+    sudo virsh list --all | sed 's/shut off/shutdown/' | grep -i "^.*{{ vm_host }}.*" | awk '{print $NF}' 2>&1
   register: vm_state
   vars: 
     ansible_loop_var: verbose
