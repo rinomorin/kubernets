@@ -57,7 +57,11 @@ chrony
 tmux
 git
 jq
+yq
 openssh-clients
+butane
+python3
+python3-pyyaml
 %end
 
 # ------------------------------------------------------------
@@ -65,22 +69,6 @@ openssh-clients
 # ------------------------------------------------------------
 
 %post --log=/root/ks-post.log
-
-# nmcli con modify enp2s0 ipv4.addresses {{ cluster_ip_addr }}/{{ ip_cid }}
-# nmcli con modify enp2s0 ipv4.gateway {{ cluster_gateway }}
-# nmcli con modify enp2s0 ipv4.method manual
-# nmcli con modify enp2s0 ipv4.never-default yes
-# nmcli con modify enp2s0 ipv6.method ignore
-# nmcli con modify enp2s0 connection.autoconnect yes
-# nmcli con up enp2s0
-
-# nmcli con modify enp3s0 ipv4.addresses {{ ip_address }}/{{ ip_cid }}
-# nmcli con modify enp3s0 ipv4.gateway {{ ip_gate }}
-# nmcli con modify enp3s0 ipv4.method manual
-# nmcli con modify enp3s0 ipv4.never-default yes
-# nmcli con modify enp3s0 ipv6.method ignore
-# nmcli con modify enp3s0 connection.autoconnect yes
-# nmcli con up enp3s0
 
 mkdir -p /home/core/.ssh
 chmod 700 /home/core/.ssh
@@ -127,13 +115,44 @@ if ! ls /etc/ssh/ssh_host_*key >/dev/null 2>&1; then
   /usr/libexec/openssh/sshd-keygen || ssh-keygen -A
 fi
 
-# Placeholder for next stage:
-# - configure correct repos
-# - install CRI-O, kubelet, kubeadm, kubectl
-# - apply hardening
-# - validate services
-# - prepare for read-only root
-# - run kubeadm init/join logic
+# Disable after successful run
+systemctl disable firstboot-provision.service
+EOF
+
+###############################################
+# Install CRI-O and Kubernetes repositories
+###############################################
+
+CRIO_VER="{{ crio_repo_ver }}"
+K8S_VER="{{ kubernetes_repo_ver }}"
+
+# CRI-O repo
+cat >/etc/yum.repos.d/crio.repo <<EOF2
+[crio]
+name=CRI-O ${CRIO_VER}
+baseurl=https://download.opensuse.org/repositories/isv:/cri-o:/stable:/v${CRIO_VER}/rpm/
+enabled=1
+gpgcheck=1
+gpgkey=https://download.opensuse.org/repositories/isv:/cri-o:/stable:/v${CRIO_VER}/rpm/repodata/repomd.xml.key
+EOF2
+
+# Kubernetes repo
+cat >/etc/yum.repos.d/kubernetes.repo <<EOF3
+[kubernetes]
+name=Kubernetes ${K8S_VER}
+baseurl=https://pkgs.k8s.io/core:/stable:/v${K8S_VER}/rpm/
+enabled=1
+gpgcheck=1
+gpgkey=https://pkgs.k8s.io/core:/stable:/v${K8S_VER}/rpm/repodata/repomd.xml.key
+EOF3
+
+# Refresh repos
+dnf clean all
+dnf makecache
+
+###############################################
+# Placeholder for Stage 2 provisioning
+###############################################
 
 # Disable after successful run
 systemctl disable firstboot-provision.service
