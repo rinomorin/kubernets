@@ -22,19 +22,19 @@
 # Ensure golden-base is powered off
 # ------------------------------------------------------------
 - name: Check golden-base power state
-  shell: sudo virsh domstate "{{ golden_vm }}"
+  shell: sudo virsh domstate golden-base
   register: golden_state
   delegate_to: "{{ VM_HOST_IP }}"
 
 - name: Shutdown golden-base if running
   when: golden_state.stdout == "running"
-  shell: sudo virsh shutdown "{{ golden_vm }}"
+  shell: sudo virsh shutdown golden-base
   delegate_to: "{{ VM_HOST_IP }}"
 
-- name: Wait for golden-base to be shut off
-  shell: sudo virsh domstate "{{ golden_vm }}"
-  register: golden_wait
-  until: golden_wait.stdout == "shut off"
+- name: Wait for golden image to be powered off
+  shell: sudo virsh domstate golden-base
+  register: golden_power
+  until: golden_power.stdout == "shut off"
   retries: 30
   delay: 2
   delegate_to: "{{ VM_HOST_IP }}"
