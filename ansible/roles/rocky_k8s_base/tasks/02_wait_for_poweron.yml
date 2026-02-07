@@ -1,12 +1,12 @@
 - name: Start golden-base VM
   shell: virsh start golden-base
-  delegate_to: "{{ KVM_HOST_IP }}"
+  # delegate_to: "{{ KVM_HOST_IP }}"
 
 - name: Wait for golden-base VM to be running
   shell: |
     virsh list --all | grep golden-base | awk '{print $NF}'
   register: vm_state
-  delegate_to: "{{ KVM_HOST_IP }}"
+  # delegate_to: "{{ KVM_HOST_IP }}"
   failed_when: false
   changed_when: false
   until: vm_state.stdout == "running"
@@ -19,7 +19,7 @@
     grep $(sudo virsh domiflist golden-base | grep br-nat | awk '{print $NF}') | \
     awk -F/ '{print $1}' | awk '{print $NF}'
   register: gold_ip
-  delegate_to: "{{ KVM_HOST_IP }}"
+  # delegate_to: "{{ KVM_HOST_IP }}"
 
 - set_fact:
     golden_ip: "{{ gold_ip.stdout }}"
