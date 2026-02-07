@@ -10,17 +10,17 @@
 # --------------------------------------------------------
 - name: Install podman
   become: true
-  delegate_to: "{{ golden_ip }}"
+  delegate_to: localhost
   shell: |
-    dnf install -y podman
+    ssh core@"{{ golden_ip }}" sudo dnf install -y podman
 # --------------------------------------------------------
 # Install kubeadm, kubelet, kubectl
 # --------------------------------------------------------
 - name: Install kubeadm, kubelet, kubectl
   become: true
-  delegate_to: "{{ golden_ip }}"
+  delegate_to: localhost
   shell: |
-    dnf install -y kubeadm kubelet   kubectl
+    ssh core@"{{ golden_ip }}" sudo dnf install -y kubeadm kubelet   kubectl
 
 # --------------------------------------------------------
 # Install crictl
@@ -31,10 +31,10 @@
 
 - name: Download crictl
   become: true
-  delegate_to: "{{ golden_ip }}"
-  get_url:
-    url: "https://github.com/kubernetes-sigs/cri-tools/releases/download/v{{ crictl_version }}/crictl-v{{ crictl_version }}-linux-amd64.tar.gz"
-    dest: "/tmp/crictl.tar.gz"
+  delegate_to: localhost
+  shell: |
+    curl -L -o /tmp/crictl.tar.gz \
+    "https://github.com/kubernetes-sigs/cri-tools/releases/download/v{{ crictl_version }}/crictl-v{{ crictl_version }}-linux-amd64.tar.gz"
 
 - name: Extract crictl
   become: true
