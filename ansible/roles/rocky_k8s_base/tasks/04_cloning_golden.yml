@@ -47,7 +47,7 @@
   loop_control:
     loop_var: node
   shell: |
-    sudo qemu-img create -f qcow2 -b "{{ golden_disk }}" "/var/lib/libvirt/images/{{ node }}.qcow2"
+    sudo qemu-img create -f qcow2 -b "{{ golden_disk }}" -F qcow2 "/var/lib/libvirt/images/{{ node }}.qcow2"
   args:
     creates: "/var/lib/libvirt/images/{{ node }}.qcow2"
   delegate_to: "{{ VM_HOST_IP }}"
