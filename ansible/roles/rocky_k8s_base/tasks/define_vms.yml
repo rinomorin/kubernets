@@ -11,6 +11,8 @@
 - name: set` controller_ip
   set_fact:
     controller_ip: "{{ controller_ip2.stdout }}"
+    vm_host: "{{ inventory_hostname_short }}"
+
 - name: Ensure Kickstart staging directory in user home
   file:
     path: "/home/kvm_admin/kickstarts"
@@ -212,7 +214,6 @@
   when: 
    - "'control_nodes' in group_names"
    - "'kvm' not in group_names"
-
 
 - name: show kickstart_template_set
   debug:

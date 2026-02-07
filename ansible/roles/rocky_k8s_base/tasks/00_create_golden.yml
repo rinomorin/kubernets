@@ -6,14 +6,15 @@
 - name: Initialize existing_vms 
   set_fact: 
     existing_vms: false
+    vm_host: "{{ inventory_hostname_short }}"
 
 - name: Get VM status from virsh list
   delegate_to: localhost
   become: yes
   become_user: "{{ cloud_helper_user }}"
   shell: |
-    if virsh -c qemu+ssh://{{ cloud_helper_user}}@{{ VM_HOST_IP}}/system 'list --all' | sed 's/shut off/shutdown/' | grep -q 'golden-base'; then
-      virsh -c qemu+ssh://{{ cloud_helper_user}}@{{ VM_HOST_IP}}/system 'list --all' | sed 's/shut off/shutdown/' | awk '/golden-base/ { if ($NF != "-") print $NF; else print "undefined" }'
+    if virsh -c qemu+ssh://{{ cloud_helper_user}}@{{ VM_HOST_IP}}/system 'list --all' | sed 's/shut off/shutdown/' | grep -q '{{ vm_host }}'; then
+      virsh -c qemu+ssh://{{ cloud_helper_user}}@{{ VM_HOST_IP}}/system 'list --all' | sed 's/shut off/shutdown/' | awk '/{{ vm_host }}/ { if ($NF != "-") print $NF; else print "undefined" }'
     else
       echo "undefined"
     fi
