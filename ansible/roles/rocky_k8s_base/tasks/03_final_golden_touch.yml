@@ -1,7 +1,7 @@
 - name: set ssh user for golden-base
   set_fact:
     ansible_ssh_user: "core"
-
+    
 # ============================================================
 # PLAY 2 — Provision Golden Image (runs inside VM)
 # ============================================================
@@ -10,14 +10,17 @@
 # --------------------------------------------------------
 - name: Install podman
   become: true
-  shell: |
-    sudo dnf -y install podman --nobest --refresh
-  
+  delegate_to: "{{ golden_ip }}"
+  package:
+    name: podman
+    state: present
+
 # --------------------------------------------------------
 # Install kubeadm, kubelet, kubectl
 # --------------------------------------------------------
 - name: Install kubeadm, kubelet, kubectl
   become: true
+  delegate_to: "{{ golden_ip }}"
   package:
     name:
       - kubeadm
@@ -34,12 +37,14 @@
 
 - name: Download crictl
   become: true
+  delegate_to: "{{ golden_ip }}"
   get_url:
     url: "https://github.com/kubernetes-sigs/cri-tools/releases/download/v{{ crictl_version }}/crictl-v{{ crictl_version }}-linux-amd64.tar.gz"
     dest: "/tmp/crictl.tar.gz"
 
 - name: Extract crictl
   become: true
+  delegate_to: "{{ golden_ip }}"
   unarchive:
     src: "/tmp/crictl.tar.gz"
     dest: "/usr/local/bin"
@@ -47,6 +52,7 @@
 
 - name: Ensure crictl permissions
   become: true
+  delegate_to: "{{ golden_ip }}"
   file:
     path: "/usr/local/bin/crictl"
     mode: "0755"
@@ -56,21 +62,23 @@
 # --------------------------------------------------------
 - name: Ensure .kube directory exists
   become: true
+  delegate_to: "{{ golden_ip }}"
   file:
-    path: "/home/{{ cloud_helper_user }}/.kube"
+    path: "/home/core/.kube"
     state: directory
-    owner: "{{ cloud_helper_user }}"
-    group: "{{ cloud_helper_user }}"
+    owner: "core"
+    group: "core"
     mode: "0750"
 
 - name: Create kubeconfig placeholder
   become: true
+  delegate_to: "{{ golden_ip }}"
   copy:
-    dest: "/home/{{ cloud_helper_user }}/.kube/config"
+    dest: "/home/core/.kube/config"
     content: |
       # kubeconfig will be populated after cluster bootstrap
-    owner: "{{ cloud_helper_user }}"
-    group: "{{ cloud_helper_user }}"
+    owner: "core"
+    group: "core"
     mode: "0600"
     force: no
 
@@ -78,12 +86,16 @@
 # Validate binaries
 # --------------------------------------------------------
 - name: Validate kubeadm
+  become: false
+  delegate_to: "{{ golden_ip }}"
   command: kubeadm version
   register: kubeadm_check
   changed_when: false
   failed_when: kubeadm_check.rc != 0
 
 - name: Validate kubectl
+  become: false
+  delegate_to: "{{ golden_ip }}"
   command: kubectl version --client=true
   register: kubectl_check
   changed_when: false
@@ -100,17 +112,20 @@
 # --------------------------------------------------------
 - name: Clean machine-id
   become: true
+  delegate_to: "{{ golden_ip }}"
   shell: |
     rm -f /etc/machine-id
     touch /etc/machine-id
 
 - name: Clear logs
   become: true
+  delegate_to: "{{ golden_ip }}"
   shell: |
     rm -rf /var/log/*
 
 - name: Clear dnf cache
   become: true
+  delegate_to: "{{ golden_ip }}"
   shell: dnf clean all
 
 # --------------------------------------------------------
@@ -118,4 +133,5 @@
 # --------------------------------------------------------
 - name: Power off golden image
   become: true
+  delegate_to: "{{ golden_ip }}"
   shell: shutdown -h now

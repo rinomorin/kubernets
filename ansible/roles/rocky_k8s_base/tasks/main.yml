@@ -5,6 +5,7 @@
   set_fact: 
     existing_vms: false
     vm_host: "golden-base"
+    golden_ip: "unknown"
 
 - name: Build Rocky Linux base image
   block:
@@ -23,7 +24,7 @@
 
   - name: finalize golden image
     import_tasks: 03_final_golden_touch.yml
-    delegate_to: "{{ golden_ip }}"
+    delegate_to: localhost
 
   when: 
     - "'kvm' in group_names"
