@@ -35,8 +35,8 @@
   # when: vm_stage_map[vm_host] in ['build', 'building'] and  vm_build_stage | trim != "present"
   shell: |
     #virsh -c qemu+ssh://{{ cloud_helper_user}}@{{ VM_HOST_IP}}/system 'list --all' 
-    | sed 's/shut off/shutdown/'  | grep -i "^.*{{ vm_host }}.*" | awk '{print $NF}'
-    virsh list --all | sed 's/shut off/shutdown/' | grep -i "^.*{{ vm_host }}.*" | awk '{print $NF}'
+    #| sed 's/shut off/shutdown/'  | grep -i "^.*{{ vm_host }}.*" | awk '{print $NF}'
+    sudo virsh list --all | sed 's/shut off/shutdown/' | grep -i "^.*{{ vm_host }}.*" | awk '{print $NF}'
   register: vm_state
   become: yes
   vars:
