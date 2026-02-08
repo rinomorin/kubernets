@@ -106,15 +106,15 @@
   when: inventory_hostname in groups['control_nodes'] or
         inventory_hostname in groups['worker_nodes']
 
-- name: Copy ignition files to KVM host
-  become: yes
-  delegate_to: "{{ VM_HOST_IP }}"
-  copy:
-    src: "/tmp/{{ inventory_hostname_short }}.ign"
-    dest: "{{ ignition_path }}/{{ inventory_hostname_short }}.ign"
-    mode: "0644"
-  when: inventory_hostname in groups['control_nodes'] or
-        inventory_hostname in groups['worker_nodes']
+# - name: Copy ignition files to KVM host
+#   become: yes
+#   delegate_to: "{{ VM_HOST_IP }}"
+#   copy:
+#     src: "/tmp/{{ inventory_hostname_short }}.ign"
+#     dest: "{{ ignition_path }}/{{ inventory_hostname_short }}.ign"
+#     mode: "0644"
+#   when: inventory_hostname in groups['control_nodes'] or
+#         inventory_hostname in groups['worker_nodes']
 
 # ------------------------------------------------------------
 # Generate ignition ISO for each node
