@@ -2,11 +2,12 @@
 # ============================================================
 # 05_render_ignitions.yml — Render all ignition templates
 # ============================================================
+
 - name: set ignition_path
   set_fact:
     ignition_path: "/var/lib/libvirt/images/ignitions"
 
-# Ensure ignition output directory exists
+# Ensure ignition output directory exists on KVM host
 - name: Ensure ignition directory exists
   become: yes
   file:
@@ -16,54 +17,66 @@
   delegate_to: "{{ VM_HOST_IP }}"
 
 # ------------------------------------------------------------
-# Render kubeadm-init.yaml for control plane nodes
+# Render kubeadm-init.yaml locally for control plane nodes
 # ------------------------------------------------------------
-- debug:
-    msg: "{{ group_names }}"
-- name: Render kubeadm init config for control plane nodes
+- name: Render kubeadm init config locally
+  when: "'control_nodes' in group_names"
+  delegate_to: localhost
   template:
     src: kubeadm-init.yaml.j2
     dest: "/tmp/{{ inventory_hostname_short }}-kubeadm-init.yaml"
     mode: "0644"
-  when: "'control_nodes' in group_names"
-  delegate_to: "{{ VM_HOST_IP }}"
 
 # ------------------------------------------------------------
-# Render control plane ignition files
+# Render control plane ignition files locally
 # ------------------------------------------------------------
-- name: Render control plane ignition files
+- name: Render control plane ignition files locally
   when: "'control_nodes' in group_names"
+  delegate_to: localhost
   template:
     src: controlplane.ign.j2
-    dest: "/tmp/{{ inventory_hostname.split('.')[0] }}.ign"
+    dest: "/tmp/{{ inventory_hostname_short }}.ign"
     mode: "0644"
   vars:
-    kubeadm_init_config: "{{ lookup('file', '/tmp/'+{{ inventory_hostname_short }}+ '-kubeadm-init.yaml') }}"
-  delegate_to: "{{ VM_HOST_IP }}"
+    kubeadm_init_config: "{{ lookup('file', '/tmp/' + inventory_hostname_short + '-kubeadm-init.yaml') }}"
 
 # ------------------------------------------------------------
-# Render kubeadm-join.yaml for worker nodes
+# Render kubeadm-join.yaml locally for worker nodes
 # ------------------------------------------------------------
-- name: Render kubeadm join config for worker nodes
+- name: Render kubeadm join config locally
+  when: "'worker_nodes' in group_names"
+  delegate_to: localhost
   template:
     src: kubeadm-join.yaml.j2
     dest: "/tmp/{{ inventory_hostname_short }}-kubeadm-join.yaml"
     mode: "0644"
-  when: "'worker_nodes' in group_names"
-  delegate_to: "{{ VM_HOST_IP }}"
 
 # ------------------------------------------------------------
-# Render worker ignition files
+# Render worker ignition files locally
 # ------------------------------------------------------------
-- name: Render worker ignition files
+- name: Render worker ignition files locally
+  when: "'worker_nodes' in group_names"
+  delegate_to: localhost
   template:
     src: worker.ign.j2
-    dest: "/tmp/{{ inventory_hostname }}.ign"
+    dest: "/tmp/{{ inventory_hostname_short }}.ign"
     mode: "0644"
   vars:
-    kubeadm_join_config: "{{ lookup('file', {{ ignition_path }} + '/' + inventory_hostname + '-kubeadm-join.yaml') }}"
-  when: inventory_hostname in groups['worker_nodes']
+    kubeadm_join_config: "{{ lookup('file', '/tmp/' + inventory_hostname_short + '-kubeadm-join.yaml') }}"
+
+# ------------------------------------------------------------
+# Copy ignition files to KVM host
+# ------------------------------------------------------------
+- name: Copy ignition files to KVM host
+  become: yes
   delegate_to: "{{ VM_HOST_IP }}"
+  copy:
+    src: "/tmp/{{ inventory_hostname_short }}.ign"
+    dest: "{{ ignition_path }}/{{ inventory_hostname_short }}.ign"
+    mode: "0644"
+  when: inventory_hostname in groups['control_nodes'] or
+        inventory_hostname in groups['worker_nodes']
+
 # ------------------------------------------------------------
 # Generate ignition ISO for each node
 # ------------------------------------------------------------
@@ -71,6 +84,7 @@
   loop: "{{ groups['control_nodes'] + groups['worker_nodes'] }}"
   loop_control:
     loop_var: node
+  delegate_to: "{{ VM_HOST_IP }}"
   shell: |
     genisoimage \
       -output {{ ignition_path }}/{{ node }}.iso \
@@ -79,7 +93,6 @@
       {{ ignition_path }}/{{ node }}.ign
   args:
     creates: "{{ ignition_path }}/{{ node }}.iso"
-  delegate_to: "{{ VM_HOST_IP }}"
 
 # ------------------------------------------------------------
 # Attach ignition ISO to each VM
@@ -88,11 +101,10 @@
   loop: "{{ groups['control_nodes'] + groups['worker_nodes'] }}"
   loop_control:
     loop_var: node
+  delegate_to: "{{ VM_HOST_IP }}"
   shell: |
-    # Check if ISO already attached
     if ! virsh domblklist "{{ node }}" | grep -q "{{ node }}.iso"; then
       virsh attach-disk "{{ node }}" \
-        /var/lib/libvirt/ignitions/{{ node }}.iso \
+        {{ ignition_path }}/{{ node }}.iso \
         sdc --type cdrom --mode readonly --persistent
     fi
-  delegate_to: "{{ VM_HOST_IP }}"
