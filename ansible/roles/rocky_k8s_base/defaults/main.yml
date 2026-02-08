@@ -10,4 +10,14 @@ build_loops: "{{ bl|default(120)}}"
 tpwd_hash: "{{ lookup('env','admin_hash') }}"
 tsecops_hash: "{{ lookup('env','secops_hash') }}"
 tsecops_key: "{{ lookup('env','secops_key') }}"
-    
+mycrio_config: |
+  [crio.runtime]
+  conmon = "/usr/bin/conmon"
+  log_level = "info"
+  pids_limit = 2048
+
+mykubelet_config: |
+  kind: KubeletConfiguration
+  apiVersion: kubelet.config.k8s.io/v1beta1
+  address: "0.0.0.0"
+  cgroupDriver: "systemd"

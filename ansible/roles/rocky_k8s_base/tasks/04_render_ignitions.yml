@@ -33,10 +33,6 @@
   set_fact:
     kubeadm_init_config_raw: "{{ lookup('file', '/tmp/' + inventory_hostname_short + '-kubeadm-init.yaml') }}"
 
-- debug:
-    msg: |
-      "{{ kubeadm_init_config_raw }}"
-
 - name: Encode kubeadm-init.yaml for Ignition
   when: "'control_nodes' in group_names"
   delegate_to: localhost
@@ -46,7 +42,7 @@
 - debug:
     msg: |
       "{{kubeadm_init_config_encoded}}"
-      
+
 # ------------------------------------------------------------
 # Render control plane ignition files locally
 # ------------------------------------------------------------
@@ -58,9 +54,9 @@
     dest: "/tmp/{{ inventory_hostname_short }}.ign"
     mode: "0644"
   vars:
-    kubeadm_init_config: "{{ lookup('file', '/tmp/' + inventory_hostname_short + '-kubeadm-init.yaml') }}"
-    crio_config: "{{ hostvars[inventory_hostname].crio_config }}"
-    kubelet_config: "{{ hostvars[inventory_hostname].kubelet_config }}"
+    kubeadm_init_config: "{{ kubeadm_init_config_raw }}"
+    crio_config: "{{ mycrio_config }}"
+    kubelet_config: "{{ mykubelet_config }}"
 
 # ------------------------------------------------------------
 # Render kubeadm-join.yaml locally for worker nodes
