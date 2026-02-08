@@ -75,7 +75,7 @@
   when: "'worker_nodes' in group_names"
   delegate_to: localhost
   set_fact:
-    kubeadm_init_config_encoded: "{{ kubeadm_join_config_raw | urlencode }}"
+    kubeadm_join_config_encoded: "{{ kubeadm_join_config_raw | urlencode }}"
 
 
 # ------------------------------------------------------------
