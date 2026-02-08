@@ -28,7 +28,7 @@
   
   - name: render_ignition
     import_tasks: 04_render_ignitions.yml
-    delegate_to: "{{ VM_HOST_IP }}"
+    # delegate_to: "{{ VM_HOST_IP }}"
 
   # - name: clone golden image
   #   import_tasks: 05_cloning_golden.yml
