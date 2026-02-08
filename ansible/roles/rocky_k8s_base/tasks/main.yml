@@ -9,7 +9,7 @@
 
 - name: Build Rocky Linux base image
   block:
-
+    - debug: msg="test"
   # - name: Build Rocky Linux base image
   #   import_tasks: 00_create_golden.yml
   #   delegate_to: "{{ VM_HOST_IP }}"
