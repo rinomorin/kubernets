@@ -1,6 +1,6 @@
 ---
 # ============================================================
-# 04_cloning_golden.yml — TASKS ONLY (role‑compatible)
+# 05_cloning_golden.yml — TASKS ONLY (role‑compatible)
 # ============================================================
 
 # Golden image is always the same
@@ -71,6 +71,20 @@
     fi
   delegate_to: "{{ VM_HOST_IP }}"
 
+# ------------------------------------------------------------
+# Attach ignition ISO to each VM
+# ------------------------------------------------------------
+- name: Attach ignition ISO to each VM
+  loop: "{{ groups['control_nodes'] + groups['worker_nodes'] }}"
+  loop_control:
+    loop_var: node
+  delegate_to: "{{ VM_HOST_IP }}"
+  shell: |
+    if ! virsh domblklist "{{ node }}" | grep -q "{{ node }}.iso"; then
+      virsh attach-disk "{{ node }}" \
+        {{ ignition_path }}/{{ node }}.iso \
+        sdc --type cdrom --mode readonly --persistent
+    fi
 
 # ------------------------------------------------------------
 # Start cloned VMs
