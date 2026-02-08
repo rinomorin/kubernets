@@ -96,6 +96,13 @@
 # ------------------------------------------------------------
 # Copy ignition files to KVM host
 # ------------------------------------------------------------
+- name: Copy ign to kvm
+  delegate_to: localhost
+  shell: |
+    scp /tmp/"/tmp/{{ inventory_hostname_short }}.ign" core@"{{ VM_HOST_IP}}":/tmp/{{ inventory_hostname_short }}.ign"
+  when: inventory_hostname in groups['control_nodes'] or
+        inventory_hostname in groups['worker_nodes']
+
 - name: Copy ignition files to KVM host
   become: yes
   delegate_to: "{{ VM_HOST_IP }}"
