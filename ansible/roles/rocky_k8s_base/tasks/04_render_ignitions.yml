@@ -21,12 +21,32 @@
 # ------------------------------------------------------------
 - name: Render kubeadm init config locally
   when: "'control_nodes' in group_names"
-  delegate_to: localhost
+  delegate_to: "{{ VM_HOST_IP}}"
   template:
     src: kubeadm-init.yaml.j2
     dest: "/tmp/{{ inventory_hostname_short }}-kubeadm-init.yaml"
     mode: "0644"
 
+- name: Read kubeadm-init.yaml from localhost
+  when: "'control_nodes' in group_names"
+  delegate_to: localhost
+  set_fact:
+    kubeadm_init_config_raw: "{{ lookup('file', '/tmp/' + inventory_hostname_short + '-kubeadm-init.yaml') }}"
+
+- debug:
+    msg: |
+      "{{ kubeadm_init_config_raw }}"
+
+- name: Encode kubeadm-init.yaml for Ignition
+  when: "'control_nodes' in group_names"
+  delegate_to: localhost
+  set_fact:
+    kubeadm_init_config_encoded: "{{ kubeadm_init_config_raw | urlencode }}"
+
+- debug:
+    msg: |
+      "{{kubeadm_init_config_encoded}}"
+      
 # ------------------------------------------------------------
 # Render control plane ignition files locally
 # ------------------------------------------------------------
