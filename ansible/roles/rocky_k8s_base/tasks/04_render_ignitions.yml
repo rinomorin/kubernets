@@ -134,13 +134,20 @@
     mode: "0755"
     recurse: yes
 
-- name: Ensure all ignition files have correct permissions
+- name: Find ignition files
+  delegate_to: "{{ VM_HOST_IP }}"
+  become: yes
+  find:
+    paths: "/var/lib/libvirt/images/ignitions"
+    file_type: file
+  register: ign_files
+
+- name: Set permissions on ignition files
   delegate_to: "{{ VM_HOST_IP }}"
   become: yes
   file:
-    path: "/var/lib/libvirt/images/ignitions"
+    path: "{{ item.path }}"
     owner: qemu
     group: qemu
     mode: "0644"
-    recurse: yes
-    state: file
+  loop: "{{ ign_files.files }}"
