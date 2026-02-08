@@ -100,7 +100,7 @@
   delegate_to: localhost
   become: false
   shell: |
-    scp "/tmp/{{ inventory_hostname_short }}.ign" "core@{{ VM_HOST_IP}}:/tmp/{{ inventory_hostname_short }}.ign"
+    scp "/tmp/{{ inventory_hostname_short }}.ign" "{{ VM_HOST_IP}}:/tmp/{{ inventory_hostname_short }}.ign"
   when: inventory_hostname in groups['control_nodes'] or
         inventory_hostname in groups['worker_nodes']
 
