@@ -8,6 +8,7 @@
 
 # Ensure ignition output directory exists
 - name: Ensure ignition directory exists
+  become: yes
   file:
     path: "{{ ignition_path }}"
     state: directory

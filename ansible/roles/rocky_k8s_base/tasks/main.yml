@@ -5,7 +5,7 @@
   set_fact: 
     existing_vms: false
     vm_host: "golden-base"
-    golden_ip: "unknown"
+    golden_ip: "unknown"    
 
 - name: Build Rocky Linux base image
   block:
