@@ -23,7 +23,7 @@
     src: kubeadm-init.yaml.j2
     dest: "/tmp/{{ inventory_hostname_short }}-kubeadm-init.yaml"
     mode: "0644"
-  when: "'control_nodes' in group_names "
+  when: "{{'control_nodes' in group_names}}"
   delegate_to: "{{ VM_HOST_IP }}"
 
 # ------------------------------------------------------------
