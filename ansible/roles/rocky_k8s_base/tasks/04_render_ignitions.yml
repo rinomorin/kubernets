@@ -32,13 +32,13 @@
 # Render control plane ignition files
 # ------------------------------------------------------------
 - name: Render control plane ignition files
+  when: "'control_nodes' in group_names"
   template:
     src: controlplane.ign.j2
     dest: "/tmp/{{ inventory_hostname_short }}.ign"
     mode: "0644"
   vars:
-    kubeadm_init_config: "{{ lookup('file', '/tmp/' + inventory_hostname_short + '-kubeadm-init.yaml') }}"
-  when: "'control_nodes' in group_names"
+    kubeadm_init_config: "{{ lookup('file', {{ ignition_path }} + '/tmp/' + inventory_hostname_short + '-kubeadm-init.yaml') }}"
   delegate_to: "{{ VM_HOST_IP }}"
 
 # ------------------------------------------------------------
