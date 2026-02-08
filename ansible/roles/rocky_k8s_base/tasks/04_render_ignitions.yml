@@ -21,7 +21,7 @@
 - name: Render kubeadm init config for control plane nodes
   template:
     src: kubeadm-init.yaml.j2
-    dest: "{{ ignition_path }}/{{ inventory_hostname_short }}-kubeadm-init.yaml"
+    dest: "/tmp/{{ inventory_hostname_short }}-kubeadm-init.yaml"
     mode: "0644"
   when: inventory_hostname in groups['control_nodes']
   delegate_to: "{{ VM_HOST_IP }}"
@@ -32,7 +32,7 @@
 - name: Render control plane ignition files
   template:
     src: controlplane.ign.j2
-    dest: "{{ ignition_path }}/{{ inventory_hostname_short }}.ign"
+    dest: "/tmp/{{ inventory_hostname_short }}.ign"
     mode: "0644"
   vars:
     kubeadm_init_config: "{{ lookup('file', {{ ignition_path }} + '/' + inventory_hostname_short + '-kubeadm-init.yaml') }}"
@@ -45,7 +45,7 @@
 - name: Render kubeadm join config for worker nodes
   template:
     src: kubeadm-join.yaml.j2
-    dest: "{{ ignition_path }}/{{ inventory_hostname }}-kubeadm-join.yaml"
+    dest: "/tmp/{{ inventory_hostname }}-kubeadm-join.yaml"
     mode: "0644"
   when: inventory_hostname in groups['worker_nodes']
   delegate_to: "{{ VM_HOST_IP }}"
@@ -56,7 +56,7 @@
 - name: Render worker ignition files
   template:
     src: worker.ign.j2
-    dest: "{{ ignition_path }}/{{ inventory_hostname }}.ign"
+    dest: "/tmp/{{ inventory_hostname }}.ign"
     mode: "0644"
   vars:
     kubeadm_join_config: "{{ lookup('file', {{ ignition_path }} + '/' + inventory_hostname + '-kubeadm-join.yaml') }}"
