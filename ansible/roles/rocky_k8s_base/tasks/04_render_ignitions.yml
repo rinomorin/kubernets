@@ -83,7 +83,7 @@
 # ------------------------------------------------------------
 - name: Render worker ignition files locally
   when: "'worker_nodes' in group_names"
-  delegate_to: "{{ VM_HOST_IP }}"
+  delegate_to: localhost
   template:
     src: worker.ign.j2
     dest: "/tmp/{{ inventory_hostname_short }}.ign"
@@ -100,7 +100,7 @@
   delegate_to: localhost
   become: false
   shell: |
-    scp "/tmp/{{ inventory_hostname_short }}.ign" "{{ VM_HOST_IP}}:/tmp/{{ inventory_hostname_short }}.ign"
+    scp "/tmp/{{ inventory_hostname_short }}*.ign" "{{ VM_HOST_IP}}:/tmp/{{ inventory_hostname_short }}.ign"
   when: inventory_hostname in groups['control_nodes'] or
         inventory_hostname in groups['worker_nodes']
 
