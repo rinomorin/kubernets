@@ -18,6 +18,8 @@
 # ------------------------------------------------------------
 # Render kubeadm-init.yaml for control plane nodes
 # ------------------------------------------------------------
+- debug:
+    msg: "{{ group_names }}"
 - name: Render kubeadm init config for control plane nodes
   template:
     src: kubeadm-init.yaml.j2
