@@ -12,6 +12,7 @@ all:
       ansible_ssh_user: cloud_helper
 
     msrlv9mast01: 
+      ansible_user: core
       ansible_host: 192.168.100.31 
       hostname: msrlv9mast01.cloud.home.morinsoft.ca 
       provider_ip: 192.168.100.31 
@@ -21,6 +22,7 @@ all:
       keepalived_priority: 200
 
     msrlv9mast02: 
+      ansible_user: core
       ansible_host: 192.168.100.32
       hostname: msrlv9mast02.cloud.home.morinsoft.ca 
       provider_ip: 192.168.100.32
@@ -30,6 +32,7 @@ all:
       keepalived_priority: 150
 
     msrlv9mast03: 
+      ansible_user: core
       ansible_host: 192.168.100.33
       hostname: msrlv9mast03.cloud.home.morinsoft.ca 
       provider_ip: 192.168.100.33
@@ -39,12 +42,14 @@ all:
       keepalived_priority: 100
 
     msrlv9wrk01: 
+      ansible_user: core
       ansible_host: 10.0.0.41 
       hostname: msrlv9wrk01.cloud.home.morinsoft.ca 
       provision_ip: 10.0.0.41
       node_ip: 10.0.41
 
     msrlv9wrk02: 
+      ansible_user: core
       ansible_host: 10.0.0.42 
       hostname: msrlv9wrk02.cloud.home.morinsoft.ca 
       provision_ip: 10.0.0.42
