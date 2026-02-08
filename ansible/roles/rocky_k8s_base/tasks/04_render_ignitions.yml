@@ -39,10 +39,6 @@
   set_fact:
     kubeadm_init_config_encoded: "{{ kubeadm_init_config_raw | urlencode }}"
 
-- debug:
-    msg: |
-      "{{kubeadm_init_config_encoded}}"
-
 # ------------------------------------------------------------
 # Render control plane ignition files locally
 # ------------------------------------------------------------
