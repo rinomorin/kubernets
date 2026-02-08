@@ -38,7 +38,7 @@
     dest: "/tmp/{{ inventory_hostname.split('.')[0] }}.ign"
     mode: "0644"
   vars:
-    kubeadm_init_config: "{{ lookup('file', {{ ignition_path }} + '/' + inventory_hostname.split('.')[0] + '-kubeadm-init.yaml') }}"
+    kubeadm_init_config: "{{ lookup('file', '/tmp/' + inventory_hostname.split('.')[0] + '-kubeadm-init.yaml') }}"
   delegate_to: "{{ VM_HOST_IP }}"
 
 # ------------------------------------------------------------
