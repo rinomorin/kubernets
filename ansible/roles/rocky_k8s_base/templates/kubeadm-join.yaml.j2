@@ -1,0 +1,15 @@
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: JoinConfiguration
+
+discovery:
+  bootstrapToken:
+    token: "{{ kubeadm_token }}"
+    apiServerEndpoint: "msr-control-vip:6443"
+    caCertHashes:
+      - "{{ ca_cert_hash }}"
+
+nodeRegistration:
+  name: {{ inventory_hostname }}
+  criSocket: unix:///var/run/crio/crio.sock
+  kubeletExtraArgs:
+    cloud-provider: "external"
