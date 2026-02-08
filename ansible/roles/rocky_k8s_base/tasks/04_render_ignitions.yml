@@ -23,7 +23,7 @@
     src: kubeadm-init.yaml.j2
     dest: "/tmp/{{ inventory_hostname_short }}-kubeadm-init.yaml"
     mode: "0644"
-  when: inventory_hostname in groups['control_nodes']
+  when: "'control_nodes' in group_names "
   delegate_to: "{{ VM_HOST_IP }}"
 
 # ------------------------------------------------------------
@@ -36,7 +36,7 @@
     mode: "0644"
   vars:
     kubeadm_init_config: "{{ lookup('file', {{ ignition_path }} + '/' + inventory_hostname_short + '-kubeadm-init.yaml') }}"
-  when: inventory_hostname in groups['control_nodes']
+  when: "'control_nodes' in group_names"
   delegate_to: "{{ VM_HOST_IP }}"
 
 # ------------------------------------------------------------
@@ -47,7 +47,7 @@
     src: kubeadm-join.yaml.j2
     dest: "/tmp/{{ inventory_hostname }}-kubeadm-join.yaml"
     mode: "0644"
-  when: inventory_hostname in groups['worker_nodes']
+  when: "'worker_nodes' in group_names"
   delegate_to: "{{ VM_HOST_IP }}"
 
 # ------------------------------------------------------------
@@ -60,7 +60,7 @@
     mode: "0644"
   vars:
     kubeadm_join_config: "{{ lookup('file', {{ ignition_path }} + '/' + inventory_hostname + '-kubeadm-join.yaml') }}"
-  when: inventory_hostname in groups['worker_nodes']
+  when: "'worker_nodes' in group_names"
   delegate_to: "{{ VM_HOST_IP }}"
 # ------------------------------------------------------------
 # Generate ignition ISO for each node
