@@ -80,8 +80,8 @@
     loop_var: node
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
-    if ! virsh domblklist "{{ node }}" | grep -q "{{ node }}.iso"; then
-      virsh attach-disk "{{ node }}" \
+    if ! sudo virsh domblklist "{{ node }}" | grep -q "{{ node }}.iso"; then
+      sudo virsh attach-disk "{{ node }}" \
         {{ ignition_path }}/{{ node }}.iso \
         sdc --type cdrom --mode readonly --persistent
     fi
