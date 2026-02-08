@@ -96,11 +96,13 @@
 # ------------------------------------------------------------
 # Copy ignition files to KVM host
 # ------------------------------------------------------------
-- name: Copy ign to kvm
-  delegate_to: localhost
-  become: false
-  shell: |
-    scp "/tmp/{{ inventory_hostname_short }}*.ign" "{{ VM_HOST_IP}}:/tmp/{{ inventory_hostname_short }}.ign"
+- name: Copy ignition file to KVM host
+  delegate_to: "{{ VM_HOST_IP }}"
+  become: yes
+  copy:
+    src: "/tmp/{{ inventory_hostname_short }}.ign"
+    dest: "/var/lib/libvirt/images/ignitions/{{ inventory_hostname_short }}.ign"
+    mode: "0644"
   when: inventory_hostname in groups['control_nodes'] or
         inventory_hostname in groups['worker_nodes']
 
