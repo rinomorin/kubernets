@@ -129,8 +129,8 @@
   become: yes
   file:
     path: "/var/lib/libvirt/images/ignitions"
-    owner: root
-    group: root
+    owner: qemu
+    group: qemu
     mode: "0755"
     recurse: yes
 
@@ -139,8 +139,8 @@
   become: yes
   file:
     path: "/var/lib/libvirt/images/ignitions"
-    owner: root
-    group: root
+    owner: qemu
+    group: qemu
     mode: "0644"
     recurse: yes
     state: file
