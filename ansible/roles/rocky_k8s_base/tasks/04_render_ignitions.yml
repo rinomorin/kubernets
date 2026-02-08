@@ -39,6 +39,8 @@
     mode: "0644"
   vars:
     kubeadm_init_config: "{{ lookup('file', '/tmp/' + inventory_hostname_short + '-kubeadm-init.yaml') }}"
+    crio_config: "{{ hostvars[inventory_hostname].crio_config }}"
+    kubelet_config: "{{ hostvars[inventory_hostname].kubelet_config }}"
 
 # ------------------------------------------------------------
 # Render kubeadm-join.yaml locally for worker nodes
