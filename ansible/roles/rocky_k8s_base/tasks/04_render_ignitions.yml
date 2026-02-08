@@ -90,6 +90,8 @@
     mode: "0644"
   vars:
     kubeadm_join_config: "{{ kubeadm_join_config_encoded }}"
+    crio_config: "{{ mycrio_config }}"
+    kubelet_config: "{{ mykubelet_config }}"
 
 # ------------------------------------------------------------
 # Copy ignition files to KVM host
