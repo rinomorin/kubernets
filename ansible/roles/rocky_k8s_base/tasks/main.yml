@@ -9,22 +9,21 @@
 
 - name: Build Rocky Linux base image
   block:
-    - debug: msg="test"
-  # - name: Build Rocky Linux base image
-  #   import_tasks: 00_create_golden.yml
-  #   delegate_to: "{{ VM_HOST_IP }}"
+  - name: Build Rocky Linux base image
+    import_tasks: 00_create_golden.yml
+    delegate_to: "{{ VM_HOST_IP }}"
   
-  # - name: wait for power down
-  #   import_tasks: 01_wait_for_shutdown.yml
-  #   delegate_to: "{{ VM_HOST_IP }}"
+  - name: wait for power down
+    import_tasks: 01_wait_for_shutdown.yml
+    delegate_to: "{{ VM_HOST_IP }}"
 
-  # - name: wait for power up
-  #   import_tasks: 02_wait_for_poweron.yml
-  #   delegate_to: "{{ VM_HOST_IP }}"
+  - name: wait for power up
+    import_tasks: 02_wait_for_poweron.yml
+    delegate_to: "{{ VM_HOST_IP }}"
 
-  # - name: finalize golden image
-  #   import_tasks: 03_final_golden_touch.yml
-  #   delegate_to: localhost
+  - name: finalize golden image
+    import_tasks: 03_final_golden_touch.yml
+    delegate_to: localhost
   
   when: 
     - "'kvm' in group_names"
@@ -35,26 +34,9 @@
 
 - name: Build Rocky Linux base image continued
   block:
-    - debug: msg="test"
-  # - name: clone golden image
-  #   import_tasks: 05_cloning_golden.yml
-  #   delegate_to: "{{ VM_HOST_IP }}"
+  - name: clone golden image
+    import_tasks: 05_cloning_golden.yml
+    delegate_to: "{{ VM_HOST_IP }}"
   when: 
     - "'kvm' in group_names"
 
-
-    # - name: fix url
-    #   import_tasks: fix_url.yml
-    #   delegate_to: localhost  
-
-    # - name: Run image build tasks on builder
-    #   import_tasks: build.yml
-    #   delegate_to: localhost
-
-    # - name: Run finalize tasks on builder
-    #   import_tasks: finalize.yml
-    #   delegate_to: localhost
-
-    # - name: Convert raw → qcow2 on builder
-    #   import_tasks: convert.yml
-    #   delegate_to: localhost
