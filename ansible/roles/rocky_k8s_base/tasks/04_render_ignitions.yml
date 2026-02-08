@@ -123,3 +123,24 @@
       {{ ignition_path }}/{{ node }}.ign
   args:
     creates: "{{ ignition_path }}/{{ node }}.iso"
+
+- name: Ensure ignition directory and files have correct ownership and permissions
+  delegate_to: "{{ VM_HOST_IP }}"
+  become: yes
+  file:
+    path: "/var/lib/libvirt/images/ignitions"
+    owner: root
+    group: root
+    mode: "0755"
+    recurse: yes
+
+- name: Ensure all ignition files have correct permissions
+  delegate_to: "{{ VM_HOST_IP }}"
+  become: yes
+  file:
+    path: "/var/lib/libvirt/images/ignitions"
+    owner: root
+    group: root
+    mode: "0644"
+    recurse: yes
+    state: file
