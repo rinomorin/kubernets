@@ -214,7 +214,7 @@
     # Ensure this matches the Copy task's expectations exactly
     dest: "{{ output_dir }}/{{ inventory_hostname }}/meta-data"
     mode: "0644"
-    
+
 - name: Render NoCloud user-data
   delegate_to: localhost
   template:
@@ -264,7 +264,7 @@
   delegate_to: "{{ VM_HOST_IP }}"
   become: yes
   shell: |
-    genisoimage \
+    sudo genisoimage \
       -output /var/lib/libvirt/images/nocloud/{{ inventory_hostname_short }}.iso \
       -volid cidata \
       -joliet -rock \
