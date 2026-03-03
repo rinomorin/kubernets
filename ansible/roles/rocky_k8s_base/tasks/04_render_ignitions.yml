@@ -264,11 +264,11 @@
   delegate_to: "{{ VM_HOST_IP }}"
   become: yes
   shell: |
-    sudo genisoimage \
-      -output /var/lib/libvirt/images/nocloud/{{ inventory_hostname_short }}.iso \
+    sudo genisoimage -output /var/lib/libvirt/images/nocloud/{{ inventory_hostname }}.iso \
       -volid cidata \
       -joliet -rock \
-      /var/lib/libvirt/images/nocloud/{{ inventory_hostname_short }}/user-data \
-      /var/lib/libvirt/images/nocloud/{{ inventory_hostname_short }}/meta-data
+      -graft-points \
+      user-data=/var/lib/libvirt/images/nocloud/{{ inventory_hostname }}-user-data \
+      meta-data=/var/lib/libvirt/images/nocloud/{{ inventory_hostname }}-meta-data
   args:
-    creates: "/var/lib/libvirt/images/nocloud/{{ inventory_hostname_short }}.iso"
+    creates: "/var/lib/libvirt/images/nocloud/{{ inventory_hostname }}.iso"
