@@ -224,8 +224,7 @@
     # We read the files directly from the local /tmp folder where they were saved
     kubeadm_init_yaml: "{{ lookup('file', '/tmp/' + inventory_hostname_short + '-kubeadm-init.yaml') if inventory_hostname in groups['control_nodes'] else '' }}"
     kubeadm_join_yaml: "{{ lookup('file', '/tmp/' + inventory_hostname_short + '-kubeadm-join.yaml') if inventory_hostname in groups['worker_nodes'] else '' }}"
-  when: not in groups['kvm']
-
+  
 - name: Create NoCloud directory on KVM host
   delegate_to: "{{ VM_HOST_IP }}"
   become: yes
