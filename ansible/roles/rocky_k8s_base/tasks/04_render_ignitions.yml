@@ -32,9 +32,6 @@
     mode: "0644"
   register: rendered_init
 
-- debug:
-    var: rendered_init
-    
 # - name: Read kubeadm-init.yaml from localhost
 #   when: "'control_nodes' in group_names"
 #   delegate_to: localhost
@@ -172,12 +169,24 @@
 #     mode: "0644"
 #   loop: "{{ ign_files.files }}"
 
-- name: Render NoCloud meta-data
+- name: Render NoCloud user-data
   delegate_to: localhost
   template:
-    src: meta-data.j2
-    dest: "/tmp/{{ inventory_hostname_short }}-meta-data"
+    src: user-data.j2
+    dest: "{{ output_dir }}/{{ inventory_hostname }}/user-data"
     mode: "0644"
+  vars:
+    # This pulls the content from the local /tmp/ files we rendered in the previous step
+    kubeadm_config_content: >-
+      {{ lookup('file', '/tmp/' + inventory_hostname_short + '-kubeadm-init.yaml') 
+         if inventory_hostname in groups['control_nodes'] 
+         else lookup('file', '/tmp/' + inventory_hostname_short + '-kubeadm-join.yaml') }}
+# - name: Render NoCloud meta-data
+#   delegate_to: localhost
+#   template:
+#     src: meta-data.j2
+#     dest: "/tmp/{{ inventory_hostname_short }}-meta-data"
+#     mode: "0644"
 
 - name: Render kubeadm config (controller or worker)
   delegate_to: localhost
