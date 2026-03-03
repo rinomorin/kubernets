@@ -233,17 +233,32 @@
     state: directory
     mode: "0755"
 
-- name: Copy NoCloud files to KVM host
-  delegate_to: "{{ VM_HOST_IP }}"
-  become: yes
+- name: Ensure staging directory exists on KVM host
+  delegate_to: "{{ kvm_host_ip }}"
+  file:
+    path: /tmp/nocopy
+    state: directory
+    mode: '0777'  # Broad permissions so the copy user can write to it
+
+- name: Copy NoCloud files to KVM host staging
+  delegate_to: "{{ kvm_host_ip }}"
   copy:
-    src: "/tmp/{{ inventory_hostname_short }}-{{ item }}"
-    dest: "/var/lib/libvirt/images/nocloud/{{ inventory_hostname_short }}/{{ item }}"
+    src: "{{ output_dir }}/{{ inventory_hostname }}/{{ item }}"
+    dest: "/tmp/nocopy/{{ inventory_hostname }}-{{ item }}"
     mode: "0644"
   loop:
-    - meta-data
     - user-data
+    - meta-data
 
+- name: Move NoCloud files to final destination
+  delegate_to: "{{ kvm_host_ip }}"
+  become: true
+  shell: |
+    mkdir -p /var/lib/libvirt/images/nocloud/
+    mv /tmp/nocopy/{{ inventory_hostname }}-user-data /var/lib/libvirt/images/nocloud/{{ inventory_hostname }}-user-data
+    mv /tmp/nocopy/{{ inventory_hostname }}-meta-data /var/lib/libvirt/images/nocloud/{{ inventory_hostname }}-meta-data
+    chown root:root /var/lib/libvirt/images/nocloud/{{ inventory_hostname }}-*
+    
 - name: Generate NoCloud ISO
   delegate_to: "{{ VM_HOST_IP }}"
   become: yes
