@@ -6,6 +6,7 @@ discovery:
     apiServerEndpoint: "{{ hostvars[groups['control_nodes'][0]]['provision_ip'] }}:6443"
     token: "{{ cluster_token }}"
     unsafeSkipCAVerification: true
+    unsafeSkipCAVerification: true
 {% if inventory_hostname in groups['control_nodes'] %}
 controlPlane:
   localAPIEndpoint:
