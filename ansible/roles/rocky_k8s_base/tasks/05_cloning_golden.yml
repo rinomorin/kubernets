@@ -73,26 +73,54 @@
 
 # ------------------------------------------------------------
 # Attach ignition ISO to each VM
-# ------------------------------------------------------------
-- name: Attach ignition ISO to each VM
-  loop: "{{ groups['control_nodes'] + groups['worker_nodes'] }}"
-  loop_control:
-    loop_var: node
+# # ------------------------------------------------------------
+# - name: Attach ignition ISO to each VM
+#   loop: "{{ groups['control_nodes'] + groups['worker_nodes'] }}"
+#   loop_control:
+#     loop_var: node
+#   delegate_to: "{{ VM_HOST_IP }}"
+#   shell: |
+#     if ! sudo virsh domblklist "{{ node }}" | grep -q "{{ node }}.iso"; then
+#       sudo virsh attach-disk "{{ node }}" \
+#         {{ ignition_path }}/{{ node }}.iso \
+#         sdc --type cdrom --mode readonly --persistent
+#     fi
+
+- name: Attach NoCloud ISO to VM
   delegate_to: "{{ VM_HOST_IP }}"
+  # become: yes
   shell: |
-    if ! sudo virsh domblklist "{{ node }}" | grep -q "{{ node }}.iso"; then
-      sudo virsh attach-disk "{{ node }}" \
-        {{ ignition_path }}/{{ node }}.iso \
+    if ! sudo virsh domblklist "{{ inventory_hostname_short }}" | grep -q "{{ inventory_hostname_short }}.iso"; then
+      sudo virsh attach-disk "{{ inventory_hostname_short }}" \
+        /var/lib/libvirt/images/nocloud/{{ inventory_hostname_short }}.iso \
         sdc --type cdrom --mode readonly --persistent
     fi
 
 # ------------------------------------------------------------
 # Start cloned VMs
 # ------------------------------------------------------------
-- name: Start cloned VMs
-  loop: "{{ clone_nodes }}"
-  loop_control:
-    loop_var: node
-  shell: sudo virsh start "{{ node }}"
-  delegate_to: "{{ VM_HOST_IP }}"
+# - name: Start cloned VMs
+#   loop: "{{ clone_nodes }}"
+#   loop_control:
+#     loop_var: node
+#   shell: sudo virsh start "{{ node }}"
+#   delegate_to: "{{ VM_HOST_IP }}"
 
+- name: Start VM
+  delegate_to: "{{ VM_HOST_IP }}"
+  # become: yes
+  shell: |
+    sudo virsh start "{{ inventory_hostname_short }}" || true
+
+- name: Wait for cloud-init to finish
+  wait_for:
+    host: "{{ ansible_host }}"
+    port: 22
+    delay: 10
+    timeout: 600
+
+- name: Check cloud-init status
+  become: yes
+  command: cloud-init status --wait
+  register: cloudinit_status
+  changed_when: false

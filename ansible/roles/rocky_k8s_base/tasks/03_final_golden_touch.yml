@@ -22,6 +22,18 @@
   shell: |
     ssh core@"{{ golden_ip }}" sudo dnf install -y kubeadm kubelet   kubectl
 
+- name: Prepare Golden Image with cloud-init
+  become: false
+  delegate_to: localhost
+  shell: |
+    # 1. Install and enable
+    ssh core@"{{ golden_ip }}" "sudo dnf install -y cloud-init"
+    ssh core@"{{ golden_ip }}" "sudo systemctl enable cloud-init"
+    
+    # 2. Clean the image so it acts as a fresh template
+    # This ensures clones generate new hostnames and machine-ids
+    ssh core@"{{ golden_ip }}" "sudo cloud-init clean --logs"
+
 # --------------------------------------------------------
 # Install crictl
 # --------------------------------------------------------
