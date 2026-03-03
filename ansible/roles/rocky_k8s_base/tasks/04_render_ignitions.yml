@@ -211,9 +211,10 @@
   delegate_to: localhost
   template:
     src: meta-data.j2
-    dest: "/tmp/{{ inventory_hostname_short }}-meta-data"
+    # Ensure this matches the Copy task's expectations exactly
+    dest: "{{ output_dir }}/{{ inventory_hostname }}/meta-data"
     mode: "0644"
-
+    
 - name: Render NoCloud user-data
   delegate_to: localhost
   template:
