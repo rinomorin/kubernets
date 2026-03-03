@@ -32,6 +32,9 @@
     mode: "0644"
   register: rendered_init
 
+- debug:
+    var: rendered_init
+    
 # - name: Read kubeadm-init.yaml from localhost
 #   when: "'control_nodes' in group_names"
 #   delegate_to: localhost
