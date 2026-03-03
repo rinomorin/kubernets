@@ -88,14 +88,16 @@
 
 - name: Attach NoCloud ISO to VM
   delegate_to: "{{ VM_HOST_IP }}"
-  # become: yes
   shell: |
     if ! sudo virsh domblklist "{{ inventory_hostname_short }}" | grep -q "{{ inventory_hostname_short }}.iso"; then
       sudo virsh attach-disk "{{ inventory_hostname_short }}" \
         /var/lib/libvirt/images/nocloud/{{ inventory_hostname_short }}.iso \
         sdc --type cdrom --mode readonly --persistent
     fi
-
+  # This skips the task if the current host is the KVM host or in a specific group
+  when: 
+    - inventory_hostname != 'kvmdc01'
+    - inventory_hostname in groups['control_nodes'] or inventory_hostname in groups['worker_nodes']
 # ------------------------------------------------------------
 # Start cloned VMs
 # ------------------------------------------------------------
