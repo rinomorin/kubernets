@@ -169,6 +169,13 @@
 #     mode: "0644"
 #   loop: "{{ ign_files.files }}"
 
+- name: Ensure ignition output directories exist
+  delegate_to: localhost
+  file:
+    path: "{{ output_dir }}/{{ inventory_hostname }}"
+    state: directory
+    mode: '0755'
+
 - name: Render NoCloud user-data
   delegate_to: localhost
   template:
@@ -176,10 +183,15 @@
     dest: "{{ output_dir }}/{{ inventory_hostname }}/user-data"
     mode: "0644"
   vars:
-    # Use the specific names your templates are crying out for:
-    kubeadm_init_yaml: "{{ lookup('file', '/tmp/' + inventory_hostname_short + '-kubeadm-init.yaml') if inventory_hostname in groups['control_nodes'] else '' }}"
-    kubeadm_join_yaml: "{{ lookup('file', '/tmp/' + inventory_hostname_short + '-kubeadm-join.yaml') if inventory_hostname in groups['worker_nodes'] or inventory_hostname == 'kvmdc01' else '' }}"
-
+    # We use 'errors=ignore' or a conditional check to prevent the crash
+    kubeadm_init_yaml: >-
+      {{ lookup('file', '/tmp/' + inventory_hostname_short + '-kubeadm-init.yaml', errors='ignore') 
+         if inventory_hostname in groups['control_nodes'] else '' }}
+    
+    kubeadm_join_yaml: >-
+      {{ lookup('file', '/tmp/' + inventory_hostname_short + '-kubeadm-join.yaml', errors='ignore') 
+         if (inventory_hostname in groups['worker_nodes'] or inventory_hostname == 'kvmdc01') else '' }}
+         
 # - name: Render NoCloud meta-data
 #   delegate_to: localhost
 #   template:
