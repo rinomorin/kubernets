@@ -32,11 +32,11 @@
   import_tasks: 04_render_ignitions.yml
   delegate_to: "{{ VM_HOST_IP }}"
 
-- name: Build Rocky Linux base image continued
-  block:
-  - name: clone golden image
-    import_tasks: 05_cloning_golden.yml
-    delegate_to: "{{ VM_HOST_IP }}"
-  when: 
-    - "'kvm' in group_names"
+# - name: Build Rocky Linux base image continued
+#   block:
+#   - name: clone golden image
+#     import_tasks: 05_cloning_golden.yml
+#     delegate_to: "{{ VM_HOST_IP }}"
+#   when: 
+#     - "'kvm' in group_names"
 

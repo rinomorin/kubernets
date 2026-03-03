@@ -191,7 +191,7 @@
     kubeadm_join_yaml: >-
       {{ lookup('file', '/tmp/' + inventory_hostname_short + '-kubeadm-join.yaml', errors='ignore') 
          if (inventory_hostname in groups['worker_nodes'] or inventory_hostname == 'kvmdc01') else '' }}
-         
+
 # - name: Render NoCloud meta-data
 #   delegate_to: localhost
 #   template:
@@ -217,12 +217,14 @@
 - name: Render NoCloud user-data
   delegate_to: localhost
   template:
-    src: "{{ (inventory_hostname in groups['control_nodes']) | ternary('user-data-controller.j2', 'user-data-worker.j2') }}"
-    dest: "/tmp/{{ inventory_hostname_short }}-user-data"
+    src: "{{ 'user-data-controller.j2' if inventory_hostname in groups['control_nodes'] else 'user-data-worker.j2' }}"
+    dest: "{{ output_dir }}/{{ inventory_hostname }}/user-data"
     mode: "0644"
   vars:
-    kubeadm_init_yaml: "{{ rendered_kubeadm.content if inventory_hostname in groups['control_nodes'] else '' }}"
-    kubeadm_join_yaml: "{{ rendered_kubeadm.content if inventory_hostname in groups['worker_nodes'] else '' }}"
+    # We read the files directly from the local /tmp folder where they were saved
+    kubeadm_init_yaml: "{{ lookup('file', '/tmp/' + inventory_hostname_short + '-kubeadm-init.yaml') if inventory_hostname in groups['control_nodes'] else '' }}"
+    kubeadm_join_yaml: "{{ lookup('file', '/tmp/' + inventory_hostname_short + '-kubeadm-join.yaml') if inventory_hostname in groups['worker_nodes'] else '' }}"
+  when: not in groups['kvm']
 
 - name: Create NoCloud directory on KVM host
   delegate_to: "{{ VM_HOST_IP }}"
