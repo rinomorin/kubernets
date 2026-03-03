@@ -113,6 +113,9 @@
   # become: yes
   shell: |
     sudo virsh start "{{ inventory_hostname_short }}" || true
+  when: 
+    - inventory_hostname != 'kvmdc01'
+    - inventory_hostname in groups['control_nodes'] or inventory_hostname in groups['worker_nodes']
 
 - name: Wait for cloud-init to finish
   wait_for:
@@ -126,3 +129,6 @@
   command: cloud-init status --wait
   register: cloudinit_status
   changed_when: false
+  when: 
+    - inventory_hostname != 'kvmdc01'
+    - inventory_hostname in groups['control_nodes'] or inventory_hostname in groups['worker_nodes']
