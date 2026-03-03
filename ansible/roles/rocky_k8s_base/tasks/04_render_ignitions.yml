@@ -172,15 +172,18 @@
 - name: Render NoCloud user-data
   delegate_to: localhost
   template:
-    src: user-data.j2
+    # Match the source file to your actual filenames on disk
+    src: "{{ 'user-data-controller.j2' if inventory_hostname in groups['control_nodes'] else 'user-data-worker.j2' }}"
     dest: "{{ output_dir }}/{{ inventory_hostname }}/user-data"
     mode: "0644"
   vars:
-    # This pulls the content from the local /tmp/ files we rendered in the previous step
+    # This pulls the kubeadm content we rendered earlier into a variable 
+    # that the user-data template can then inject.
     kubeadm_config_content: >-
       {{ lookup('file', '/tmp/' + inventory_hostname_short + '-kubeadm-init.yaml') 
          if inventory_hostname in groups['control_nodes'] 
          else lookup('file', '/tmp/' + inventory_hostname_short + '-kubeadm-join.yaml') }}
+
 # - name: Render NoCloud meta-data
 #   delegate_to: localhost
 #   template:
