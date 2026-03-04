@@ -135,6 +135,4 @@
   command: cloud-init status --wait
   register: cloudinit_status
   changed_when: false
-  when: 
-    - inventory_hostname != 'kvmdc01'
-    - inventory_hostname in groups['control_nodes'] or inventory_hostname in groups['worker_nodes']
+  

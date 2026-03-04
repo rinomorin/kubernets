@@ -28,7 +28,7 @@ write_files:
   - path: /etc/kubernetes/kubeadm-init.yaml
     permissions: "0644"
     content: |
-{{ kubeadm_init_yaml | indent(6) }}
+      {{ kubeadm_init_yaml | indent(6) }}
 
 # --- Firstboot commands -------------------------------------------------------
 runcmd:
