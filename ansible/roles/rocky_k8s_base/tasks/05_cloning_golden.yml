@@ -73,7 +73,7 @@
 
 - name: Attach all NoCloud ISOs to matching VMs
   delegate_to: "{{ VM_HOST_IP }}"
-  run_once: true
+  when: "'kvm' in group_names"
   shell: |
     ISO_DIR="/var/lib/libvirt/images/nocloud"
 
@@ -101,7 +101,7 @@
 
 - name: Start all control + worker VMs from hypervisor
   delegate_to: "{{ VM_HOST_IP }}"
-  run_once: true
+  when: "'kvm' in group_names"
   shell: |
     # Build VM list from Ansible inventory
     VM_LIST="{{ groups['control_nodes'] | join(' ') }} {{ groups['worker_nodes'] | join(' ') }}"
