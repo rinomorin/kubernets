@@ -71,22 +71,58 @@
     fi
   delegate_to: "{{ VM_HOST_IP }}"
 
-- name: Attach NoCloud ISO to VM
+- name: Attach all NoCloud ISOs to matching VMs
   delegate_to: "{{ VM_HOST_IP }}"
+  run_once: true
   shell: |
-    # We use inventory_hostname because this task runs once for EVERY node
-    if ! sudo virsh domblklist "{{ inventory_hostname }}" | grep -q "{{ inventory_hostname }}.iso"; then
-      sudo virsh attach-disk "{{ inventory_hostname }}" \
-        /var/lib/libvirt/images/nocloud/{{ inventory_hostname }}.iso \
-        sdc --type cdrom --mode readonly --persistent
-    fi
-  when: inventory_hostname in groups['control_nodes'] or inventory_hostname in groups['worker_nodes']
+    ISO_DIR="/var/lib/libvirt/images/nocloud"
 
-- name: Start VM
+    for iso in "${ISO_DIR}"/*.iso; do
+      [ -e "$iso" ] || continue
+
+      filename="$(basename "$iso")"
+      vm="${filename%.iso}"
+
+      # Check if VM exists
+      if ! sudo virsh list --all --name | grep -qx "$vm"; then
+        echo "VM '$vm' does not exist, skipping."
+        continue
+      fi
+
+      # Check if ISO already attached
+      if sudo virsh domblklist "$vm" | grep -q "$filename"; then
+        echo "ISO already attached to $vm, skipping."
+        continue
+      fi
+
+      echo "Attaching $iso to $vm"
+      sudo virsh attach-disk "$vm" "$iso" sdc --type cdrom --mode readonly --persistent
+    done
+
+- name: Start all control + worker VMs from hypervisor
   delegate_to: "{{ VM_HOST_IP }}"
+  run_once: true
   shell: |
-    sudo virsh start "{{ inventory_hostname }}" || true
-  when: inventory_hostname in groups['control_nodes'] or inventory_hostname in groups['worker_nodes']
+    # Build VM list from Ansible inventory
+    VM_LIST="{{ groups['control_nodes'] | join(' ') }} {{ groups['worker_nodes'] | join(' ') }}"
+
+    for vm in $VM_LIST; do
+      # Check VM exists
+      if ! sudo virsh list --all --name | grep -qx "$vm"; then
+        echo "VM '$vm' does not exist on this hypervisor, skipping."
+        continue
+      fi
+
+      # Check if already running
+      if sudo virsh domstate "$vm" | grep -q "running"; then
+        echo "VM '$vm' already running, skipping."
+        continue
+      fi
+
+      echo "Starting VM '$vm'"
+      sudo virsh start "$vm" || echo "Failed to start $vm"
+    done
+
 - name: Wait for cloud-init to finish
   wait_for:
     host: "{{ ansible_host }}"
