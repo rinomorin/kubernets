@@ -26,13 +26,8 @@
   become: false
   delegate_to: localhost
   shell: |
-    # 1. Install and enable
     ssh core@"{{ golden_ip }}" "sudo dnf install -y cloud-init"
     ssh core@"{{ golden_ip }}" "sudo systemctl enable cloud-init"
-    
-    # 2. Clean the image so it acts as a fresh template
-    # This ensures clones generate new hostnames and machine-ids
-    ssh core@"{{ golden_ip }}" "sudo cloud-init clean --logs"
 
 # --------------------------------------------------------
 # Install crictl
@@ -100,12 +95,12 @@
 # --------------------------------------------------------
 # Clean dynamic state before freezing image
 # --------------------------------------------------------
-- name: Clean machine-id
+- name: Clean image for use as a template
   become: false
   delegate_to: localhost
   shell: |
-    ssh core@"{{ golden_ip }}" sudo rm -f /etc/machine-id
-    ssh core@"{{ golden_ip }}" sudo touch /etc/machine-id
+    # This ensures clones get a new machine-id and run cloud-init on first boot
+    ssh core@"{{ golden_ip }}" "sudo cloud-init clean --logs --seed"
 
 - name: Clear logs
   become: false

@@ -21,14 +21,10 @@
 # ------------------------------------------------------------
 # Ensure golden-base is powered off
 # ------------------------------------------------------------
-- name: Check golden-base power state
-  shell: sudo virsh domstate golden-base
-  register: golden_state
-  delegate_to: "{{ VM_HOST_IP }}"
-
-- name: Shutdown golden-base if running
-  when: golden_state.stdout == "running"
-  shell: sudo virsh shutdown golden-base
+- name: Ensure golden-base VM is shut down
+  community.libvirt.virt:
+    name: "{{ golden_vm }}"
+    state: shutdown
   delegate_to: "{{ VM_HOST_IP }}"
 
 - name: Wait for golden image to be powered off
@@ -71,68 +67,36 @@
     fi
   delegate_to: "{{ VM_HOST_IP }}"
 
-- name: Attach all NoCloud ISOs to matching VMs
+- name: Attach NoCloud ISO to each cloned VM
   delegate_to: "{{ VM_HOST_IP }}"
-  when: "'kvm' in group_names"
-  shell: |
-    ISO_DIR="/var/lib/libvirt/images/nocloud"
+  loop: "{{ clone_nodes }}"
+  loop_control:
+    loop_var: node
+  vars:
+    iso_path: "/var/lib/libvirt/images/nocloud/{{ node }}.iso"
+  block:
+    - name: "Check if ISO is already attached to {{ node }}"
+      command: "sudo virsh domblklist {{ node }}"
+      register: blklist
+      changed_when: false
+      failed_when: false # The VM might not exist yet on a failed run
 
-    for iso in "${ISO_DIR}"/*.iso; do
-      [ -e "$iso" ] || continue
+    - name: "Attach ISO to {{ node }}"
+      when: "iso_path not in blklist.stdout"
+      command: "sudo virsh attach-disk {{ node }} {{ iso_path }} sdc --type cdrom --mode readonly --persistent"
 
-      filename="$(basename "$iso")"
-      vm="${filename%.iso}"
-
-      # Check if VM exists
-      if ! sudo virsh list --all --name | grep -qx "$vm"; then
-        echo "VM '$vm' does not exist, skipping."
-        continue
-      fi
-
-      # Check if ISO already attached
-      if sudo virsh domblklist "$vm" | grep -q "$filename"; then
-        echo "ISO already attached to $vm, skipping."
-        continue
-      fi
-
-      echo "Attaching $iso to $vm"
-      sudo virsh attach-disk "$vm" "$iso" sdc --type cdrom --mode readonly --persistent
-    done
-
-- name: Start all control + worker VMs from hypervisor
+- name: Start all cloned VMs
   delegate_to: "{{ VM_HOST_IP }}"
-  when: "'kvm' in group_names"
-  shell: |
-    # Build VM list from Ansible inventory
-    VM_LIST="{{ groups['control_nodes'] | join(' ') }} {{ groups['worker_nodes'] | join(' ') }}"
+  community.libvirt.virt:
+    name: "{{ item }}"
+    state: running
+  loop: "{{ clone_nodes }}"
 
-    for vm in $VM_LIST; do
-      # Check VM exists
-      if ! sudo virsh list --all --name | grep -qx "$vm"; then
-        echo "VM '$vm' does not exist on this hypervisor, skipping."
-        continue
-      fi
-
-      # Check if already running
-      if sudo virsh domstate "$vm" | grep -q "running"; then
-        echo "VM '$vm' already running, skipping."
-        continue
-      fi
-
-      echo "Starting VM '$vm'"
-      sudo virsh start "$vm" || echo "Failed to start $vm"
-    done
-
-- name: Wait for cloud-init to finish
+- name: Wait for SSH to become available on all cloned VMs
   wait_for:
-    host: "{{ ansible_host }}"
+    host: "{{ hostvars[item]['ansible_host'] | default(item) }}"
     port: 22
     delay: 10
     timeout: 600
-
-- name: Check cloud-init status
-  become: yes
-  command: cloud-init status --wait
-  register: cloudinit_status
-  changed_when: false
-  
+  loop: "{{ clone_nodes }}"
+  delegate_to: localhost

@@ -1,4 +1,4 @@
-ipa_domain: "{{ lookup('env', 'ipa_domin`') }}"
+ipa_domain: "{{ lookup('env', 'ipa_domain') }}"
 dns_zone: "{{ lookup('env', 'dns_zone') }}"
 account_name: "{{ lookup('env', 'ACCOUNT') }}"
 admin_id: "{{ lookup('env', 'admin_id') }}"
