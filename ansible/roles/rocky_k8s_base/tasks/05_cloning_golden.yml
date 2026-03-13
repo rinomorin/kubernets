@@ -69,15 +69,15 @@
 
 - name: Attach NoCloud ISO to each cloned VM
   delegate_to: "{{ VM_HOST_IP }}"
-  loop: "{{ clone_nodes }}"
-  loop_control:
-    loop_var: node
-  vars:
-    iso_path: "/var/lib/libvirt/images/nocloud/{{ node }}.iso"
-  include_tasks: chck_node.yml
-
+  block:
+    - name: Run node check tasks
+      include_tasks: chck_node.yml
+      loop: "{{ clone_nodes }}"
+      loop_control:
+        loop_var: node
+      vars:
+        iso_path: "/var/lib/libvirt/images/nocloud/{{ node }}.iso"
   
-
 - name: Start all cloned VMs
   delegate_to: "{{ VM_HOST_IP }}"
   community.libvirt.virt:
