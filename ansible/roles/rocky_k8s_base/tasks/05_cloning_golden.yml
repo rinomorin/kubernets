@@ -74,16 +74,9 @@
     loop_var: node
   vars:
     iso_path: "/var/lib/libvirt/images/nocloud/{{ node }}.iso"
-  block:
-    - name: "Check if ISO is already attached to {{ node }}"
-      command: "sudo virsh domblklist {{ node }}"
-      register: blklist
-      changed_when: false
-      failed_when: false # The VM might not exist yet on a failed run
+  include_tasks: chck_node.yml
 
-    - name: "Attach ISO to {{ node }}"
-      when: "iso_path not in blklist.stdout"
-      command: "sudo virsh attach-disk {{ node }} {{ iso_path }} sdc --type cdrom --mode readonly --persistent"
+  
 
 - name: Start all cloned VMs
   delegate_to: "{{ VM_HOST_IP }}"
