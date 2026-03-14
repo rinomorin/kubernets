@@ -93,3 +93,20 @@
     timeout: 600
   loop: "{{ clone_nodes }}"
   delegate_to: localhost
+
+- name: Collect DHCP leases from KVM Host
+  shell: |
+    for i in $(virsh list | grep msrlv | awk '{print $2}'); do 
+      MAC=$(virsh domiflist $i | grep br-nat | awk '{print $NF}')
+      IP=$(virsh net-dhcp-leases br-nat | grep "$MAC" | awk '{print $6}' | sed 's/\/24$//')
+      echo "$i=$IP"
+    done
+  register: kvm_ips_output
+  # Only run this on the KVM host(s)
+  when: inventory_hostname in groups['kvm']
+
+- name: Trigger configuration for each discovered VM
+  include_tasks: node_config.yml
+  loop: "{{ hostvars[groups['kvm'][0]].kvm_ips_output.stdout_lines | default([]) }}"
+  loop_control:
+    loop_var: vm_mapping

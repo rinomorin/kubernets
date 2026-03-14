@@ -1,0 +1,26 @@
+---
+- name: "Parse mapping for {{ vm_mapping }}"
+  set_fact:
+    this_vm_name: "{{ vm_mapping.split('=')[0] }}"
+    this_vm_ip: "{{ vm_mapping.split('=')[1] }}"
+
+- name: "Configure networking for {{ this_vm_name }}"
+  delegate_to: localhost
+  shell: |
+    ssh -o StrictHostKeyChecking=no core@{{ this_vm_ip }} << 'EOF'
+      # Configure enp2s0 (Provisioning)
+      {% if hostvars[this_vm_name]['provision_ip'] is defined %}
+      sudo nmcli con modify enp2s0 ipv4.addresses {{ hostvars[this_vm_name]['provision_ip'] }}/24 ipv4.method manual
+      sudo nmcli con up enp2s0
+      {% endif %}
+
+      # Configure enp3s0 (Provider)
+      {% if hostvars[this_vm_name]['provider_ip'] is defined %}
+      sudo nmcli con modify enp3s0 ipv4.addresses {{ hostvars[this_vm_name]['provider_ip'] }}/24 ipv4.method manual
+      sudo nmcli con up enp3s0
+      {% endif %}
+    EOF
+  # Only attempt config if the VM found in KVM exists in your inventory groups
+  when: 
+    - this_vm_name in groups['cluster_nodes']
+    - this_vm_ip | length > 0
