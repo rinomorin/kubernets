@@ -44,13 +44,3 @@
   until: vm_state.stdout_lines[-1] == "shutdown"
   retries: "{{ build_loops|int }}"
   delay: 10
-
-- name: Clear old SSH keys for transient IP
-  delegate_to: localhost
-  shell: "ssh-keygen -f ~/.ssh/known_hosts -R {{ this_vm_ip }}"
-  ignore_errors: yes
-
-- name: Accept new SSH key
-  delegate_to: localhost
-  shell: "ssh-keyscan -H {{ this_vm_ip }} >> ~/.ssh/known_hosts"
-  ignore_errors: yes
