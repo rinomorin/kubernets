@@ -1,6 +1,11 @@
 ---
-- name: Join Worker to Cluster
-  become: true
-  shell: "{{ hostvars['localhost']['worker_join_cmd'] }}"
-  args:
-    creates: /etc/kubernetes/kubelet.conf
+- name: "Join Worker Nodes to Cluster"
+  delegate_to: localhost
+  shell: |
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR core@{{ this_vm_ip }} << 'EOF'
+    if [ ! -f /etc/kubernetes/kubelet.conf ]; then
+      sudo {{ hostvars['localhost']['worker_join_cmd'] }} \
+        --ignore-preflight-errors=Swap
+    fi
+    EOF
+  when: inventory_hostname in groups['worker_nodes']

@@ -1,15 +1,20 @@
 ---
-- name: Join Secondary Master to Control Plane
-  become: true
-  shell: "{{ hostvars['localhost']['master_join_cmd'] }}"
-  args:
-    creates: /etc/kubernetes/kubelet.conf
+- name: "Join Secondary Masters to Control Plane"
+  delegate_to: localhost
+  shell: |
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR core@{{ this_vm_ip }} << 'EOF'
+    # Only join if not already part of the cluster
+    if [ ! -f /etc/kubernetes/kubelet.conf ]; then
+      sudo {{ hostvars['localhost']['master_join_cmd'] }} \
+        --apiserver-advertise-address={{ provision_ip }} \
+        --ignore-preflight-errors=Swap
+    fi
 
-- name: Setup kubeconfig
-  become: true
-  file:
-    path: "/home/core/.kube"
-    state: directory
-    owner: core
-    group: core
-# (Add copy admin.conf task here if needed for local kubectl)
+    # Setup .kube for the core user on secondary masters
+    mkdir -p $HOME/.kube
+    sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config
+    sudo chown $(id -u):$(id -g) $HOME/.kube/config
+    EOF
+  when: 
+    - inventory_hostname in groups['control_nodes']
+    - inventory_hostname != groups['control_nodes'][0]
