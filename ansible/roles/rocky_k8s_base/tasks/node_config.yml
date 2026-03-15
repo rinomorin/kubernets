@@ -22,26 +22,55 @@
   delay: 5
   # This acts as your 300-second timeout (60 retries * 5s delay)
 
-- name: "Configure networking for {{ this_vm_name }} via {{ this_vm_ip }}"
+---
+- name: "Parse mapping for {{ vm_mapping }}"
+  set_fact:
+    this_vm_name: "{{ vm_mapping.split('=')[0] }}"
+    this_vm_ip: "{{ vm_mapping.split('=')[1] }}"
+
+- name: "Wait for SSH Login to {{ this_vm_name }}"
   delegate_to: localhost
   shell: |
-    sshcmd="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ this_vm_ip }}"
-      {% if hostvars[this_vm_name]['provision_ip'] is defined %}
-      $sshcmd sudo nmcli con modify enp2s0 ipv4.addresses {{ hostvars[this_vm_name]['provision_ip'] }}/24 ipv4.method manual
-      $sshcmd sudo nmcli con up enp2s0
-      {% endif %}
-      {% if hostvars[this_vm_name]['provider_ip'] is defined %}
-      $sshcmd sudo nmcli con modify enp3s0 ipv4.addresses {{ hostvars[this_vm_name]['provider_ip'] }}/24 ipv4.method manual
-      $sshcmd sudo nmcli con up enp3s0
-      {% endif %}
-  when: 
-    - this_vm_name in groups['cluster_nodes']
-    - this_vm_ip is defined and this_vm_ip | length > 0
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+        -o ConnectTimeout=5 -o BatchMode=yes \
+        core@{{ this_vm_ip }} /bin/true
+  register: ssh_check
+  until: ssh_check.rc == 0
+  retries: 60
+  delay: 5
+
+- name: "Apply static networking and verify"
+  delegate_to: localhost
+  shell: |
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ this_vm_ip }} << EOF
+    # Set Provisioning IP
+    {% if hostvars[this_vm_name]['provision_ip'] is defined %}
+    sudo nmcli con modify enp2s0 ipv4.addresses {{ hostvars[this_vm_name]['provision_ip'] }}/24 ipv4.method manual ipv4.gateway ""
+    sudo nmcli con up enp2s0
+    {% endif %}
+
+    # Set Provider IP
+    {% if hostvars[this_vm_name]['provider_ip'] is defined %}
+    sudo nmcli con modify enp3s0 ipv4.addresses {{ hostvars[this_vm_name]['provider_ip'] }}/24 ipv4.method manual
+    sudo nmcli con up enp3s0
+    {% endif %}
+
+    # Wait a second for NM to settle and then show current IPs
+    sleep 2
+    echo "--- FINAL IP STATE ---"
+    ip -4 -br addr show
+    EOF
   register: fix_ip_result
+  when: this_vm_name in groups['cluster_nodes']
+
+- name: Show Final IP State for {{ this_vm_name }}
+  debug:
+    var: fix_ip_result.stdout_lines
 
 - name: "Show results"
   debug:
     msg: |
+    
       fix_ip_result is {{ fix_ip_result.stdout }}
 
 - name: Get update ipa
@@ -50,19 +79,7 @@
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ this_vm_ip }} ip a s
   register: ip_result
 
-
     
 - debug:
     msg: |
       ip_result is {{ ip_result.stdout }}
-      sshcmd="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ this_vm_ip }}"
-      {% if hostvars[this_vm_name]['provision_ip'] is defined %}
-      $sshcmd sudo nmcli con modify enp2s0 ipv4.addresses {{ hostvars[this_vm_name]['provision_ip'] }}/24 ipv4.method manual
-      $sshcmd sudo nmcli con up enp2s0
-      {% endif %}
-      {% if hostvars[this_vm_name]['provider_ip'] is defined %}
-      $sshcmd sudo nmcli con modify enp3s0 ipv4.addresses {{ hostvars[this_vm_name]['provider_ip'] }}/24 ipv4.method manual
-      $sshcmd sudo nmcli con up enp3s0
-      {% endif %}
-      
-
