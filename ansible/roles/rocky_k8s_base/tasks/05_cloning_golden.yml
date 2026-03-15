@@ -85,28 +85,40 @@
     state: running
   loop: "{{ clone_nodes }}"
 
-- name: Wait for SSH to become available on all cloned VMs
-  wait_for:
-    host: "{{ hostvars[item]['ansible_host'] | default(item) }}"
-    port: 22
-    delay: 10
-    timeout: 600
-  loop: "{{ clone_nodes }}"
-  delegate_to: localhost
-
-- name: Collect DHCP leases from KVM Host
+- name: Wait for all msrlv VMs to have a DHCP lease
+  delegate_to: "{{ VM_HOST_IP }}"
   shell: |
-    for i in $(virsh list | grep msrlv | awk '{print $2}'); do 
+    VM_LIST=$(virsh list --all | grep msrlv | awk '{print $2}')
+    TOTAL_VMS=$(echo "$VM_LIST" | wc -l)
+    IP_COUNT=0
+    for vm in $VM_LIST; do
+      MAC=$(virsh domiflist $vm | grep br-nat | awk '{print $NF}')
+      IP=$(virsh net-dhcp-leases br-nat | grep "$MAC" | awk '{print $6}')
+      if [ -n "$IP" ]; then ((IP_COUNT++)); fi
+    done
+    echo "$IP_COUNT/$TOTAL_VMS"
+  register: dhcp_status
+  until: "dhcp_status.stdout.split('/')[0] == dhcp_status.stdout.split('/')[1]"
+  retries: 40
+  delay: 15
+  # Check if the group exists, then execute on the KVM host
+  when: "'kvm' in groups"
+
+- name: Collect final mapping of Name to IP
+  delegate_to: "{{ VM_HOST_IP }}"
+  shell: |
+    for i in $(virsh list --all | grep msrlv | awk '{print $2}'); do 
       MAC=$(virsh domiflist $i | grep br-nat | awk '{print $NF}')
       IP=$(virsh net-dhcp-leases br-nat | grep "$MAC" | awk '{print $6}' | sed 's/\/24$//')
       echo "$i=$IP"
     done
   register: kvm_ips_output
-  # Only run this on the KVM host(s)
-  when: inventory_hostname in groups['kvm']
+  when: "'kvm' in groups"
 
-- name: Trigger configuration for each discovered VM
+- name: Trigger configuration for discovered VMs
   include_tasks: node_config.yml
+  # We pull the output from the first host in the kvm group
   loop: "{{ hostvars[groups['kvm'][0]].kvm_ips_output.stdout_lines | default([]) }}"
   loop_control:
     loop_var: vm_mapping
+  when: "'kvm' in groups"
