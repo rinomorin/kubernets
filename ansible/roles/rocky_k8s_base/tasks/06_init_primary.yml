@@ -1,7 +1,7 @@
 ---
-- name: set provider_ip from control_nodes
+- name: set provision_ip  from control_nodes
   set_fact:
-    provider_ip: "{{ hostvars[groups['control_nodes'][0]]['provision_ip'] }}"
+    provision_ip: "{{ hostvars[groups['control_nodes'][0]]['provision_ip'] }}"
   run_once: true
 
 
