@@ -37,6 +37,12 @@
   - name: clone golden image
     import_tasks: 05_cloning_golden.yml
     delegate_to: "{{ VM_HOST_IP }}"
+
+  - name: init cluster
+    import_tasks: 06_init_cluster.yml
+    delegate_to: "{{ VM_HOST_IP }}"
+
   when: 
     - "'kvm' in group_names"
+
 

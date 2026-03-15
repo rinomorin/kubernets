@@ -3,6 +3,16 @@
     this_vm_name: "{{ vm_mapping.split('=')[0] }}"
     this_vm_ip: "{{ vm_mapping.split('=')[1] }}"
 
+- name: Clear old SSH keys for transient IP
+  delegate_to: localhost
+  shell: "ssh-keygen -f ~/.ssh/known_hosts -R {{ this_vm_ip }}"
+  ignore_errors: yes
+
+- name: Accept new SSH key
+  delegate_to: localhost
+  shell: "ssh-keyscan -H {{ this_vm_ip }} >> ~/.ssh/known_hosts"
+  ignore_errors: yes
+
 - name: "Wait for SSH Login to {{ this_vm_name }}"
   delegate_to: localhost
   shell: |
@@ -47,5 +57,30 @@
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ this_vm_ip }} "ip -4 -br addr show"
   register: final_ipa
   
-- debug:
-    msg: "Final State for {{ this_vm_name }}: {{ final_ipa.stdout }}"
+- name: "Generate cluster hosts string"
+  set_fact:
+    cluster_hosts_string: |
+      {% for host in groups['cluster_nodes'] %}
+      {{ hostvars[host]['provision_ip'] }} {{ hostvars[host]['inventory_hostname_short'] }}.{{ cloud_zone }} {{ hostvars[host]['inventory_hostname_short'] }}
+      {% endfor %}
+  run_once: true
+
+- name: "Inject /etc/hosts entries via SSH to {{ this_vm_name }}"
+  delegate_to: localhost
+  shell: |
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR core@{{ this_vm_ip }} << 'EOF'
+    # Use a temporary file to construct the block
+    cat << 'HOSTSBLOCK' > /tmp/k8s_hosts
+    # BEGIN ANSIBLE MANAGED K8S CLUSTER NODES
+    {{ cluster_hosts_string }}
+    # END ANSIBLE MANAGED K8S CLUSTER NODES
+    HOSTSBLOCK
+
+    # Remove old block if it exists and append new one to avoid duplicates
+    sudo sed -i '/# BEGIN ANSIBLE MANAGED/,/# END ANSIBLE MANAGED/d' /etc/hosts
+    cat /tmp/k8s_hosts | sudo tee -a /etc/hosts > /dev/null
+    rm /tmp/k8s_hosts
+    EOF
+  # when: 
+  #   - this_vm_name == inventory_hostname
+  #   - this_vm_name in groups['cluster_nodes']

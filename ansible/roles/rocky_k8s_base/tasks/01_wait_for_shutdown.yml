@@ -32,7 +32,7 @@
 
 - name: Display wait time
   debug:
-    msg: "This will wait up to {{ wait_time_to_shutdown_or_fail }} minutes before resuming to next tasks"
+    msg: "Probe VM will wait up to {{ wait_time_to_shutdown_or_fail }} minutes before resuming to next tasks"
 
 - name: Probe VM with virsh until VM powers down
   shell: |
@@ -45,3 +45,12 @@
   retries: "{{ build_loops|int }}"
   delay: 10
 
+- name: Clear old SSH keys for transient IP
+  delegate_to: localhost
+  shell: "ssh-keygen -f ~/.ssh/known_hosts -R {{ this_vm_ip }}"
+  ignore_errors: yes
+
+- name: Accept new SSH key
+  delegate_to: localhost
+  shell: "ssh-keyscan -H {{ this_vm_ip }} >> ~/.ssh/known_hosts"
+  ignore_errors: yes
