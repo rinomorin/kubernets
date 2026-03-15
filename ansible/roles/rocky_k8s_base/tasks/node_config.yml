@@ -4,14 +4,17 @@
     this_vm_name: "{{ (vm_mapping.split('='))[0] }}"
     this_vm_ip: "{{ (vm_mapping.split('='))[1] }}"
 
-- name: "Wait for SSH to be fully ready on {{ this_vm_ip }}"
+- name: "Wait for SSH Login to be successful on {{ this_vm_ip }}"
   delegate_to: localhost
-  wait_for:
-    host: "{{ this_vm_ip }}"
-    port: 22
-    state: started
-    delay: 5
-    timeout: 300
+  shell: |
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+        -o ConnectTimeout=5 -o BatchMode=yes \
+        core@{{ this_vm_ip }} /bin/true
+  register: ssh_check
+  until: ssh_check.rc == 0
+  retries: 60
+  delay: 5
+  # This acts as your 300-second timeout (60 retries * 5s delay)
 
 - name: "Configure networking for {{ this_vm_name }} via {{ this_vm_ip }}"
   delegate_to: localhost
