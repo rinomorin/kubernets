@@ -1,11 +1,6 @@
----
 - name: "Join Worker Nodes to Cluster"
   delegate_to: localhost
-  shell: |
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR core@{{ this_vm_ip }} << 'EOF'
-    if [ ! -f /etc/kubernetes/kubelet.conf ]; then
-      sudo {{ hostvars['localhost']['worker_join_cmd'] }} \
-        --ignore-preflight-errors=Swap
-    fi
-    EOF
   when: inventory_hostname in groups['worker_nodes']
+  shell: |
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    core@{{ provision_ip }} "sudo {{ hostvars['localhost']['worker_join_cmd'] }}"

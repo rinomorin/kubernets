@@ -1,20 +1,7 @@
----
 - name: "Join Secondary Masters to Control Plane"
   delegate_to: localhost
+  # Run this for secondary masters only
+  when: inventory_hostname in groups['control_nodes'][1:] 
   shell: |
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR core@{{ this_vm_ip }} << 'EOF'
-    # Only join if not already part of the cluster
-    if [ ! -f /etc/kubernetes/kubelet.conf ]; then
-      sudo {{ hostvars['localhost']['master_join_cmd'] }} \
-        --apiserver-advertise-address={{ provision_ip }} \
-        --ignore-preflight-errors=Swap
-    fi
-
-    # Setup .kube for the core user on secondary masters
-    mkdir -p $HOME/.kube
-    sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config
-    sudo chown $(id -u):$(id -g) $HOME/.kube/config
-    EOF
-  when: 
-    - inventory_hostname in groups['control_nodes']
-    - inventory_hostname != groups['control_nodes'][0]
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    core@{{ provision_ip }} "sudo {{ hostvars['localhost']['master_join_cmd'] }}"
