@@ -2,13 +2,8 @@
 - name: set provision_ip  from control_nodes
   set_fact:
     provision_ip: "{{ hostvars[groups['control_nodes'][0]]['provision_ip'] }}"
-  run_once: true
-
-- name: "Parse mapping for {{ vm_mapping }}"
-  set_fact:
     prime_vm_name: "{{hostvars[groups['control_nodes'][0]]['hostname'].split('.')[0] }}"
-    this_vm_ip: "{{ vm_mapping.split('=')[1] }}"
-
+  run_once: true
 
 - name: "Initialize Cluster and Setup Config via SSH"
   delegate_to: localhost
