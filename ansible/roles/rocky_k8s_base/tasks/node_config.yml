@@ -44,9 +44,17 @@
     msg: |
       fix_ip_result is {{ fix_ip_result.stdout }}
 
+- name: Get update ipa
+  delegate_to: localhost
+  shell: |
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ this_vm_ip }} ip a s
+  register: ip_result
 
+
+    
 - debug:
     msg: |
+      ip_result is {{ ip_result.stdout }}
       sshcmd="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ this_vm_ip }}"
       {% if hostvars[this_vm_name]['provision_ip'] is defined %}
       $sshcmd sudo nmcli con modify enp2s0 ipv4.addresses {{ hostvars[this_vm_name]['provision_ip'] }}/24 ipv4.method manual
