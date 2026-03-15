@@ -125,7 +125,7 @@
     # Re-run once to get the final list for Ansible looping
     for i in $(sudo virsh list --all | grep msrlv | awk '{print $2}'); do 
       MAC=$(sudo virsh domiflist $i | grep br-nat | awk '{print $NF}')
-      IP=$(sudo virsh net-dhcp-leases br-nat | grep "$MAC" | awk '{print $6}' | sed 's/\/24$//')
+      IP=$(sudo virsh net-dhcp-leases br-nat | grep "$MAC" | awk '{print $5}' | sed 's/\/24$//')
       echo "$i=$IP"
     done
   register: kvm_ips_output
