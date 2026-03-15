@@ -4,6 +4,12 @@
     this_vm_name: "{{ (vm_mapping.split('='))[0] }}"
     this_vm_ip: "{{ (vm_mapping.split('='))[1] }}"
 
+- debug:
+    msg: |
+      this_vm_name is {{ this_vm_name }}
+      this_vm_ip is {{ this_vm_ip }}
+      vm_mapping is {{ vm_mapping }}
+
 - name: "Wait for SSH Login to be successful on {{ this_vm_ip }}"
   delegate_to: localhost
   shell: |
