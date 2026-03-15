@@ -89,18 +89,18 @@
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
     # 1. Get the list of VMs we are tracking
-    VMS=$(virsh list --all | grep msrlv | awk '{print $2}')
+    VMS=$(sudo virsh list --all | grep msrlv | awk '{print $2}')
     TOTAL_VMS=$(echo "$VMS" | wc -l)
     
     # 2. Get the network prefix (e.g., "172.16") to ensure we grab the right lease
-    NET_PREFIX=$(virsh net-dumpxml br-nat | grep range | cut -d\' -f2 | cut -d\. -f1-2)
+    NET_PREFIX=$(sudo virsh net-dumpxml br-nat | grep range | cut -d\' -f2 | cut -d\. -f1-2)
 
     while true; do
       FOUND_COUNT=0
       for i in $VMS; do
         # Check if this specific VM has a lease in our prefix
-        MAC=$(virsh domiflist $i | grep br-nat | awk '{print $NF}')
-        HAS_IP=$(virsh net-dhcp-leases br-nat | grep "$MAC" | grep "$NET_PREFIX" | wc -l)
+        MAC=$(sudo virsh domiflist $i | grep br-nat | awk '{print $NF}')
+        HAS_IP=$(sudo virsh net-dhcp-leases br-nat | grep "$MAC" | grep "$NET_PREFIX" | wc -l)
         
         if [ "$HAS_IP" -gt 0 ]; then
           ((FOUND_COUNT++))
@@ -123,9 +123,9 @@
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
     # Re-run once to get the final list for Ansible looping
-    for i in $(virsh list --all | grep msrlv | awk '{print $2}'); do 
-      MAC=$(virsh domiflist $i | grep br-nat | awk '{print $NF}')
-      IP=$(virsh net-dhcp-leases br-nat | grep "$MAC" | awk '{print $6}' | sed 's/\/24$//')
+    for i in $(sudo virsh list --all | grep msrlv | awk '{print $2}'); do 
+      MAC=$(sudo virsh domiflist $i | grep br-nat | awk '{print $NF}')
+      IP=$(sudo virsh net-dhcp-leases br-nat | grep "$MAC" | awk '{print $6}' | sed 's/\/24$//')
       echo "$i=$IP"
     done
   register: kvm_ips_output
