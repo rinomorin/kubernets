@@ -39,7 +39,7 @@
     - this_vm_name in groups['cluster_nodes']
     - this_vm_ip is defined and this_vm_ip | length > 0
 
-- debud:
+- debug:
     msg: |
       ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ this_vm_ip }} << EOF
       {% if hostvars[this_vm_name]['provision_ip'] is defined %}
