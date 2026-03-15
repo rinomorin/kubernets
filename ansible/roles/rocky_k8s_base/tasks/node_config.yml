@@ -37,6 +37,13 @@
   when: 
     - this_vm_name in groups['cluster_nodes']
     - this_vm_ip is defined and this_vm_ip | length > 0
+  register: fix_ip_result
+
+- name: "Show results"
+  debug:
+    msg: |
+      fix_ip_result is {{ fix_ip_result.stdout }}
+
 
 - debug:
     msg: |
