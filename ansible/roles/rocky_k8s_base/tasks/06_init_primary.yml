@@ -12,9 +12,17 @@
   register: init_result
   changed_when: "'INITIALIZED_SUCCESS' in init_result.stdout"
 
-- name: show init_result
+- name: "Persist Init Output to Localhost"
+  set_fact:
+    primary_init_output: "{{ init_result.stdout }}"
+  delegate_to: localhost
+  delegate_facts: true
+  run_once: true
+
+- name: "Show Initialization Success"
   debug:
-    msg: "{{ init_result.stdout }}"
+    msg: "{{ hostvars['localhost']['primary_init_output'] }}"
+  run_once: true
 
 - name: "Capture Join Commands"
   delegate_to: localhost
