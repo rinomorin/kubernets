@@ -39,7 +39,15 @@
     delegate_to: "{{ VM_HOST_IP }}"
 
   - name: init cluster
-    import_tasks: 06_init_cluster.yml
+    import_tasks: 06_init_primary.yml
+    delegate_to: "{{ VM_HOST_IP }}"
+
+  - name: join cluster
+    import_tasks: 07_join_masters.yml
+    delegate_to: "{{ VM_HOST_IP }}"
+
+  - name: join cluster
+    import_tasks: 08_join_workers.yml
     delegate_to: "{{ VM_HOST_IP }}"
 
   when: 
