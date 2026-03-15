@@ -1,5 +1,4 @@
 ---
----
 - name: "Initialize Primary Master Cluster"
   delegate_to: localhost
   run_once: true
