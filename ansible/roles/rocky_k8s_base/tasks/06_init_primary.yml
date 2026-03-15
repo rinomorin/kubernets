@@ -12,6 +12,10 @@
   register: init_result
   changed_when: "'INITIALIZED_SUCCESS' in init_result.stdout"
 
+- name: show init_result
+  debug:
+    msg: "{{ init_result.stdout }}"
+
 - name: "Capture Join Commands"
   delegate_to: localhost
   run_once: true
@@ -25,6 +29,10 @@
     EOF
   register: join_cmds_raw
 
+- name: show join_cmds_raw
+  debug:
+    msg: "{{ join_cmds_raw.stdout }}"
+
 - name: "Set Global Join Facts"
   set_fact:
     master_join_cmd: "{{ join_cmds_raw.stdout_lines | select('match', '^MASTER_JOIN=') | first | replace('MASTER_JOIN=', '') }}"
@@ -32,3 +40,12 @@
   delegate_to: localhost
   delegate_facts: true
   run_once: true
+
+- name: show *_join_cmd
+  debug:
+    msg: |
+      MASTER_JOIN: "{{ master_join_cmd }}"
+      WORKER_JOIN: "{{ worker_join_cmd }}"
+
+
+
