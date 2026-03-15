@@ -25,30 +25,29 @@
 - name: "Configure networking for {{ this_vm_name }} via {{ this_vm_ip }}"
   delegate_to: localhost
   shell: |
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ this_vm_ip }} << EOF
-    {% if hostvars[this_vm_name]['provision_ip'] is defined %}
-    sudo nmcli con modify enp2s0 ipv4.addresses {{ hostvars[this_vm_name]['provision_ip'] }}/24 ipv4.method manual
-    sudo nmcli con up enp2s0
-    {% endif %}
-    {% if hostvars[this_vm_name]['provider_ip'] is defined %}
-    sudo nmcli con modify enp3s0 ipv4.addresses {{ hostvars[this_vm_name]['provider_ip'] }}/24 ipv4.method manual
-    sudo nmcli con up enp3s0
-    {% endif %}
-    EOF
+    sshcmd="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ this_vm_ip }}"
+      {% if hostvars[this_vm_name]['provision_ip'] is defined %}
+      $sshcmd sudo nmcli con modify enp2s0 ipv4.addresses {{ hostvars[this_vm_name]['provision_ip'] }}/24 ipv4.method manual
+      $sshcmd sudo nmcli con up enp2s0
+      {% endif %}
+      {% if hostvars[this_vm_name]['provider_ip'] is defined %}
+      $sshcmd sudo nmcli con modify enp3s0 ipv4.addresses {{ hostvars[this_vm_name]['provider_ip'] }}/24 ipv4.method manual
+      $sshcmd sudo nmcli con up enp3s0
+      {% endif %}
   when: 
     - this_vm_name in groups['cluster_nodes']
     - this_vm_ip is defined and this_vm_ip | length > 0
 
 - debug:
     msg: |
-      ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ this_vm_ip }} << EOF
+      sshcmd="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ this_vm_ip }}"
       {% if hostvars[this_vm_name]['provision_ip'] is defined %}
-      sudo nmcli con modify enp2s0 ipv4.addresses {{ hostvars[this_vm_name]['provision_ip'] }}/24 ipv4.method manual
-      sudo nmcli con up enp2s0
+      $sshcmd sudo nmcli con modify enp2s0 ipv4.addresses {{ hostvars[this_vm_name]['provision_ip'] }}/24 ipv4.method manual
+      $sshcmd sudo nmcli con up enp2s0
       {% endif %}
       {% if hostvars[this_vm_name]['provider_ip'] is defined %}
-      sudo nmcli con modify enp3s0 ipv4.addresses {{ hostvars[this_vm_name]['provider_ip'] }}/24 ipv4.method manual
-      sudo nmcli con up enp3s0
+      $sshcmd sudo nmcli con modify enp3s0 ipv4.addresses {{ hostvars[this_vm_name]['provider_ip'] }}/24 ipv4.method manual
+      $sshcmd sudo nmcli con up enp3s0
       {% endif %}
-      EOF
+      
 
