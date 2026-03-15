@@ -1,10 +1,10 @@
 ---
+---
 - name: "Initialize Primary Master Cluster"
   delegate_to: localhost
-  # This ensures the task is only evaluated for the first master
   run_once: true
   shell: |
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR core@{{ hostvars[groups['control_nodes'][0]]['this_vm_ip'] }} << 'EOF'
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR core@{{ hostvars[groups['control_nodes'][0]]['provision_ip'] }} << 'EOF'
     # 1. Kernel Prerequisites
     cat << 'SYS' | sudo tee /etc/sysctl.d/k8s.conf
     net.bridge.bridge-nf-call-iptables  = 1
@@ -13,20 +13,14 @@
     SYS
     sudo sysctl --system
 
-    # 2. Check if CRI-O is installed, if not, try to install it (Rocky 9)
-    if ! systemctl list-unit-files | grep -q crio; then
-      sudo dnf install -y cri-o
-    fi
-
-    # 3. Ensure CRI-O and Kubelet are running
-    sudo systemctl daemon-reload
-    sudo systemctl enable --now crio
+    # 2. Ensure CRI-O and Kubelet are running
+    sudo systemctl enable --now crio || sudo systemctl enable --now cri-o
     sudo systemctl enable --now kubelet
 
-    # 4. Initialize K8s
+    # 3. Initialize K8s
     if [ ! -f /etc/kubernetes/admin.conf ]; then
       sudo kubeadm init \
-        --control-plane-endpoint "{{ hostvars[groups['control_nodes'][0]]['inventory_hostname_short'] }}:6443" \
+        --control-plane-endpoint "{{ hostvars[groups['control_nodes'][0]]['hostname'].split('.')[0] }}:6443" \
         --upload-certs \
         --pod-network-cidr=10.244.0.0/16 \
         --apiserver-advertise-address={{ hostvars[groups['control_nodes'][0]]['provision_ip'] }} \
@@ -36,16 +30,82 @@
       echo "INITIALIZED_SUCCESS"
     fi
 
-    # 5. Config Setup
+    # 4. Config Setup
     mkdir -p $HOME/.kube
     sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config
     sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
-    # 6. Network Setup
+    # 5. Network Setup (Flannel)
     kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
     EOF
   register: init_result
-  # Only execute if the current host being processed is the first control node
+  when: inventory_hostname == groups['control_nodes'][0]
+  changed_when: "'INITIALIZED_SUCCESS' in init_result.stdout"
+
+- name: "Capture Join Commands"
+  delegate_to: localhost
+  run_once: true
+  shell: |
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR core@{{ hostvars[groups['control_nodes'][0]]['provision_ip'] }} << 'EOF'
+    # Generate tokens and certificate keys
+    M_TOKEN=$(sudo kubeadm token create --print-join-command)
+    CERT_KEY=$(sudo kubeadm init phase upload-certs --upload-certs | tail -1)
+    W_TOKEN=$(sudo kubeadm token create --print-join-command)
+
+    echo "MASTER_JOIN=${M_TOKEN} --control-plane --certificate-key ${CERT_KEY}"
+    echo "WORKER_JOIN=${W_TOKEN}"
+    EOF
+  register: join_cmds_raw
+  when: inventory_hostname == groups['control_nodes'][0]
+
+- name: "Set Global Join Facts"
+  set_fact:
+    master_join_cmd: "{{ join_cmds_raw.stdout_lines | select('match', '^MASTER_JOIN=') | first | replace('MASTER_JOIN=', '') }}"
+    worker_join_cmd: "{{ join_cmds_raw.stdout_lines | select('match', '^WORKER_JOIN=') | first | replace('WORKER_JOIN=', '') }}"
+  delegate_to: localhost
+  delegate_facts: true
+  run_once: true
+  when: inventory_hostname == groups['control_nodes'][0]- name: "Initialize Primary Master Cluster"
+  delegate_to: localhost
+  run_once: true
+  # Using the provision_ip from inventory as the source of truth
+  shell: |
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR core@{{ hostvars[groups['control_nodes'][0]]['provision_ip'] }} << 'EOF'
+    # 1. Kernel Prerequisites
+    cat << 'SYS' | sudo tee /etc/sysctl.d/k8s.conf
+    net.bridge.bridge-nf-call-iptables  = 1
+    net.bridge.bridge-nf-call-ip6tables = 1
+    net.ipv4.ip_forward                 = 1
+    SYS
+    sudo sysctl --system
+
+    # 2. Ensure CRI-O and Kubelet are running
+    # Note: If 'crio' fails, try 'cri-o' (some Rocky builds use the hyphen)
+    sudo systemctl enable --now crio || sudo systemctl enable --now cri-o
+    sudo systemctl enable --now kubelet
+
+    # 3. Initialize K8s
+    if [ ! -f /etc/kubernetes/admin.conf ]; then
+      sudo kubeadm init \
+        --control-plane-endpoint "{{ hostvars[groups['control_nodes'][0]]['hostname'].split('.')[0] }}:6443" \
+        --upload-certs \
+        --pod-network-cidr=10.244.0.0/16 \
+        --apiserver-advertise-address={{ hostvars[groups['control_nodes'][0]]['provision_ip'] }} \
+        --cri-socket unix:///var/run/crio/crio.sock \
+        --ignore-preflight-errors=Swap,SystemVerification
+      
+      echo "INITIALIZED_SUCCESS"
+    fi
+
+    # 4. Config Setup
+    mkdir -p $HOME/.kube
+    sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config
+    sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+    # 5. Network Setup (Flannel)
+    kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+    EOF
+  register: init_result
   when: inventory_hostname == groups['control_nodes'][0]
   changed_when: "'INITIALIZED_SUCCESS' in init_result.stdout"
 
