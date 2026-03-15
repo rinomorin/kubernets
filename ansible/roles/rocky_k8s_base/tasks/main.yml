@@ -10,15 +10,22 @@
 - name: Build Rocky Linux base image
   block:
 
-  - name: "Cleanup Stale SSH Known Hosts (172.*)"
+  - name: "Forcefully scrub Lab IPs from known_hosts"
     delegate_to: localhost
     run_once: true
     shell: |
-      # Find all unique IPs starting with 172. in the current known_hosts and remove them
-      grep -oP '^172\.[0-9]+\.[0-9]+\.[0-9]+' ~/.ssh/known_hosts | sort -u | while read -r ip; do
+      # Clean every IP in the 172.16 and 10.0 ranges to be safe
+      for ip in $(grep -oP '(172\.16\.\d+\.\d+|10\.0\.\d+\.\d+)' ~/.ssh/known_hosts); do
         ssh-keygen -R "$ip" > /dev/null 2>&1
       done
-    failed_when: false  # Don't fail if the file is empty or missing
+
+      # Also explicitly clean every host in the current inventory by name and IP
+      {% for host in groups['all'] %}
+      ssh-keygen -R "{{ host }}" > /dev/null 2>&1
+      ssh-keygen -R "{{ hostvars[host]['provision_ip'] | default('') }}" > /dev/null 2>&1
+      ssh-keygen -R "{{ hostvars[host]['ansible_host'] | default('') }}" > /dev/null 2>&1
+      {% endfor %}
+    failed_when: false
 
   - name: Build Rocky Linux base image
     import_tasks: 00_create_golden.yml
