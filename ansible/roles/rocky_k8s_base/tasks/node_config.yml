@@ -38,3 +38,17 @@
   when: 
     - this_vm_name in groups['cluster_nodes']
     - this_vm_ip is defined and this_vm_ip | length > 0
+
+- debud:
+    msg: |
+      ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ this_vm_ip }} << EOF
+      {% if hostvars[this_vm_name]['provision_ip'] is defined %}
+      sudo nmcli con modify enp2s0 ipv4.addresses {{ hostvars[this_vm_name]['provision_ip'] }}/24 ipv4.method manual
+      sudo nmcli con up enp2s0
+      {% endif %}
+      {% if hostvars[this_vm_name]['provider_ip'] is defined %}
+      sudo nmcli con modify enp3s0 ipv4.addresses {{ hostvars[this_vm_name]['provider_ip'] }}/24 ipv4.method manual
+      sudo nmcli con up enp3s0
+      {% endif %}
+      EOF
+
