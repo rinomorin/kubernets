@@ -85,7 +85,6 @@
     state: running
   loop: "{{ clone_nodes }}"
 
----
 - name: Wait for all msrlv VMs to obtain a DHCP lease
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
@@ -123,6 +122,7 @@
 - name: Collect final mapping of Name to IP
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
+    # Re-run once to get the final list for Ansible looping
     for i in $(virsh list --all | grep msrlv | awk '{print $2}'); do 
       MAC=$(virsh domiflist $i | grep br-nat | awk '{print $NF}')
       IP=$(virsh net-dhcp-leases br-nat | grep "$MAC" | awk '{print $6}' | sed 's/\/24$//')
@@ -133,7 +133,6 @@
 
 - name: Trigger configuration for discovered VMs
   include_tasks: node_config.yml
-  # We pull the output from the first host in the kvm group
   loop: "{{ hostvars[groups['kvm'][0]].kvm_ips_output.stdout_lines | default([]) }}"
   loop_control:
     loop_var: vm_mapping
