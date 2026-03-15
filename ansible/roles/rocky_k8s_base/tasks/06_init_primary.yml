@@ -1,4 +1,10 @@
 ---
+- name: set provider_ip from control_nodes
+  set_fact:
+    provider_ip: "{{ hostvars[groups['control_nodes'][0]]['provision_ip'] }}"
+  run_once: true
+
+
 - name: Initialize Kubernetes Cluster on Primary Master
   become: true
   shell: |
