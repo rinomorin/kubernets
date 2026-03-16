@@ -25,6 +25,10 @@
   register: gold_ip
   delegate_to: "{{ VM_HOST_IP }}"
 
+- name: wait 20 seconds
+  delay: 20
+  delegate_to: localhost
+
 - set_fact:
     golden_ip: "{{ gold_ip.stdout }}"
 
