@@ -41,7 +41,7 @@
   delegate_to: localhost
   run_once: true
   shell: >
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR
+    ssh -v -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR
     core@{{ hostvars[groups['control_nodes'][0]]['provision_ip'] }}
     # ... after repo creation ...
     sudo dnf makecache
