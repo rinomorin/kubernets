@@ -26,7 +26,7 @@
   delegate_to: "{{ VM_HOST_IP }}"
 
 - name: wait 20 seconds
-  delay: 20
+  shell: sleep 20
   delegate_to: localhost
 
 - set_fact:
