@@ -1,73 +1,24 @@
-- name: show init command
-  debug:
-    msg: |
-      ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
-      core@{{ hostvars[groups['control_nodes'][0]]['provision_ip'] }} << 'EOF'
-      # 1. Kernel Prerequisites
-      cat << 'SYS' | sudo tee /etc/sysctl.d/k8s.conf
-      net.bridge.bridge-nf-call-iptables  = 1
-      net.bridge.bridge-nf-call-ip6tables = 1
-      net.ipv4.ip_forward                 = 1
-      SYS
-      sudo sysctl --system
-
-      # 2. Ensure CRI-O and Kubelet are running
-      sudo systemctl enable --now crio || sudo systemctl enable --now cri-o
-      sudo systemctl enable --now kubelet
-
-      # 3. Initialize K8s
-      if [ ! -f /etc/kubernetes/admin.conf ]; then
-        sudo kubeadm init \
-          --control-plane-endpoint "{{ hostvars[groups['control_nodes'][0]]['hostname'].split('.')[0] }}:6443" \
-          --upload-certs \
-          --pod-network-cidr=10.244.0.0/16 \
-          --apiserver-advertise-address={{ hostvars[groups['control_nodes'][0]]['provision_ip'] }} \
-          --cri-socket unix:///var/run/crio/crio.sock \
-          --ignore-preflight-errors=Swap,SystemVerification
-        
-        echo "INITIALIZED_SUCCESS"
-      fi
-
-      # 4. Config Setup
-      mkdir -p $HOME/.kube
-      sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config
-      sudo chown $(id -u):$(id -g) $HOME/.kube/config
-
-      # 5. Network Setup (Flannel)
-      kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
-      EOF
 
 - name: "Initialize Primary Master Cluster"
   delegate_to: localhost
   run_once: true
   shell: >
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR core@10.0.0.31 "
-    # 1. Load Modules
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR core@{{ hostvars[groups['control_nodes'][0]]['provision_ip'] }} "
     sudo modprobe overlay && sudo modprobe br_netfilter;
-    
-    # 2. Sysctl Params
     printf 'net.bridge.bridge-nf-call-iptables = 1\nnet.bridge.bridge-nf-call-ip6tables = 1\nnet.ipv4.ip_forward = 1\n' | sudo tee /etc/sysctl.d/k8s.conf;
     sudo sysctl --system;
-
-    # 3. Disable Firewalld (Critical for Rocky 9 API Server access)
     sudo systemctl disable --now firewalld;
-
-    # 4. Install Packages (This was the missing piece)
     sudo dnf makecache;
     sudo dnf install -y cri-o kubeadm kubelet kubectl;
-
-    # 5. Enable Services
     sudo systemctl daemon-reload;
     sudo systemctl enable --now crio;
     sudo systemctl enable --now kubelet;
-
-    # 6. Initialize Cluster
     if [ ! -f /etc/kubernetes/admin.conf ]; then
       sudo kubeadm init \
-        --control-plane-endpoint 'msrlv9mast01:6443' \
+        --control-plane-endpoint '{{ hostvars[groups['control_nodes'][0]]['hostname'].split(".")[0] }}:6443' \
         --upload-certs \
         --pod-network-cidr=10.244.0.0/16 \
-        --apiserver-advertise-address=10.0.0.31 \
+        --apiserver-advertise-address={{ hostvars[groups['control_nodes'][0]]['provision_ip'] }} \
         --cri-socket unix:///var/run/crio/crio.sock \
         --ignore-preflight-errors=Swap,SystemVerification;
     else
