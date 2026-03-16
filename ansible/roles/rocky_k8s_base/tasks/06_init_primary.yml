@@ -28,14 +28,15 @@
         echo "INITIALIZED_SUCCESS"
       fi
 
-    # 4. Config Setup
-    mkdir -p $HOME/.kube
-    sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config
-    sudo chown $(id -u):$(id -g) $HOME/.kube/config
+      # 4. Config Setup
+      mkdir -p $HOME/.kube
+      sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config
+      sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
-    # 5. Network Setup (Flannel)
-    kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
-    EOF
+      # 5. Network Setup (Flannel)
+      kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+      EOF
+
 - name: "Initialize Primary Master Cluster"
   delegate_to: localhost
   run_once: true
