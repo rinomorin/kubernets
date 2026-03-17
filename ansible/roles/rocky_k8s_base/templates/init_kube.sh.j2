@@ -29,10 +29,10 @@ else
     SVC_NAME="crio"
 fi
 
-systemctl stop $SVC_NAME || true
-systemctl start $SVC_NAME
-systemctl enable $SVC_NAME
-systemctl restart kubelet
+#systemctl stop $SVC_NAME || true
+#systemctl start $SVC_NAME
+#systemctl enable $SVC_NAME
+#systemctl restart kubelet
 
 echo "--- Validating Socket ---"
 for i in {1..10}; do
