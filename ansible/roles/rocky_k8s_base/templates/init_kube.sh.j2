@@ -2,8 +2,10 @@
 # Ansible managed: Kubernetes initialization script for {{ inventory_hostname }}
 set -e 
 
-# Define the short name for the endpoint
-{% set short_name = control_nodes[0].hostname.split('.')[0] %}
+# 1. Get the name of the first master host from the control_nodes group
+{% set first_master = groups['control_nodes'][0] %}
+# 2. Get that host's defined hostname and split it to get the short name
+{% set short_name = hostvars[first_master]['hostname'].split('.')[0] %}
 
 echo "--- Loading Kernel Modules ---"
 sudo modprobe overlay
@@ -35,7 +37,7 @@ for i in {1..20}; do
 done
 
 if [ ! -f /etc/kubernetes/admin.conf ]; then
-    echo "--- Initializing Cluster with Kubeadm ---"
+    echo "--- Initializing Cluster ---"
     sudo kubeadm init \
       --control-plane-endpoint '{{ short_name }}:6443' \
       --upload-certs \
