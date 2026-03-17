@@ -10,11 +10,18 @@
         dest: "/tmp/init_kube_{{ inventory_hostname }}.sh"
         mode: '0755'
 
-    - name: Transfer and Execute
+    - name: Transfer and Execute K8s Init
+      delegate_to: localhost
+      # Use the provision_ip specific to the host being processed
+      vars:
+        ssh_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
       shell: |
-        scp -o StrictHostKeyChecking=no /tmp/init_kube_{{ inventory_hostname }}.sh core@{{ provision_ip }}:/home/core/init_kube.sh
-        ssh -o StrictHostKeyChecking=no core@{{ provision_ip }} "bash /home/core/init_kube.sh"
+        scp {{ ssh_args }} /tmp/init_kube_{{ inventory_hostname }}.sh core@{{ provision_ip }}:/home/core/init_kube.sh
+        ssh {{ ssh_args }} core@{{ provision_ip }} "bash /home/core/init_kube.sh"
       register: kube_init_result
+      # Run only on the first master for the actual 'init' 
+      # (If you want to run prep on all, remove the 'when' and split the tasks)
+      when: inventory_hostname == groups['control_nodes'][0]
 
     - name: Debug Output
       debug:
