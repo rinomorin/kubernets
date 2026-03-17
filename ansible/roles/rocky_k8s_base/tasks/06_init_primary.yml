@@ -9,7 +9,7 @@
         dest: "/tmp/init_kube_master.sh"
         mode: '0755'
 
-    - name: Transfer and Execute K8s Init via SSH
+    - name: Transfer K8s Init via SSH
       vars:
         ssh_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
         # Explicitly pull the target IP from the master node's hostvars
@@ -17,7 +17,16 @@
         target_ip: "{{ hostvars[master_node]['provision_ip'] }}"
       shell: |
         scp {{ ssh_args }} /tmp/init_kube_master.sh core@{{ target_ip }}:/home/core/init_kube.sh
-        ssh {{ ssh_args }} core@{{ target_ip }} "sudo bash /home/core/init_kube.sh"
+      register: kube_init_result
+
+    - name: Execute K8s Init via SSH
+      vars:
+        ssh_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
+        # Explicitly pull the target IP from the master node's hostvars
+        master_node: "{{ groups['control_nodes'][0] }}"
+        target_ip: "{{ hostvars[master_node]['provision_ip'] }}"
+      shell: |
+        ssh {{ ssh_args }} core@{{ target_ip }} "sudo /home/core/init_kube.sh"
       register: kube_init_result
 
     - name: Debug Output
