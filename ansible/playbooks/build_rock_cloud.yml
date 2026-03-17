@@ -14,6 +14,19 @@
         - kubernetes.core  # Highly recommended for your FCOS/K8s work
       changed_when: false # These commands check for updates every time
 
+    - name: Configure local SSH to auto-accept lab keys
+      delegate_to: localhost
+      blockinfile:
+        path: "~/.ssh/config"
+        create: yes
+        mode: '0600'
+        block: |
+          # Lab Environment Auto-Accept
+          Host 172.16.0.* 10.0.0.* 192.168.100.*
+              StrictHostKeyChecking accept-new
+              UserKnownHostsFile ~/.ssh/known_hosts_lab
+              LogLevel ERROR
+
     - name: load environment
       set_fact:
         VM_HOST: "{{ lookup('env','VM_HOST')}}"

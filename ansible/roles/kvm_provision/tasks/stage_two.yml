@@ -67,7 +67,7 @@
   until: (ssh_check.stdout | default('')) == "sshok"
   retries: "{{ build_loops|int }}"
   delay: 10          # 10 seconds between attempts
-  no_log: true
+  # no_log: true
 
 - name: Mark VM as ready
   set_fact:

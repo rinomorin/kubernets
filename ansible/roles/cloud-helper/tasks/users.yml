@@ -24,8 +24,6 @@
     - "{{ secure_group }}"
     - "sshusers"
 
-    - "sshusers"
-
 - name: Pre-create Ansible temporary directory for cloud_helper
   become: true
   file:

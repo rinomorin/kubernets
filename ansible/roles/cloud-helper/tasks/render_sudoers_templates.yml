@@ -187,6 +187,15 @@
       register: sudo_shell_check
       failed_when: "'SUDO_SHELL_OK' not in sudo_shell_check.stdout"
       become: true
+
+    - name: Verify sudo shell/su access on guest
+      shell: |
+        # Check privileges for the secops user specifically (as root)
+        sudo -l -U {{ cloud_helper_user }} | grep -E '(su|/bin/sh|/usr/bin/sh)' 2>/dev/null && echo "SUDO_SHELL_OK" || echo "SUDO_SHELL_FAIL"
+      register: sudo_shell_check
+      # Ensure we only care about the last line to ignore banner noise
+      failed_when: "'SUDO_SHELL_OK' not in sudo_shell_check.stdout_lines"
+      become: true
   when: not all_files_match
 
 - name: Remove temporary sudoers scaffolding

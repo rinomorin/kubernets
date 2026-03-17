@@ -1,6 +1,6 @@
 all:
   vars:
-    ansible_user: cloud_helper
+    ansible_user: secops
 
   hosts:
     helper: 
@@ -8,8 +8,8 @@ all:
       hostname: helper.home.morinsoft.ca 
       provider_ip: 192.168.100.20
       provision_ip: 10.0.0.20 
-      ansible_user: cloud_helper
-      ansible_ssh_user: cloud_helper
+      # ansible_user: cloud_helper
+      # ansible_ssh_user: cloud_helper
 
     msrlv9mast01: 
       ansible_user: core

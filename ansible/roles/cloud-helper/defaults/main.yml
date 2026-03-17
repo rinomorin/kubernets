@@ -69,7 +69,6 @@ ipa_admin_principal:  "{{ lookup('env', 'ipa_admin_principal')}}"
 # default system info
 vcpu: "{{ lookup('env', 'VM_CPU') | default(4,true) }}"
 ram: "{{ lookup('env', 'VM_MEM') | default(4096,true) }}"
-# iso: "/var/lib/libvirt/images/Rocky-9.6-x86_64-dvd.iso"
 default_network: "default"
 os_variant: "rocky9"
 shutdown_max_timeout: 1800

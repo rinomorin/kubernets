@@ -14,7 +14,7 @@
         | list
       }}
   run_once: true
-  delegate_to: kvmdc01
+  delegate_to: "{{ kvm_delegate }}"
 
 - name: Share and merge final_vm_order with all hosts
   set_fact:
@@ -29,7 +29,12 @@
     - hostvars['kvmdc01']['final_vm_order'] is defined
     - inventory_hostname != 'kvmdc01'
 
+- name: show final_vm_order
+  debug:
+    msg: "{{ final_vm_order }}"
+
 - name: Conditionally start VM if defined and not running
+  when: "'kvm' in groups"
   shell: |
     if virsh dominfo {{ vm_host2 }} >/dev/null 2>&1; then
       state=$(virsh domstate {{ vm_host2 }} | tr -d '\r')
@@ -46,7 +51,7 @@
   loop_control:
     loop_var: vm_host2
     label: "{{ vm_host2 }}"
-  delegate_to: kvmdc01
+  delegate_to: "{{ kvm_delegate }}"
   become: true
   changed_when: "'already running' not in vm_start.stdout and 'not defined' not in vm_start.stdout"
   failed_when: false

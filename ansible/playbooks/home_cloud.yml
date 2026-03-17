@@ -4,6 +4,7 @@
   tasks:
     - name: load environment
       set_fact:
+        VM_HOST: "{{ lookup('env','VM_HOST')}}"
         ipa_domain: "{{ lookup('env', 'ipa_domain') }}"
         dns_zone: "{{ lookup('env', 'dns_zone') }}"
         admin_id: "{{ lookup('env', 'admin_id') }}"
@@ -82,4 +83,4 @@
 # - hosts: helpers
 #   gather_facts: false
 #   roles:
-#     - helper_node_prepare
+#     - 

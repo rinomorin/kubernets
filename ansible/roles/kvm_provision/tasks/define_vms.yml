@@ -299,6 +299,12 @@
     my_os_variant: "{{ os_variant }}"
   no_log: true
 
+- name: show iso
+  debug:
+    msg: |
+      iso = {{ iso }}
+      iso env = {{ lookup('env', 'iso_path') }}
+
 - name: Execute virt-install non-interactively and wait for completion
   when: 
     - not existing_vms
