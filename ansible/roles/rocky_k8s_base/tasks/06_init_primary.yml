@@ -1,31 +1,25 @@
 - name: Render and Run K8s Init
   delegate_to: localhost
-  vars:
-    # Ensure this matches your variable structure
-    provision_ip: "10.0.0.31" 
   block:
-    - name: Render script
+    - name: Render script locally
       template:
         src: init_kube.sh.j2
         dest: "/tmp/init_kube_{{ inventory_hostname }}.sh"
         mode: '0755'
 
-    - name: Transfer and Execute K8s Init
-      delegate_to: localhost
-      # Use the provision_ip specific to the host being processed
+    - name: Transfer and Execute K8s Init via Sudo
       vars:
         ssh_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
       shell: |
         scp {{ ssh_args }} /tmp/init_kube_{{ inventory_hostname }}.sh core@{{ provision_ip }}:/home/core/init_kube.sh
-        ssh {{ ssh_args }} core@{{ provision_ip }} "bash /home/core/init_kube.sh"
+        ssh {{ ssh_args }} core@{{ provision_ip }} "sudo bash /home/core/init_kube.sh"
       register: kube_init_result
-      # Run only on the first master for the actual 'init' 
-      # (If you want to run prep on all, remove the 'when' and split the tasks)
       when: inventory_hostname == groups['control_nodes'][0]
 
     - name: Debug Output
       debug:
         var: kube_init_result.stdout_lines
+      when: kube_init_result is defined
 
 - name: "Show Initialization Output"
   debug:
