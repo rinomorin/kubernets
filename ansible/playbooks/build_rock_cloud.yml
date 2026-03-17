@@ -16,6 +16,7 @@
 
     - name: Configure local SSH to auto-accept lab keys
       delegate_to: localhost
+      become: false
       blockinfile:
         path: "~/.ssh/config"
         create: yes
