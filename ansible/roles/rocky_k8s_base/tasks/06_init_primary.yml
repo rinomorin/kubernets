@@ -12,6 +12,7 @@
   delegate_to: localhost
   run_once: true
   shell: |
+    source /etc/profile
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR core@10.0.0.31 << 'EOF'
       sudo systemctl disable --now firewalld
       # sudo systemctl daemon-reload
