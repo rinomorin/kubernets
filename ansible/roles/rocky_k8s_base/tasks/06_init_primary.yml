@@ -22,11 +22,11 @@
 
     - name: Debug Output
       debug:
-        var: kube_init_result.stdout_lines
+        var: kube_init_result
 
 - name: "Show Initialization Output"
   debug:
-    msg: "{{ init_result.stdout_lines }}"
+    msg: "{{ kube_init_result.stdout }}"
   run_once: true
 - name: "Capture Join Commands"
   delegate_to: localhost
