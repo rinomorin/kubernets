@@ -1,37 +1,24 @@
-- name: Set Kubernetes sysctl flags
+- name: Render and Run K8s Init
   delegate_to: localhost
-  run_once: true
-  shell: |
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR core@10.0.0.31 << 'EOF'
-      sudo modprobe overlay && sudo modprobe br_netfilter
-      printf 'net.bridge.bridge-nf-call-iptables = 1\nnet.bridge.bridge-nf-call-ip6tables = 1\nnet.ipv4.ip_forward = 1\n' | sudo tee /etc/sysctl.d/k8s.conf
-      sudo sysctl --system
-    EOF
-  
-- name: "Initialize Primary Master Cluster"
-  delegate_to: localhost
-  run_once: true
-  shell: |
-    source /etc/profile
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR core@10.0.0.31 << 'EOF'
-      sudo systemctl disable --now firewalld
-      # sudo systemctl daemon-reload
-      # sudo systemctl enable --now crio || sudo systemctl enable --now cri-o
-      # sudo systemctl enable --now kubelet
+  vars:
+    # Ensure this matches your variable structure
+    provision_ip: "10.0.0.31" 
+  block:
+    - name: Render script
+      template:
+        src: init_kube.sh.j2
+        dest: "/tmp/init_kube_{{ inventory_hostname }}.sh"
+        mode: '0755'
 
-      if [ ! -f /etc/kubernetes/admin.conf ]; then 
-        sudo kubeadm init \
-          --control-plane-endpoint 'msrlv9mast01:6443' \
-          --upload-certs \
-          --pod-network-cidr=10.244.0.0/16 \
-          --apiserver-advertise-address=10.0.0.31 \
-          --cri-socket unix:///var/run/crio/crio.sock \
-          --ignore-preflight-errors=Swap,SystemVerification
-      else 
-        echo 'ALREADY_INITIALIZED'
-      fi
-    EOF
-  register: init_result
+    - name: Transfer and Execute
+      shell: |
+        scp -o StrictHostKeyChecking=no /tmp/init_kube_{{ inventory_hostname }}.sh core@{{ provision_ip }}:/home/core/init_kube.sh
+        ssh -o StrictHostKeyChecking=no core@{{ provision_ip }} "bash /home/core/init_kube.sh"
+      register: kube_init_result
+
+    - name: Debug Output
+      debug:
+        var: kube_init_result.stdout_lines
 
 - name: "Show Initialization Output"
   debug:
