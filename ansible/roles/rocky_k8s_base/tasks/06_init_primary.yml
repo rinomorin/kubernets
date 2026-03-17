@@ -12,7 +12,24 @@
   delegate_to: localhost
   run_once: true
   shell: |
-     
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR core@10.0.0.31 << 'EOF'
+      sudo systemctl disable --now firewalld
+      # sudo systemctl daemon-reload
+      # sudo systemctl enable --now crio || sudo systemctl enable --now cri-o
+      # sudo systemctl enable --now kubelet
+
+      if [ ! -f /etc/kubernetes/admin.conf ]; then 
+        sudo kubeadm init \
+          --control-plane-endpoint 'msrlv9mast01:6443' \
+          --upload-certs \
+          --pod-network-cidr=10.244.0.0/16 \
+          --apiserver-advertise-address=10.0.0.31 \
+          --cri-socket unix:///var/run/crio/crio.sock \
+          --ignore-preflight-errors=Swap,SystemVerification
+      else 
+        echo 'ALREADY_INITIALIZED'
+      fi
+    EOF
   register: init_result
 
 - name: "Show Initialization Output"
