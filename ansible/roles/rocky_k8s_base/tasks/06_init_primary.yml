@@ -1,7 +1,7 @@
 - name: Render and Run K8s Init
   delegate_to: localhost
   # This ensures the task only runs when Ansible is iterating over the helper
-  when: "'helper_nodes' in group_names"
+  when: inventory_hostname == hostvars[groups['control_nodes'][0]]['inventory_hostname']
   block:
     - name: Render script locally on helper
       template:
