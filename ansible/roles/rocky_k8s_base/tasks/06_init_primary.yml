@@ -1,25 +1,28 @@
 - name: Render and Run K8s Init
   delegate_to: localhost
+  # This ensures the task only runs when Ansible is iterating over the helper
+  when: "'helper_nodes' in group_names"
   block:
-    - name: Render script locally
+    - name: Render script locally on helper
       template:
         src: init_kube.sh.j2
-        dest: "/tmp/init_kube_{{ inventory_hostname }}.sh"
+        dest: "/tmp/init_kube_master.sh"
         mode: '0755'
 
-    - name: Transfer and Execute K8s Init via Sudo
+    - name: Transfer and Execute K8s Init via SSH
       vars:
         ssh_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
+        # Explicitly pull the target IP from the master node's hostvars
+        master_node: "{{ groups['control_nodes'][0] }}"
+        target_ip: "{{ hostvars[master_node]['provision_ip'] }}"
       shell: |
-        scp {{ ssh_args }} /tmp/init_kube_{{ inventory_hostname }}.sh core@{{ provision_ip }}:/home/core/init_kube.sh
-        ssh {{ ssh_args }} core@{{ provision_ip }} "sudo bash /home/core/init_kube.sh"
+        scp {{ ssh_args }} /tmp/init_kube_master.sh core@{{ target_ip }}:/home/core/init_kube.sh
+        ssh {{ ssh_args }} core@{{ target_ip }} "sudo bash /home/core/init_kube.sh"
       register: kube_init_result
-      when: inventory_hostname == groups['control_nodes'][0]
 
     - name: Debug Output
       debug:
         var: kube_init_result.stdout_lines
-      when: kube_init_result is defined
 
 - name: "Show Initialization Output"
   debug:

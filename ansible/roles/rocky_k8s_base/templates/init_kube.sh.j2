@@ -1,9 +1,10 @@
 #!/bin/bash
-# Ansible managed: K8s Init for {{ inventory_hostname }}
+# Ansible managed: K8s Init
 set -e 
 
-{% set first_master = groups['control_nodes'][0] %}
-{% set short_name = hostvars[first_master]['hostname'].split('.')[0] %}
+{% set master_node = groups['control_nodes'][0] %}
+{% set master_ip = hostvars[master_node]['provision_ip'] %}
+{% set master_short_name = hostvars[master_node]['hostname'].split('.')[0] %}
 
 echo "--- Loading Kernel Modules ---"
 modprobe overlay
@@ -21,8 +22,14 @@ echo "--- Managing Services ---"
 systemctl disable --now firewalld || true
 systemctl daemon-reload
 
-SVC_NAME="crio"
-systemctl stop $SVC_NAME
+# Determine service name (handles Rocky/RHEL variants)
+if systemctl list-unit-files | grep -q "^cri-o.service"; then
+    SVC_NAME="cri-o"
+else
+    SVC_NAME="crio"
+fi
+
+systemctl stop $SVC_NAME || true
 systemctl start $SVC_NAME
 systemctl enable $SVC_NAME
 systemctl restart kubelet
@@ -31,20 +38,21 @@ echo "--- Validating Socket ---"
 for i in {1..10}; do
     if [ -S /var/run/crio/crio.sock ]; then
         SOCK="unix:///var/run/crio/crio.sock"
-        echo "Socket found: $SOCK"
+        break
+    elif [ -S /var/run/cri-o/cri-o.sock ]; then
+        SOCK="unix:///var/run/cri-o/cri-o.sock"
         break
     fi
-    echo "Waiting for socket... $i"
     sleep 1
 done
 
 if [ ! -f /etc/kubernetes/admin.conf ]; then
     echo "--- Initializing Cluster ---"
     kubeadm init \
-      --control-plane-endpoint '{{ short_name }}:6443' \
+      --control-plane-endpoint '{{ master_short_name }}:6443' \
       --upload-certs \
       --pod-network-cidr=10.244.0.0/16 \
-      --apiserver-advertise-address={{ provision_ip }} \
+      --apiserver-advertise-address={{ master_ip }} \
       --cri-socket ${SOCK:-unix:///var/run/crio/crio.sock} \
       --ignore-preflight-errors=Swap,SystemVerification
 else
