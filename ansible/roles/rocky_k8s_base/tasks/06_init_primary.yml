@@ -1,74 +1,46 @@
-- name: Render and Run K8s Init
-  delegate_to: localhost
-  # This ensures the task only runs when Ansible is iterating over the helper
-  when: inventory_hostname == hostvars[groups['control_nodes'][0]]['inventory_hostname']
-  block:
-    - name: Render script locally on helper
-      template:
-        src: init_kube.sh.j2
-        dest: "/tmp/init_kube_master.sh"
+---
+- name: Prepare Manual Initialization
+  hosts: msrlv9mast01
+  become: true
+  tasks:
+    - name: Ensure Swap is off (Permanent)
+      replace:
+        path: /etc/fstab
+        regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+        replace: '# \1'
+
+    - name: Disable swap immediately
+      command: swapoff -a
+
+    - name: Create the final init script
+      copy:
+        dest: /home/core/manual_k8s_init.sh
         mode: '0755'
+        owner: core
+        group: core
+        content: |
+          #!/bin/bash
+          echo "--- Disabling Firewalld ---"
+          sudo systemctl disable --now firewalld
+          
+          echo "--- Ensuring CRI-O is active ---"
+          sudo systemctl enable --now crio
+          
+          echo "--- Initializing Cluster ---"
+          sudo kubeadm init \
+            --control-plane-endpoint 'msrlv9mast01:6443' \
+            --upload-certs \
+            --pod-network-cidr=10.244.0.0/16 \
+            --apiserver-advertise-address=10.0.0.31 \
+            --cri-socket unix:///var/run/crio/crio.sock \
+            --ignore-preflight-errors=Swap,SystemVerification
 
-    - name: Transfer K8s Init via SSH
-      vars:
-        ssh_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
-        # Explicitly pull the target IP from the master node's hostvars
-        master_node: "{{ groups['control_nodes'][0] }}"
-        target_ip: "{{ hostvars[master_node]['provision_ip'] }}"
-      shell: |
-        rm -f ~/.ssh/known_hosts_lab
-        scp {{ ssh_args }} /tmp/init_kube_master.sh core@{{ target_ip }}:/home/core/init_kube.sh
-      register: kube_init_result
-
-    - name: Execute K8s Init via SSH
-      vars:
-        ssh_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
-        # Explicitly pull the target IP from the master node's hostvars
-        master_node: "{{ groups['control_nodes'][0] }}"
-        target_ip: "{{ hostvars[master_node]['provision_ip'] }}"
-      shell: |
-        rm -f ~/.ssh/known_hosts_lab
-        ssh {{ ssh_args }} core@{{ target_ip }} "sudo /home/core/init_kube.sh"
-      register: kube_init_result
-
-    - name: Debug Output
+    - name: Final Instructions
       debug:
-        var: kube_init_result
-
-- name: "Show Initialization Output"
-  debug:
-    msg: "{{ kube_init_result.stdout }}"
-  run_once: true
-- name: "Capture Join Commands"
-  delegate_to: localhost
-  run_once: true
-  shell: |
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
-    core@{{ hostvars[groups['control_nodes'][0]]['provision_ip'] }} << 'EOF'
-    M_TOKEN=$(sudo kubeadm token create --print-join-command)
-    CERT_KEY=$(sudo kubeadm init phase upload-certs --upload-certs | tail -1)
-    echo "MASTER_JOIN=${M_TOKEN} --control-plane --certificate-key ${CERT_KEY}"
-    echo "WORKER_JOIN=$(sudo kubeadm token create --print-join-command)"
-    EOF
-  register: join_cmds_raw
-
-- name: show join_cmds_raw
-  debug:
-    msg: "{{ join_cmds_raw.stdout }}"
-
-- name: "Set Global Join Facts"
-  set_fact:
-    master_join_cmd: "{{ join_cmds_raw.stdout_lines | select('match', '^MASTER_JOIN=') | first | replace('MASTER_JOIN=', '') }}"
-    worker_join_cmd: "{{ join_cmds_raw.stdout_lines | select('match', '^WORKER_JOIN=') | first | replace('WORKER_JOIN=', '') }}"
-  delegate_to: localhost
-  delegate_facts: true
-  run_once: true
-
-- name: show *_join_cmd
-  debug:
-    msg: |
-      MASTER_JOIN: "{{ master_join_cmd }}"
-      WORKER_JOIN: "{{ worker_join_cmd }}"
-
-
-
+        msg: 
+          - "=========================================================="
+          - "READY FOR MANUAL INITIALIZATION"
+          - "1. SSH to the node: ssh core@10.0.0.31"
+          - "2. Run this script: /home/core/manual_k8s_init.sh"
+          - "3. Copy the 'kubeadm join' commands from the output!"
+          - "=========================================================="
