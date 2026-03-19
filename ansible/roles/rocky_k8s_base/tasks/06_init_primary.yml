@@ -1,43 +1,42 @@
 ---
-- name: Ensure Swap is off (Permanent)
-  replace:
-    path: /etc/fstab
-    regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
-    replace: '# \1'
+- name: Prepare Manual Initialization (Primary Master)
+  block:
+    - name: Ensure Swap is off (Permanent)
+      replace:
+        path: /etc/fstab
+        regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+        replace: '# \1'
 
-- name: Disable swap immediately
-  command: swapoff -a
-  ignore_errors: true
+    - name: Disable swap immediately
+      command: swapoff -a
+      ignore_errors: true
 
-- name: Create the manual init script
-  copy:
-    dest: /home/core/manual_k8s_init.sh
-    mode: '0755'
-    owner: core
-    group: core
-    content: |
-      #!/bin/bash
-      echo "--- Disabling Firewalld ---"
-      sudo systemctl disable --now firewalld
-      
-      echo "--- Ensuring CRI-O is active ---"
-      sudo systemctl enable --now crio
-      
-      echo "--- Initializing Cluster ---"
-      sudo kubeadm init \
-        --control-plane-endpoint 'msrlv9mast01:6443' \
-        --upload-certs \
-        --pod-network-cidr=10.244.0.0/16 \
-        --apiserver-advertise-address=10.0.0.31 \
-        --cri-socket unix:///var/run/crio/crio.sock \
-        --ignore-preflight-errors=Swap,SystemVerification
+    - name: Create the manual init script
+      copy:
+        dest: /home/core/manual_k8s_init.sh
+        mode: '0755'
+        owner: core
+        group: core
+        content: |
+          #!/bin/bash
+          echo "--- Disabling Firewalld ---"
+          sudo systemctl disable --now firewalld
+          echo "--- Ensuring CRI-O is active ---"
+          sudo systemctl enable --now crio
+          echo "--- Initializing Cluster ---"
+          sudo kubeadm init \
+            --control-plane-endpoint '{{ hostvars[groups["control_nodes"][0]].inventory_hostname }}:6443' \
+            --upload-certs \
+            --pod-network-cidr=10.244.0.0/16 \
+            --apiserver-advertise-address={{ hostvars[groups["control_nodes"][0]].ansible_host }} \
+            --cri-socket unix:///var/run/crio/crio.sock \
+            --ignore-preflight-errors=Swap,SystemVerification
 
-- name: Final Instructions
-  debug:
-    msg: 
-      - "=========================================================="
-      - "READY FOR MANUAL INITIALIZATION ON {{ inventory_hostname }}"
-      - "1. SSH to the node: ssh core@{{ ansible_host | default('10.0.0.31') }}"
-      - "2. Run this script: sudo /home/core/manual_k8s_init.sh"
-      - "3. Copy the 'kubeadm join' commands from the output!"
-      - "=========================================================="
+    - name: Final Instructions for Master
+      debug:
+        msg: 
+          - "=========================================================="
+          - "RUN ON PRIMARY MASTER: {{ inventory_hostname }}"
+          - "Command: sudo /home/core/manual_k8s_init.sh"
+          - "=========================================================="
+  when: inventory_hostname == groups['control_nodes'][0]
