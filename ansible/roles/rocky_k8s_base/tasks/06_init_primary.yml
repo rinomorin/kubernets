@@ -7,11 +7,7 @@
         regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
         replace: '# \1'
 
-    - name: Disable swap immediately
-      command: swapoff -a
-      ignore_errors: true
-
-    - name: Create the manual init script
+    - name: Create the manual init script with Auto-Display
       copy:
         dest: /home/core/manual_k8s_init.sh
         mode: '0755'
@@ -19,24 +15,46 @@
         group: core
         content: |
           #!/bin/bash
-          echo "--- Disabling Firewalld ---"
+          echo "--- Cleaning and Disabling Firewalld ---"
           sudo systemctl disable --now firewalld
+          sudo kubeadm reset -f
+          
           echo "--- Ensuring CRI-O is active ---"
           sudo systemctl enable --now crio
+          
           echo "--- Initializing Cluster ---"
+          # Capture the output to pull variables later
           sudo kubeadm init \
             --control-plane-endpoint '{{ hostvars[groups["control_nodes"][0]].inventory_hostname }}:6443' \
             --upload-certs \
             --pod-network-cidr=10.244.0.0/16 \
             --apiserver-advertise-address={{ hostvars[groups["control_nodes"][0]].ansible_host }} \
             --cri-socket unix:///var/run/crio/crio.sock \
-            --ignore-preflight-errors=Swap,SystemVerification
+            --ignore-preflight-errors=Swap,SystemVerification | tee /tmp/kubeadm_output
+          
+          # Extract variables from the output
+          TOKEN=$(grep "kubeadm join" /tmp/kubeadm_output | head -n 1 | awk '{print $5}')
+          HASH=$(grep "sha256:" /tmp/kubeadm_output | head -n 1 | awk '{print $2}')
+          CERT_KEY=$(grep -A 1 "upload-certs" /tmp/kubeadm_output | tail -n 1 | xargs)
 
-    - name: Final Instructions for Master
+          echo -e "\n\n=========================================================="
+          echo "K8S INITIALIZATION COMPLETE"
+          echo "=========================================================="
+          echo -e "\n--- COPY THIS FOR SECONDARY MASTERS ---"
+          echo "sudo kubeadm join {{ hostvars[groups['control_nodes'][0]].ansible_host }}:6443 \\"
+          echo "  --token $TOKEN \\"
+          echo "  --discovery-token-ca-cert-hash $HASH \\"
+          echo "  --control-plane --certificate-key $CERT_KEY \\"
+          echo "  --ignore-preflight-errors=Swap,SystemVerification"
+
+          echo -e "\n--- COPY THIS FOR WORKER NODES ---"
+          echo "sudo kubeadm join {{ hostvars[groups['control_nodes'][0]].ansible_host }}:6443 \\"
+          echo "  --token $TOKEN \\"
+          echo "  --discovery-token-ca-cert-hash $HASH \\"
+          echo "  --ignore-preflight-errors=Swap,SystemVerification"
+          echo -e "==========================================================\n"
+
+    - name: Instructions for Master
       debug:
-        msg: 
-          - "=========================================================="
-          - "RUN ON PRIMARY MASTER: {{ inventory_hostname }}"
-          - "Command: sudo /home/core/manual_k8s_init.sh"
-          - "=========================================================="
+        msg: "Run this on {{ inventory_hostname }}: sudo /home/core/manual_k8s_init.sh"
   when: inventory_hostname == groups['control_nodes'][0]
