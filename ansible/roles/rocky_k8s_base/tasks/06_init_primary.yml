@@ -1,4 +1,30 @@
 ---
+---
+- name: Configure Firewalld via SSH (Bypass Python dependency)
+  vars:
+    opt1: "-o StrictHostKeyChecking=no"
+    opt2: "-o UserKnownHostsFile=/dev/null"
+    opt3: "-o ConnectTimeout=10"  # Good safety for unreachable nodes
+  shell: |
+    ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} core@{{ ansible_host }} \
+    "sudo systemctl enable --now firewalld && \
+     sudo firewall-cmd --permanent --add-port=10250/tcp --add-port=8472/udp \
+     {% if 'control_nodes' in group_names %}
+     --add-port=6443/tcp --add-port=2379-2380/tcp --add-port=10257/tcp --add-port=10259/tcp \
+     {% else %}
+     --add-port=30000-32767/tcp \
+     {% endif %}
+     && sudo firewall-cmd --reload"
+  delegate_to: localhost
+  register: firewall_out
+  # Since firewall-cmd usually returns "success", we track that for "changed" status
+  changed_when: "'success' in firewall_out.stdout or 'ALREADY_ENABLED' not in firewall_out.stderr"
+
+- name: Debug Firewall Output for {{ inventory_hostname }}
+  debug:
+    msg: "{{ firewall_out.stdout_lines }}"
+  when: firewall_out.stdout is defined
+
 - name: Prepare Manual Initialization (Primary Master)
   block:
     - name: Ensure Swap is off (Permanent)
@@ -15,15 +41,13 @@
         group: core
         content: |
           #!/bin/bash
-          echo "--- Cleaning and Disabling Firewalld ---"
-          sudo systemctl disable --now firewalld
           sudo kubeadm reset -f
           
           echo "--- Ensuring CRI-O is active ---"
           sudo systemctl enable --now crio
           
           echo "--- Initializing Cluster ---"
-          # Capture the output to pull variables later
+          # Capture the output to a temp file to extract tokens and keys
           sudo kubeadm init \
             --control-plane-endpoint '{{ hostvars[groups["control_nodes"][0]].inventory_hostname }}:6443' \
             --upload-certs \
@@ -32,15 +56,25 @@
             --cri-socket unix:///var/run/crio/crio.sock \
             --ignore-preflight-errors=Swap,SystemVerification | tee /tmp/kubeadm_output
           
-          # Extract variables from the output
+          # 1. Extract the Token (usually the 5th field in the join line)
           TOKEN=$(grep "kubeadm join" /tmp/kubeadm_output | head -n 1 | awk '{print $5}')
+          
+          # 2. Extract the Discovery Token CA Cert Hash
           HASH=$(grep "sha256:" /tmp/kubeadm_output | head -n 1 | awk '{print $2}')
-          CERT_KEY=$(grep -A 1 "upload-certs" /tmp/kubeadm_output | tail -n 1 | xargs)
+          
+          # 3. Extract the Certificate Key (look for line after the 'Using certificate key:' header)
+          CERT_KEY=$(grep -A 1 "Using certificate key:" /tmp/kubeadm_output | tail -n 1 | xargs)
+
+          # Fallback: If CERT_KEY is empty, search for any 64-character hex string in the file
+          if [ -z "$CERT_KEY" ] || [ ${#CERT_KEY} -lt 60 ]; then
+             CERT_KEY=$(grep -E '^[a-f0-9]{64}$' /tmp/kubeadm_output | head -n 1)
+          fi
 
           echo -e "\n\n=========================================================="
           echo "K8S INITIALIZATION COMPLETE"
           echo "=========================================================="
-          echo -e "\n--- COPY THIS FOR SECONDARY MASTERS ---"
+          
+          echo -e "\n--- COPY THIS FOR SECONDARY MASTERS (Control Plane) ---"
           echo "sudo kubeadm join {{ hostvars[groups['control_nodes'][0]].ansible_host }}:6443 \\"
           echo "  --token $TOKEN \\"
           echo "  --discovery-token-ca-cert-hash $HASH \\"
@@ -52,7 +86,7 @@
           echo "  --token $TOKEN \\"
           echo "  --discovery-token-ca-cert-hash $HASH \\"
           echo "  --ignore-preflight-errors=Swap,SystemVerification"
-          echo -e "==========================================================\n"
+          echo -e "\n==========================================================\n"
 
     - name: Instructions for Master
       debug:
