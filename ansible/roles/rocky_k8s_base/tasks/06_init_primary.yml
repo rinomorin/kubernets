@@ -1,5 +1,4 @@
 ---
----
 - name: Configure Firewalld via SSH (Bypass Python dependency)
   vars:
     opt1: "-o StrictHostKeyChecking=no"
