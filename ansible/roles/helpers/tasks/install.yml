@@ -9,6 +9,7 @@
       - samba-winbind-clients
       - ipa-server-trust-ad
     state: present
+    nobest: true
   register: ipa_install_result
   when: "'helpers' in group_names"
 

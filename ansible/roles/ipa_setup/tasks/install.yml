@@ -10,6 +10,7 @@
       - ipa-server-trust-ad
       - python3-pexpect
     state: present
+    nobest: true
   register: ipa_install_result
   when: "'ca' in group_names or 'ca_intermediate' in group_names"
 

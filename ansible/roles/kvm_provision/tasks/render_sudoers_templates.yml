@@ -158,11 +158,18 @@
         for f in /etc/sudoers.d/*; do visudo -cf "$f" || exit 1; done
 
     - name: Verify sudo shell/su access on guest
-      shell: |
-        sudo -l | grep -E '(su|/bin/sh|/usr/bin/sh)' && echo "SUDO_SHELL_OK" || echo "SUDO_SHELL_FAIL"
-      register: sudo_shell_check
-      failed_when: "'SUDO_SHELL_OK' not in sudo_shell_check.stdout"
       become: true
+      shell: |
+        if sudo -l | grep -E -q '(su|/bin/sh|/usr/bin/sh|ALL)'; then
+          echo "SUDO_SHELL_OK"
+        else
+          echo "SUDO_SHELL_FAIL"
+        fi
+      register: sudo_shell_check
+      failed_when: >
+        sudo_shell_check.stdout is not defined or 
+        "SUDO_SHELL_OK" not in sudo_shell_check.stdout
+
   when: not all_files_match
 
 - name: Remove temporary sudoers scaffolding

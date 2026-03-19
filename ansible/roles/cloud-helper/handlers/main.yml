@@ -9,7 +9,10 @@
     state: restarted
 
 - name: Restart IPA services
-  command: ipactl restart
+  become: true
+  service:
+    name: ipa
+    state: restarted
 
 - name: refresh_repos
   become: true

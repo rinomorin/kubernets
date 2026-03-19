@@ -8,6 +8,7 @@
   package:
     name: "{{ cloud_helper_packages }}"
     state: present
+    nobest: true
   become: true
 
 ###############################################################
@@ -19,6 +20,7 @@
       - python3
       - python3-pip
     state: present
+    nobest: true
   become: true
 
 - name: Ensure cloud_helper venv directory exists
@@ -61,5 +63,3 @@
     regexp: 'source {{ cloud_helper_workdir }}/venv/bin/activate'
     line: 'source {{ cloud_helper_workdir }}/venv/bin/activate'
     insertafter: EOF
-
-

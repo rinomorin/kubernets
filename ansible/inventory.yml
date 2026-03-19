@@ -1,6 +1,6 @@
 all:
   vars:
-    # ansible_user: secops
+    #ansible_user: secops
     ansible_user: cloud_helper
 
   hosts:
@@ -59,8 +59,8 @@ all:
     kvmdc01:
       ansible_host: 192.168.100.3
       hostname: kvmdc01.home.morinsoft.ca
-      ansible_user: cloud_helper
-      ansible_ssh_user: cloud_helper
+      # ansible_user: cloud_helper
+      # ansible_ssh_user: cloud_helper
     ipa01:
       ansible_host: 192.168.100.10
       hostname: ipa01.home.morinsoft.ca

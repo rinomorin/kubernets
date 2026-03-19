@@ -50,6 +50,7 @@
   delegate_to: localhost
   become: false
   when: vm_build_state == "running"
+
 - name: probbing name
   debug: msg="{{ vm_host }} or {{ vm_fqdn }}"
 
