@@ -18,6 +18,8 @@
   register: firewall_out
   # Since firewall-cmd usually returns "success", we track that for "changed" status
   changed_when: "'success' in firewall_out.stdout or 'ALREADY_ENABLED' not in firewall_out.stderr"
+  when: "'kvm' not in group_names"
+
 
 - name: Debug Firewall Output for {{ inventory_hostname }}
   debug:
