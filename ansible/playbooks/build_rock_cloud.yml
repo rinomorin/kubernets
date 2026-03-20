@@ -25,7 +25,7 @@
           # Lab Environment Auto-Accept
           Host 172.16.0.* 10.0.0.* 192.168.100.*
               StrictHostKeyChecking accept-new
-              UserKnownHostsFile ~/.ssh/known_hosts_lab
+              UserKnownHostsFile ~/.ssh/known_hosts
               LogLevel ERROR
 
     - name: load environment
