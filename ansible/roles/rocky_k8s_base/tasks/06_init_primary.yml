@@ -79,9 +79,9 @@
           echo ############################
           echo # hint run the config
           echo ############################
-          echo mkdir -p $HOME/.kube
-          echo sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-          echo sudo chown $(id -u):$(id -g) $HOME/.kube/config
+          echo mkdir -p \$HOME/.kube
+          echo sudo cp -i /etc/kubernetes/admin.conf \$HOME/.kube/config
+          echo sudo chown \$(id -u):\$(id -g) \$HOME/.kube/config
           echo
           echo kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
           
