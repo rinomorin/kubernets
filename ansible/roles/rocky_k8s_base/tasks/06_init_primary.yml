@@ -5,6 +5,7 @@
     opt2: "-o UserKnownHostsFile=/dev/null"
     opt3: "-o ConnectTimeout=10"  # Good safety for unreachable nodes
   shell: |
+    rm -f ~/.ssh/known_hosts*
     ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} core@{{ ansible_host }} \
     "sudo systemctl enable --now firewalld && \
      sudo firewall-cmd --permanent --add-port=10250/tcp --add-port=8472/udp \
