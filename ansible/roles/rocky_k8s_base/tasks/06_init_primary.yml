@@ -96,7 +96,7 @@
       become: false
       shell: |
         scp /tmp/manual_k8s_init.sh core@{{ ansible_host }}:~/manual_k8s_init.sh
-      when: "'kvm' in group_names"
+      when: inventory_hostname == groups['control_nodes'][0]
 
     - name: Instructions for Master
       debug:
