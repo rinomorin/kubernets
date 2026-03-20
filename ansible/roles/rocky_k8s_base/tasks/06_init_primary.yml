@@ -35,21 +35,25 @@
         replace: '# \1'
 
     - name: Create the manual init script with Auto-Display
-      delegate_to: localhost
-      become: false
       copy:
-        dest: /tmp/manual_k8s_init.sh
+        dest: /home/core/manual_k8s_init.sh
         mode: '0755'
+        owner: core
+        group: core
+        # We use 'content' with a raw block to prevent Jinja from choking on bash symbols
         content: |
           #!/bin/bash
+          {% raw %}
+          echo "--- Cleaning and Resetting ---"
           sudo kubeadm reset -f
           
           echo "--- Ensuring CRI-O is active ---"
           sudo systemctl enable --now crio
           
           echo "--- Initializing Cluster ---"
-          # Capture the output to a temp file to extract tokens and keys
+          # We use -o to capture output to a file for parsing
           sudo kubeadm init \
+          {% endraw %}
             --control-plane-endpoint '{{ hostvars[groups["control_nodes"][0]].inventory_hostname }}:6443' \
             --upload-certs \
             --pod-network-cidr=10.244.0.0/16 \
@@ -57,16 +61,13 @@
             --cri-socket unix:///var/run/crio/crio.sock \
             --ignore-preflight-errors=Swap,SystemVerification | tee /tmp/kubeadm_output
           
-          # 1. Extract the Token (usually the 5th field in the join line)
+          {% raw %}
+          # Extract variables from the output using grep and awk
           TOKEN=$(grep "kubeadm join" /tmp/kubeadm_output | head -n 1 | awk '{print $5}')
-          
-          # 2. Extract the Discovery Token CA Cert Hash
           HASH=$(grep "sha256:" /tmp/kubeadm_output | head -n 1 | awk '{print $2}')
-          
-          # 3. Extract the Certificate Key (look for line after the 'Using certificate key:' header)
           CERT_KEY=$(grep -A 1 "Using certificate key:" /tmp/kubeadm_output | tail -n 1 | xargs)
 
-          # Fallback: If CERT_KEY is empty, search for any 64-character hex string in the file
+          # Fallback check for hex key if grep missed the newline
           if [ -z "$CERT_KEY" ] || [ ${#CERT_KEY} -lt 60 ]; then
              CERT_KEY=$(grep -E '^[a-f0-9]{64}$' /tmp/kubeadm_output | head -n 1)
           fi
@@ -74,8 +75,9 @@
           echo -e "\n\n=========================================================="
           echo "K8S INITIALIZATION COMPLETE"
           echo "=========================================================="
+          {% endraw %}
           
-          echo -e "\n--- COPY THIS FOR SECONDARY MASTERS (Control Plane) ---"
+          echo -e "\n--- COPY THIS FOR SECONDARY MASTERS ---"
           echo "sudo kubeadm join {{ hostvars[groups['control_nodes'][0]].ansible_host }}:6443 \\"
           echo "  --token $TOKEN \\"
           echo "  --discovery-token-ca-cert-hash $HASH \\"
