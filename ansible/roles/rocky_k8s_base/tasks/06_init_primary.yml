@@ -35,8 +35,10 @@
         replace: '# \1'
 
     - name: Create the manual init script with Auto-Display
+      delegate_to: localhost
+      become: false
       copy:
-        dest: /home/core/manual_k8s_init.sh
+        dest: /tmp/manual_k8s_init.sh
         mode: '0755'
         owner: core
         group: core
@@ -88,6 +90,12 @@
           echo "  --discovery-token-ca-cert-hash $HASH \\"
           echo "  --ignore-preflight-errors=Swap,SystemVerification"
           echo -e "\n==========================================================\n"
+
+    - name: scp file to host
+      delegate_to: localhost
+      become: false
+      shell: |
+        scp /tmp/manual_k8s_init.sh core@{{ ansible_host }}:~/manual_k8s_init.sh
 
     - name: Instructions for Master
       debug:
