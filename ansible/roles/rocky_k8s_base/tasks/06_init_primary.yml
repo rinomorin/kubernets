@@ -40,8 +40,6 @@
       copy:
         dest: /tmp/manual_k8s_init.sh
         mode: '0755'
-        owner: core
-        group: core
         content: |
           #!/bin/bash
           sudo kubeadm reset -f
