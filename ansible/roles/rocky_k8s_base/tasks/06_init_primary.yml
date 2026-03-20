@@ -38,8 +38,6 @@
       copy:
         dest: /home/core/manual_k8s_init.sh
         mode: '0755'
-        owner: core
-        group: core
         # We use 'content' with a raw block to prevent Jinja from choking on bash symbols
         content: |
           #!/bin/bash
