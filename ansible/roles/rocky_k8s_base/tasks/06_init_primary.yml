@@ -93,10 +93,9 @@
       delegate_to: localhost
       become: false
       shell: |
-        scp -o StrictHostKeyChecking=no -o UserKnowtrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-        /home/core/manual_k8s_init.sh core@{{ ansible_host }}:~/manual_k8s_init.sh
+        scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+        /home/core/manual_k8s_init.sh {{ ansible_user }}@{{ ansible_host }}:~/manual_k8s_init.sh
       when: inventory_hostname == groups['control_nodes'][0]
-
     - name: Instructions for Master
       debug:
         msg: "Run this on {{ inventory_hostname }}: sudo /home/core/manual_k8s_init.sh"
