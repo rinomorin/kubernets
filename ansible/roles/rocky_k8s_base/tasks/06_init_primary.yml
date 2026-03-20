@@ -96,6 +96,7 @@
       become: false
       shell: |
         scp /tmp/manual_k8s_init.sh core@{{ ansible_host }}:~/manual_k8s_init.sh
+      when: "'kvm' in group_names"
 
     - name: Instructions for Master
       debug:
