@@ -79,12 +79,25 @@
           echo ############################
           echo # hint run the config
           echo ############################
-          echo mkdir -p \$HOME/.kube
-          echo sudo cp -i /etc/kubernetes/admin.conf \$HOME/.kube/config
-          echo sudo chown \$(id -u):\$(id -g) \$HOME/.kube/config
-          echo
+          echo "--- To configure kubectl for your user, run: ---"
+          echo "mkdir -p \$HOME/.kube"
+          echo "sudo cp -i /etc/kubernetes/admin.conf \$HOME/.kube/config"
+          # Escape both the $ and the opening ( to prevent immediate execution
+          echo "sudo chown \$(id -u):\$(id -g) \$HOME/.kube/config"          echo
           echo kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
-          
+
+          echo ETCD_VER=v3.5.12
+          echo ETCD_GOOGLE_URL=https://storage.googleapis.com/etcd
+          echo DOWNLOAD_URL=\${GOOGLE_URL}
+          echo
+          echo  curl -L \${DOWNLOAD_URL}/\${ETCD_VER}/etcd-\${ETCD_VER}-linux-amd64.tar.gz -o /tmp/etcd.tar.gz
+          echo  tar xzvf /tmp/etcd.tar.gz -C /tmp/ --strip-components=1
+          echo  sudo mv /tmp/etcdctl /usr/local/bin/
+          echo  rm -f /tmp/etcd.tar.gzS
+          echo  sudo ln -s /usr/local/bin/etcdctl /usr/bin/etcdctl
+          echo  sudo -f /tmp/etcd.tar.gz
+          echo
+
           echo -e "\n--- COPY THIS FOR SECONDARY MASTERS ---"
           echo "sudo kubeadm join {{ hostvars[groups['control_nodes'][0]].ansible_host }}:6443 \\"
           echo "  --token $TOKEN \\"
