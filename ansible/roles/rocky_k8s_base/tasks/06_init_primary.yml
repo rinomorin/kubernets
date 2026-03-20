@@ -75,6 +75,15 @@
           echo "K8S INITIALIZATION COMPLETE"
           echo "=========================================================="
           {% endraw %}
+
+          echo ############################
+          echo # hint run the config
+          echo ############################
+          echo mkdir -p $HOME/.kube
+          echo sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+          echo sudo chown $(id -u):$(id -g) $HOME/.kube/config
+          echo
+          echo kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
           
           echo -e "\n--- COPY THIS FOR SECONDARY MASTERS ---"
           echo "sudo kubeadm join {{ hostvars[groups['control_nodes'][0]].ansible_host }}:6443 \\"
