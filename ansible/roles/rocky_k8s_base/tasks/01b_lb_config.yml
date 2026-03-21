@@ -28,66 +28,71 @@
   delegate_to: localhost
   run_once: true
 
+---
+# 1. Start the VMs (Already working in your logs)
 - name: Start all cloned Load Balancer VMs
   delegate_to: "{{ VM_HOST_IP }}"
   community.libvirt.virt:
     name: "{{ item.split('.')[0] }}"
     state: running
   loop: "{{ groups['hahost'] }}"
+  run_once: true
 
+# 2. Wait for leases (Already working in your logs)
 - name: Wait for DHCP leases on br-nat
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
-    # Get the short names for the LB group
     VMS="{{ groups['hahost'] | map('regex_replace', '^(.*?)\\..*$', '\\1') | join(' ') }}"
-    
     while true; do
       FOUND_COUNT=0
       for vm in $VMS; do
-        # Get the MAC specifically on the br-nat interface
         MAC=$(sudo virsh domiflist $vm | grep 'br-nat' | awk '{print $5}')
-        # Check if that MAC has a lease
         if sudo virsh net-dhcp-leases br-nat | grep -q "$MAC"; then
           ((FOUND_COUNT++))
         fi
       done
-      
       TOTAL=$(echo $VMS | wc -w)
-      if [ "$FOUND_COUNT" -eq "$TOTAL" ]; then break; fi
+      [ "$FOUND_COUNT" -eq "$TOTAL" ] && break
       sleep 5
     done
   run_once: true
 
-- name: Capture Live DHCP IPs
+# 3. Capture IPs for ALL LBs into a single Fact
+- name: Capture Live DHCP IPs for all LBs
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
-    MAC=$(sudo virsh domiflist {{ inventory_hostname.split('.')[0] }} | grep 'br-nat' | awk '{print $5}')
+    # Get MAC for the specific item
+    MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'br-nat' | awk '{print $5}')
+    # Get IP for that MAC
     sudo virsh net-dhcp-leases br-nat | grep "$MAC" | awk '{print $5}' | cut -d/ -f1
-  register: dhcp_ip_discovery
-  when: inventory_hostname in groups['hahost']
+  register: discovered_ips
+  loop: "{{ groups['hahost'] }}"
+  run_once: true
 
-- name: Set Temporary Management IP Fact
+# 4. Map these IPs into a dictionary so we can use them
+- name: Create IP Map
   set_fact:
-    temp_mgmt_ip: "{{ dhcp_ip_discovery.stdout }}"
-  when: inventory_hostname in groups['hahost']
+    lb_dhcp_map: "{{ lb_dhcp_map | default({}) | combine({ item.item: item.stdout }) }}"
+  loop: "{{ discovered_ips.results }}"
+  run_once: true
 
-- debug: 
-      msg: "break {{ here }}"
-
+# 5. Configure the Provider NIC via the Temp IP
 - name: Configure Provider IP via DHCP Management Link
   delegate_to: localhost
-  when: inventory_hostname in groups['hahost']
+  run_once: true
+  loop: "{{ groups['hahost'] }}"
   vars:
-    target_mac: "{{ lb_mac_map[inventory_hostname] }}"
-    target_ip: "{{ hostvars[inventory_hostname].ansible_host }}"
+    temp_mgmt_ip: "{{ lb_dhcp_map[item] }}"
+    target_mac: "{{ lb_mac_map[item] }}" # From your previous discovery
+    target_ip: "{{ hostvars[item].ansible_host }}"
     target_gw: "{{ target_ip.split('.')[:3] | join('.') }}.1"
     dns_servers: "{{ groups['dns'] | map('extract', hostvars, 'ansible_host') | join(',') }}"
   shell: |
-    ssh -o StrictHostKeyChecking=no core@{{ temp_mgmt_ip }} "
-      # Identify which device (enp...) has the target MAC
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ temp_mgmt_ip }} "
+      # Identify device by MAC
       IFACE=\$(ip -o link show | grep -i '{{ target_mac }}' | awk -F': ' '{print \$2}')
       
-      # Create the static profile
+      # Setup Provider Connection
       sudo nmcli con add type ethernet con-name provider ifname \$IFACE \
         ipv4.addresses {{ target_ip }}/24 \
         ipv4.gateway {{ target_gw }} \
@@ -97,6 +102,33 @@
       
       sudo nmcli con up provider
     "
+
+# - debug: 
+#       msg: "break {{ here }}"
+
+# - name: Configure Provider IP via DHCP Management Link
+#   delegate_to: localhost
+#   when: inventory_hostname in groups['hahost']
+#   vars:
+#     target_mac: "{{ lb_mac_map[inventory_hostname] }}"
+#     target_ip: "{{ hostvars[inventory_hostname].ansible_host }}"
+#     target_gw: "{{ target_ip.split('.')[:3] | join('.') }}.1"
+#     dns_servers: "{{ groups['dns'] | map('extract', hostvars, 'ansible_host') | join(',') }}"
+#   shell: |
+#     ssh -o StrictHostKeyChecking=no core@{{ temp_mgmt_ip }} "
+#       # Identify which device (enp...) has the target MAC
+#       IFACE=\$(ip -o link show | grep -i '{{ target_mac }}' | awk -F': ' '{print \$2}')
+      
+#       # Create the static profile
+#       sudo nmcli con add type ethernet con-name provider ifname \$IFACE \
+#         ipv4.addresses {{ target_ip }}/24 \
+#         ipv4.gateway {{ target_gw }} \
+#         ipv4.dns {{ dns_servers }} \
+#         ipv4.method manual \
+#         connection.autoconnect yes
+      
+#       sudo nmcli con up provider
+#     "
 
 
 # # 01b_lb_config.yml
