@@ -190,8 +190,8 @@
     sed -i "s|interface .*|interface $REAL_IFACE|" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
     sed -i 's|killall -0 haproxy|pgrep -x haproxy|' /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
     
-    # 3. FIX: Force trailing newline (escaped for YAML)
-    sed -i '$a\\' /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg
+    # 3. FIX: Force trailing newline (Double-escaped backslash for YAML block)
+    sed -i '$a\' /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg
 
     # 4. Push Configs
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
@@ -213,7 +213,7 @@
           exit 1
       fi
 
-      sudo systemctl start keepalived
+      sudo systemctl enable --now keepalived
       sleep 2
-      sudo systemctl start haproxy
+      sudo systemctl enable --now haproxy
     "
