@@ -195,25 +195,34 @@
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
     
     ssh {{ ssh_opts }} core@{{ target_ip }} "
-      # 4. Move and Fix Permissions/Context
+      # 1. Move and Fix Permissions
       sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
       sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf
-      
-      # Set ownership to root
       sudo chown root:root /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
-      # Set standard permissions (readable by service)
       sudo chmod 644 /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
       
-      # RELABEL for SELinux (This is the critical part for Rocky/RHEL)
-      sudo restorecon -v /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
+      # 2. EXPLICIT SELinux Labeling (The Fix)
+      # Force the specific types HAProxy and Keepalived expect
+      sudo chcon -u system_u -r object_r -t haproxy_config_t /etc/haproxy/haproxy.cfg
+      sudo chcon -u system_u -r object_r -t keepalived_config_t /etc/keepalived/keepalived.conf
       
-      # 5. System Fixes
+      # 3. System Policies
       sudo sysctl -w net.ipv4.ip_nonlocal_bind=1
       sudo setsebool -P haproxy_connect_any 1
       
-      # 6. Restart Services
+      # 4. Restart Logic
+      sudo systemctl daemon-reload
       sudo systemctl stop haproxy keepalived
-      sudo systemctl enable --now keepalived
+      
+      # Start Keepalived (Provides the VIP)
+      sudo systemctl start keepalived
       sleep 2
-      sudo systemctl enable --now haproxy
+      
+      # Start HAProxy (Check syntax manually if it fails)
+      if ! sudo systemctl start haproxy; then
+          echo 'HAProxy failed to start. Manual syntax check:'
+          sudo haproxy -c -f /etc/haproxy/haproxy.cfg
+          sudo journalctl -u haproxy --no-pager | tail -n 20
+          exit 1
+      fi
     "
