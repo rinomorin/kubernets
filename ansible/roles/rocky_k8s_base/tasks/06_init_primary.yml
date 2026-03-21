@@ -32,7 +32,7 @@
     - name: "Bootstrap etcdctl via SSH and Curl"
       delegate_to: localhost
       shell: |
-        ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} {{ opt4 }} core@{{ this_vm_ip }} << 'EOF'
+        ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} {{ opt4 }} core@{{ ansible_host }}  << 'EOF'
           # Exit immediately if a command fails
           set -e
 

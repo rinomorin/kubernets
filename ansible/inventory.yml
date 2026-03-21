@@ -1,6 +1,7 @@
 all:
   vars:
     ansible_user: "{{ lookup('env', 'USERNAME') }}"
+    k8s_api_vip: "192.168.100.100"
 
   hosts:
     helper: 
@@ -10,6 +11,18 @@ all:
       provision_ip: 10.0.0.20 
       # ansible_user: cloud_helper
       # ansible_ssh_user: cloud_helper
+
+    msrlv9l01:
+      ansible_user: core
+      ansible_host: 192.168.100.21
+
+    msrlv9l02:
+      ansible_user: core
+      ansible_host: 192.168.100.22
+
+    msrlv9l03:
+      ansible_user: core
+      ansible_host: 192.168.100.23
 
     msrlv9mast01: 
       ansible_user: core
