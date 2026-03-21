@@ -190,35 +190,25 @@
     sed -i "s|interface .*|interface $REAL_IFACE|" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
     sed -i 's|killall -0 haproxy|pgrep -x haproxy|' /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
     
-    # 3. FIX: Force trailing newline on HAProxy config (Critical for HAProxy 2.8)
-    # This ensures the file ends with a proper LF character
-    sed -i '$a\' /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg
+    # 3. FIX: Force trailing newline (escaped for YAML)
+    sed -i '$a\\' /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg
 
     # 4. Push Configs
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
     
     ssh {{ ssh_opts }} core@{{ target_ip }} "
-      # 5. Move and Set Permissions
       sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
       sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf
       sudo chown root:root /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
       sudo chmod 644 /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
-      
-      # 6. SELinux: Use restorecon which is more 'Rocky-friendly' than manual chcon
-      # We ensure the parent directories are correct first
       sudo restorecon -Rv /etc/haproxy /etc/keepalived
-      
-      # 7. System Policies
       sudo sysctl -w net.ipv4.ip_nonlocal_bind=1
       sudo setsebool -P haproxy_connect_any 1
-      
-      # 8. Start Sequence
       sudo systemctl stop haproxy keepalived
       
-      # Validate HAProxy BEFORE starting
       if ! sudo haproxy -c -f /etc/haproxy/haproxy.cfg; then
-          echo 'HAProxy config still invalid:'
+          echo 'HAProxy config invalid:'
           cat -e /etc/haproxy/haproxy.cfg | tail -n 5
           exit 1
       fi
