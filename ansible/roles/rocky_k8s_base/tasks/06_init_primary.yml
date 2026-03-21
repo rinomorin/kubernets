@@ -54,7 +54,7 @@
             echo "etcdctl already exists, skipping download."
           fi
         EOF
-      when: this_vm_name in groups['cluster_nodes']
+      when: inventory_hostname in groups['cluster_nodes']
       register: etcd_bootstrap_out
       changed_when: "'installed successfully' in etcd_bootstrap_out.stdout"
 

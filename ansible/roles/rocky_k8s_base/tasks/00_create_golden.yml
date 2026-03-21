@@ -1,8 +1,4 @@
-# - name: Create qcow2 disk
-#   command: >
-#     qemu-img create -f qcow2 {{ image_path }} {{ image_size }}
-#   args:
-#     creates: "{{ image_path }}"
+---
 - name: Get VM status from virsh list
   become: yes
   become_user: "{{ cloud_helper_user }}"
