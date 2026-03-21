@@ -30,6 +30,9 @@ ipa_master_fqdn: "{{ lookup('env', 'ipa_master') | default('ipa01.home.morinsoft
 ipa_admin_password: "{{ lookup('env','ipa_admin_password')}}"
 c_zone: "{{ lookup('env', 'cloud_zone') | default('cloud.home.morinsoft.ca', true) }}"
 p_zone: "{{ lookup('env', 'cloud_provision') | default('provision.home.morinsoft.ca', true) }}"
+# Kubernetes API Virtual IP
+k8s_api_vip: "{{ lookup('env', 'k8s_api_vip') | default('192.168.100.30', true) }}"
+vip_interface: "enp1s0"
 
 # Network Lookups from Inventory
 # We fetch the CIDRs once here so they are available globally in the role

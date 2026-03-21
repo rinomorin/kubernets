@@ -6,6 +6,7 @@
     opt3: "-o ConnectTimeout=10"
     opt4: "-o ProxyCommand=none"
   shell: |
+    rm -f ~/.ssh/known_hosts*
     ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} {{ opt4 }} core@{{ ansible_host }} \
     "sudo systemctl enable --now firewalld && \
      sudo firewall-cmd --permanent --add-port=10250/tcp --add-port=8472/udp \
@@ -32,6 +33,7 @@
     - name: "Bootstrap etcdctl via SSH and Curl"
       delegate_to: localhost
       shell: |
+        rm -f ~/.ssh/known_hosts*
         ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} {{ opt4 }} core@{{ ansible_host }}  << 'EOF'
           # Exit immediately if a command fails
           set -e
