@@ -27,7 +27,7 @@ mykubelet_config: |
 cluster_token: "{{ lookup('env', 'K8S_CLUSTER_TOKEN') | default('abcdef.1234567890abcdef', true) }}"
 # DNS Zone Defaults - Prioritize Environment Variables
 ipa_master_fqdn: "{{ lookup('env', 'ipa_master') | default('ipa01.home.morinsoft.ca', true) }}"
-ipa_admin_password: "{{ lookup('env','ipa_admin_passwprd')}}"
+ipa_admin_password: "{{ lookup('env','ipa_admin_password')}}"
 c_zone: "{{ lookup('env', 'cloud_zone') | default('cloud.home.morinsoft.ca', true) }}"
 p_zone: "{{ lookup('env', 'cloud_provision') | default('provision.home.morinsoft.ca', true) }}"
 
