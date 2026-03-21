@@ -44,17 +44,3 @@
   until: vm_state.stdout_lines[-1] == "shutdown"
   retries: "{{ build_loops|int }}"
   delay: 10
-
-# Clone only the hosts defined in the 'hahost' group in inventory
-- name: Clone Load Balancer nodes from Golden Image
-  delegate_to: "{{ VM_HOST_IP }}"
-  command: >
-    sudo virt-clone --original golden-base 
-    --name {{ item }} 
-    --file /var/lib/libvirt/images/{{ item }}.qcow2
-  loop: "{{ groups['hahost'] }}"
-  register: lb_clones
-  # We ignore the error if the VM already exists, but fail on anything else
-  failed_when: 
-    - lb_clones.rc != 0 
-    - "'already exists' not in lb_clones.stderr"
