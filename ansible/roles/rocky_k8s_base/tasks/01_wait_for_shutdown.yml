@@ -66,5 +66,5 @@
   loop: "{{ groups['hahost'] }}"
 
 - debug:
-    msg: "{{ mac_discovery.stdout }}"
+    msg: "{{ mac_discovery }}"
 
