@@ -77,9 +77,7 @@
     msg: "{{ firewall_out.stdout_lines }}"
   when: firewall_out.stdout is defined
 
-- name: Prepare Manual Initialization (Primary Master)
-  block:
-      # This creates the file LOCALLY on your helper machine/laptop
+# This creates the file LOCALLY on your helper machine/laptop
 - name: Prepare Manual Initialization (Primary Master)
   block:
     - name: Create the manual init script locally
