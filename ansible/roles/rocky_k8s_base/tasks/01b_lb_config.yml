@@ -175,7 +175,7 @@
         dest: "/tmp/k8s_lb_configs/{{ item }}/keepalived.conf"
       loop: "{{ groups['hahost'] }}"
 
-- name: Push and Enable LB Services
+- name: Push and Enable LB Services (Fixed)
   delegate_to: localhost
   run_once: true
   loop: "{{ groups['hahost'] }}"
@@ -183,31 +183,30 @@
     ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
     target_ip: "{{ hostvars[item].ansible_host }}"
   shell: |
-    # 1. Push HAProxy Config
+    # 1. Detect actual interface name on the node
+    REAL_IFACE=$(ssh {{ ssh_opts }} core@{{ target_ip }} "ip -o link show | grep '{{ lb_mac_map[item] }}' | awk -F': ' '{print \$2}'")
+
+    # 2. Fix the Keepalived config locally before pushing (re-template or sed)
+    # This ensures 'interface enp1s0' is correct even if the template was wrong
+    sed -i "s/interface .*/interface $REAL_IFACE/" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
+
+    # 3. Push Configs
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
-    ssh {{ ssh_opts }} core@{{ target_ip }} "sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg"
-
-    # 2. Push Keepalived Config
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
-    ssh {{ ssh_opts }} core@{{ target_ip }} "sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf"
-
-    # 3. System Fixes (Crucial for HAProxy + VIP)
+    
     ssh {{ ssh_opts }} core@{{ target_ip }} "
-      # Allow binding to non-local IPs (the VIP)
-      sudo sysctl -w net.ipv4.ip_nonlocal_bind=1
-      echo 'net.ipv4.ip_nonlocal_bind=1' | sudo tee /etc/sysctl.d/99-k8s-lb.conf
+      sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
+      sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf
       
-      # SELinux: Allow HAProxy to bind to any port/IP
+      # 4. Critical System Settings
+      sudo sysctl -w net.ipv4.ip_nonlocal_bind=1
       sudo setsebool -P haproxy_connect_any 1
       
-      # Firewall
-      sudo firewall-cmd --permanent --add-protocol=vrrp
-      sudo firewall-cmd --permanent --add-port=6443/tcp
-      sudo firewall-cmd --reload
-      
-      # Start Keepalived FIRST (to get the VIP) then HAProxy
-      sudo systemctl enable --now keepalived
-      sleep 2
-      sudo systemctl enable --now haproxy
+      # 5. Check HAProxy Syntax - if this fails, the task will stop here
+      sudo haproxy -c -f /etc/haproxy/haproxy.cfg || exit 1
+
+      # 6. Restart Services
+      sudo systemctl restart keepalived
+      sleep 3
+      sudo systemctl restart haproxy
     "
-  register: lb_push_result
