@@ -1,25 +1,34 @@
 ---
 - name: Configure Firewalld via SSH (Bypass Python dependency)
   vars:
-    opt1: "-o StrictHostKeyChecking=no"
-    opt2: "-o UserKnownHostsFile=/dev/null"
-    opt3: "-o ConnectTimeout=10"
-    opt4: "-o ProxyCommand=none"
+    ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o BatchMode=yes"
+    target_ip: "{{ hostvars[inventory_hostname].ansible_host }}"
   shell: |
-    rm -f ~/.ssh/known_hosts*
-    ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} {{ opt4 }} core@{{ ansible_host }} \
-    "sudo systemctl enable --now firewalld && \
-     sudo firewall-cmd --permanent --add-port=10250/tcp --add-port=8472/udp \
-     {% if 'control_nodes' in group_names %}
-     --add-port=6443/tcp --add-port=2379-2380/tcp --add-port=10257/tcp --add-port=10259/tcp \
-     {% else %}
-     --add-port=30000-32767/tcp \
-     {% endif %}
-     && sudo firewall-cmd --reload"
+    ssh {{ ssh_opts }} core@{{ target_ip }} << 'EOF'
+      # Start and enable service
+      sudo systemctl enable --now firewalld
+      
+      # Master Node Ports
+      {% if 'control_nodes' in group_names %}
+      sudo firewall-cmd --permanent --add-port={6443,2379-2380,10250,10257,10259}/tcp
+      sudo firewall-cmd --permanent --add-port=8472/udp
+      {% endif %}
+
+      # Worker Node Ports
+      {% if 'worker_nodes' in group_names %}
+      sudo firewall-cmd --permanent --add-port=10250/tcp
+      sudo firewall-cmd --permanent --add-port=30000-32767/tcp
+      sudo firewall-cmd --permanent --add-port=8472/udp
+      {% endif %}
+
+      sudo firewall-cmd --reload
+    EOF
   delegate_to: localhost
   register: firewall_out
-  # Since firewall-cmd usually returns "success", we track that for "changed" status
-  changed_when: "'success' in firewall_out.stdout or 'ALREADY_ENABLED' not in firewall_out.stderr"
+  retries: 5
+  delay: 5
+  until: firewall_out.rc == 0
+  # Only skip the Hypervisor, apply to Masters, Workers, and LBs
   when: "'kvm' not in group_names"
 
 - name: Install etcdctl via SSH (Bypass Python dependency)
@@ -29,12 +38,13 @@
     opt2: "-o UserKnownHostsFile=/dev/null"
     opt3: "-o ConnectTimeout=10"
     opt4: "-o ProxyCommand=none"
+    target_ip: "{{ hostvars[inventory_hostname].ansible_host }}" 
   block:
     - name: "Bootstrap etcdctl via SSH and Curl"
       delegate_to: localhost
       shell: |
         rm -f ~/.ssh/known_hosts*
-        ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} {{ opt4 }} core@{{ ansible_host }}  << 'EOF'
+        ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} {{ opt4 }} core@{{ target_ip }}  << 'EOF'
           # Exit immediately if a command fails
           set -e
 
