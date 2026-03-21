@@ -186,18 +186,18 @@
     # 1. Detect Interface
     REAL_IFACE=$(ssh {{ ssh_opts }} core@{{ target_ip }} "ip -o addr show | grep '192.168.100.' | awk '{print \$2}' | head -n1")
     
-    # 2. Fix configs locally
+    # 2. Local Cleanup
     sed -i "s|interface .*|interface $REAL_IFACE|" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
     sed -i 's|killall -0 haproxy|pgrep -x haproxy|' /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
-    
-    # 3. FIX: Force trailing newline (Double-escaped backslash for YAML block)
-    sed -i '$a\' /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg
+    # Ensure newline (using printf is safer for YAML blocks)
+    printf '\n' >> /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg
 
-    # 4. Push Configs
+    # 3. Transfer
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
     
-    ssh {{ ssh_opts }} core@{{ target_ip }} "
+    # 4. Remote Execution (Avoid nested double quotes)
+    ssh {{ ssh_opts }} core@{{ target_ip }} << 'EOF'
       sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
       sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf
       sudo chown root:root /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
@@ -208,12 +208,11 @@
       sudo systemctl stop haproxy keepalived
       
       if ! sudo haproxy -c -f /etc/haproxy/haproxy.cfg; then
-          echo 'HAProxy config invalid:'
-          cat -e /etc/haproxy/haproxy.cfg | tail -n 5
+          echo "HAProxy config invalid"
           exit 1
       fi
 
       sudo systemctl enable --now keepalived
       sleep 2
       sudo systemctl enable --now haproxy
-    "
+    EOF
