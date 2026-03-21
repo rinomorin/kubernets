@@ -58,3 +58,13 @@
   failed_when: 
     - lb_clones.rc != 0 
     - "'already exists' not in lb_clones.stderr"
+
+- name: Get Target MAC from Hypervisor for all LBs
+  delegate_to: "{{ VM_HOST_IP }}"
+  shell: "sudo virsh domiflist {{ item.split('.')[0] }} | grep 'default' | awk '{print $5}' | head -n1"
+  register: mac_discovery
+  loop: "{{ groups['hahost'] }}"
+
+- debug:
+    msg: "{{ mac_discovery.stdout }}"
+
