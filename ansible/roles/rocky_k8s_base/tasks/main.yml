@@ -50,9 +50,6 @@
   - name: config load balancers
     import_tasks: 01b_lb_config.yml
 
-  - debug: 
-      msg: "break {{ here }}"
-
   - name: wait for power up
     import_tasks: 02_wait_for_poweron.yml
     delegate_to: "{{ VM_HOST_IP }}"
