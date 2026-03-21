@@ -81,7 +81,7 @@
         crio_stream: "stable"
         cloud_helper_shell: "/bin/bash"
 
-- hosts: kvm,control_nodes,worker_nodes
+- hosts: kvm,control_nodes,worker_nodes,hahost
   become: false
   gather_facts: false
   # vars: 
