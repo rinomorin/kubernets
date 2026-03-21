@@ -26,46 +26,35 @@
     opt1: "-o StrictHostKeyChecking=no"
     opt2: "-o UserKnownHostsFile=/dev/null"
   block:
-    - name: Download etcd tarball to Localhost
+    - name: "Bootstrap etcdctl via SSH and Curl"
       delegate_to: localhost
-      become: false
-      get_url:
-        url: "https://github.com/etcd-io/etcd/releases/download/{{ etcd_ver }}/etcd-{{ etcd_ver }}-linux-amd64.tar.gz"
-        dest: "/tmp/etcd-{{ etcd_ver }}.tar.gz"
-        mode: '0644'
-
-    - name: SCP etcd tarball to remote node
-      delegate_to: localhost
-      become: false
       shell: |
-        scp {{ opt1 }} {{ opt2 }} /tmp/etcd-{{ etcd_ver }}.tar.gz {{ ansible_user }}@{{ ansible_host }}:/tmp/etcd.tar.gz
+        ssh {{ opt1 }} {{ opt2 }} core@{{ this_vm_ip }} << 'EOF'
+          # Exit immediately if a command fails
+          set -e
 
-    - name: Extract and Install etcdctl via SSH
-      delegate_to: localhost
-      become: false
-      shell: |
-        ssh {{ opt1 }} {{ opt2 }} {{ ansible_user }}@{{ ansible_host }} \
-        "sudo tar -xzvf /tmp/etcd.tar.gz -C /tmp/ --strip-components=1 etcd-{{ etcd_ver }}-linux-amd64/etcdctl && \
-         sudo mv /tmp/etcdctl /usr/local/bin/etcdctl && \
-         sudo chmod +x /usr/local/bin/etcdctl && \
-         sudo ln -sf /usr/local/bin/etcdctl /usr/bin/etcdctl && \
-         rm -f /tmp/etcd.tar.gz"
-      when: "'kvm' not in group_names"
-  
-    - name: Verify etcdctl version
-      delegate_to: localhost
-      become: false
-      shell: |
-        ssh {{ opt1 }} {{ opt2 }} {{ ansible_user }}@{{ ansible_host }} "etcdctl version"
-      register: etcd_check
-      changed_when: false
-      when: "'kvm' not in group_names"
-    
+          if [ ! -f /usr/local/bin/etcdctl ]; then
+            echo "Installing etcdctl on $(hostname)..."
+            curl -L -s https://github.com/etcd-io/etcd/releases/download/v3.5.12/etcd-v3.5.12-linux-amd64.tar.gz -o /tmp/etcd.tar.gz
+            
+            # Extract binary to /tmp
+            tar -xzf /tmp/etcd.tar.gz -C /tmp --strip-components=1 etcd-v3.5.12-linux-amd64/etcdctl
+            
+            # Deploy and set permissions
+            sudo mv /tmp/etcdctl /usr/local/bin/etcdctl
+            sudo chmod +x /usr/local/bin/etcdctl
+            
+            # Cleanup
+            rm /tmp/etcd.tar.gz
+            echo "etcdctl installed successfully."
+          else
+            echo "etcdctl already exists, skipping download."
+          fi
+        EOF
+      when: this_vm_name in groups['cluster_nodes']
+      register: etcd_bootstrap_out
+      changed_when: "'installed successfully' in etcd_bootstrap_out.stdout"
 
-    - name: Show etcdctl version for {{ inventory_hostname }}
-      debug:
-        msg: "{{ etcd_check.stdout_lines[0] }}"
-      when: "'kvm' not in group_names"
 - name: Debug Firewall Output for {{ inventory_hostname }}
   debug:
     msg: "{{ firewall_out.stdout_lines }}"
