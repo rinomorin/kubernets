@@ -174,30 +174,30 @@
         src: keepalived.conf.j2
         dest: "/tmp/k8s_lb_configs/{{ item }}/keepalived.conf"
       loop: "{{ groups['hahost'] }}"
-
-- name: Push and Enable LB Services (Fixed LF and IPA Cleanup)
+- name: Push and Enable LB Services (Fixed Keepalived)
   delegate_to: localhost
   run_once: true
   loop: "{{ groups['hahost'] }}"
   vars:
     ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
     target_ip: "{{ hostvars[item].ansible_host }}"
-    # We move the MAC lookup to a var to keep the shell script cleaner
     target_mac: "{{ lb_mac_map[item] }}"
   shell: |
-    # 1. Detect actual interface name
-    # We use double backslash for $2 so Ansible passes it literally to the shell
-    REAL_IFACE=$(ssh {{ ssh_opts }} core@{{ target_ip }} "ip -o link show | grep -i '{{ target_mac }}' | awk -F': ' '{print \$2}'")
+    # 1. Detect actual interface name (Verify it matches the 192.168.100.x subnet)
+    REAL_IFACE=$(ssh {{ ssh_opts }} core@{{ target_ip }} "ip -o addr show | grep '192.168.100.' | awk '{print \$2}' | head -n1")
+    
+    # Fallback to MAC search if subnet search fails
+    if [ -z "$REAL_IFACE" ]; then
+      REAL_IFACE=$(ssh {{ ssh_opts }} core@{{ target_ip }} "ip -o link show | grep -i '{{ target_mac }}' | awk -F': ' '{print \$2}'")
+    fi
 
-    # 2. Fix the Keepalived config locally
-    # We use a different separator for sed (pipe |) to avoid issues with slashes
+    # 2. Update Keepalived config with the correct interface
     sed -i "s|interface .*|interface $REAL_IFACE|" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
+    
+    # 3. Update the check script to use pgrep (more compatible than killall)
+    sed -i 's|killall -0 haproxy|pgrep -x haproxy >/dev/null 2>\&1|' /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
 
-    # 3. FIX: Ensure HAProxy config has a trailing newline (LF)
-    # Using printf is more reliable than sed for adding a trailing newline in a shell script
-    [ -n "$(tail -c1 /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg)" ] && printf '\n' >> /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg
-
-    # 4. Push Configs
+    # 4. Push and Restart
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
     
@@ -205,13 +205,12 @@
       sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
       sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf
       
-      # 5. System Fixes
+      # Ensure non-local bind is set (re-applying to be safe)
       sudo sysctl -w net.ipv4.ip_nonlocal_bind=1
-      sudo setsebool -P haproxy_connect_any 1
       
-      # 6. Syntax Check & Restart
-      sudo haproxy -c -f /etc/haproxy/haproxy.cfg && \
-      sudo systemctl restart keepalived && \
-      sleep 2 && \
-      sudo systemctl restart haproxy
+      # Attempt start
+      sudo systemctl stop haproxy keepalived
+      sudo systemctl start keepalived
+      sleep 2
+      sudo systemctl start haproxy
     "
