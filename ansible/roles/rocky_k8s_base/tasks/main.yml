@@ -48,9 +48,9 @@
   
   - name: config load balancers
     import_tasks: 01b_lb_config.yml
-    when: "'hahost' in group_names"
 
-  - debug: msg="break {{ here }}"
+  - debug: 
+      msg: "break {{ here }}"
 
   - name: wait for power up
     import_tasks: 02_wait_for_poweron.yml
