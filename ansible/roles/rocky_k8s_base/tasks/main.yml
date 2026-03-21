@@ -1,5 +1,8 @@
 ---
 - name: Ensure Python requirements are met locally
+  run_once: true
+  become: false
+  delegate_to: localhost
   pip:
     requirements: "{{ role_path }}/requirements.txt"
   # This ensures 'netaddr' is present in the current venv
