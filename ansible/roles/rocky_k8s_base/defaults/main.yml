@@ -25,3 +25,16 @@ mykubelet_config: |
 # Use the env var if provided, otherwise you can leave it empty to force an error 
 # or provide a default for testing.
 cluster_token: "{{ lookup('env', 'K8S_CLUSTER_TOKEN') | default('abcdef.1234567890abcdef', true) }}"
+# DNS Zone Defaults - Prioritize Environment Variables
+ipa_master_fqdn: "{{ lookup('env', 'ipa_master') | default('ipa01.home.morinsoft.ca', true) }}"
+c_zone: "{{ lookup('env', 'cloud_zone') | default('cloud.home.morinsoft.ca', true) }}"
+p_zone: "{{ lookup('env', 'cloud_provision') | default('provision.home.morinsoft.ca', true) }}"
+
+# Network Lookups from Inventory
+# We fetch the CIDRs once here so they are available globally in the role
+cloud_cidr: "{{ hostvars['kvmdc01'].libvirt_networks | selectattr('name', 'equalto', 'default') | map(attribute='cidr') | first | default('192.168.100.0/24') }}"
+prov_cidr: "{{ hostvars['kvmdc01'].libvirt_networks | selectattr('name', 'equalto', 'br-cluster') | map(attribute='cidr') | first | default('10.0.0.0/24') }}"
+
+# Dynamic Reverse Zone Calculation
+rev_cloud: "{{ cloud_cidr | ipaddr('revdns') | regex_replace('^0\\.', '') }}"
+rev_prov: "{{ prov_cidr | ipaddr('revdns') | regex_replace('^0\\.', '') }}"

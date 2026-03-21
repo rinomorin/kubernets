@@ -27,6 +27,11 @@
       {% endfor %}
     failed_when: false
 
+  - name: add dns
+    import_tasks: pre_register_dns_from_helper.yml
+    delegate_to: "{{ VM_HOST_IP }}"
+
+
   - name: Build Rocky Linux base image
     import_tasks: 00_create_golden.yml
     delegate_to: "{{ VM_HOST_IP }}"
