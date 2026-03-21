@@ -1,6 +1,6 @@
 ---
 - name: Register DNS Records via Helper
-  delegate_to: helper
+  delegate_to: local
   become: no
   block:
     - name: Authenticate with FreeIPA
