@@ -40,5 +40,5 @@ cloud_cidr: "{{ hostvars['kvmdc01'].libvirt_networks | selectattr('name', 'equal
 prov_cidr: "{{ hostvars['kvmdc01'].libvirt_networks | selectattr('name', 'equalto', 'br-cluster') | map(attribute='cidr') | first | default('10.0.0.0/24') }}"
 
 # Dynamic Reverse Zone Calculation
-rev_cloud: "{{ cloud_cidr | ipaddr('revdns') | regex_replace('^0\\.', '') }}"
-rev_prov: "{{ prov_cidr | ipaddr('revdns') | regex_replace('^0\\.', '') }}"
+rev_cloud: "{{ cloud_cidr | ansible.utils.ipaddr('revdns') | regex_replace('^0\\.', '') }}"
+rev_prov: "{{ prov_cidr | ansible.utils.ipaddr('revdns') | regex_replace('^0\\.', '') }}"
