@@ -20,6 +20,49 @@
   changed_when: "'success' in firewall_out.stdout or 'ALREADY_ENABLED' not in firewall_out.stderr"
   when: "'kvm' not in group_names"
 
+- name: Install etcdctl via SSH (Bypass Python dependency)
+  vars:
+    etcd_ver: "v3.5.12"
+    opt1: "-o StrictHostKeyChecking=no"
+    opt2: "-o UserKnownHostsFile=/dev/null"
+  block:
+    - name: Download etcd tarball to Localhost
+      delegate_to: localhost
+      become: false
+      get_url:
+        url: "https://github.com/etcd-io/etcd/releases/download/{{ etcd_ver }}/etcd-{{ etcd_ver }}-linux-amd64.tar.gz"
+        dest: "/tmp/etcd-{{ etcd_ver }}.tar.gz"
+        mode: '0644'
+
+    - name: SCP etcd tarball to remote node
+      delegate_to: localhost
+      become: false
+      shell: |
+        scp {{ opt1 }} {{ opt2 }} /tmp/etcd-{{ etcd_ver }}.tar.gz {{ ansible_user }}@{{ ansible_host }}:/tmp/etcd.tar.gz
+
+    - name: Extract and Install etcdctl via SSH
+      delegate_to: localhost
+      become: false
+      shell: |
+        ssh {{ opt1 }} {{ opt2 }} {{ ansible_user }}@{{ ansible_host }} \
+        "sudo tar -xzvf /tmp/etcd.tar.gz -C /tmp/ --strip-components=1 etcd-{{ etcd_ver }}-linux-amd64/etcdctl && \
+         sudo mv /tmp/etcdctl /usr/local/bin/etcdctl && \
+         sudo chmod +x /usr/local/bin/etcdctl && \
+         sudo ln -sf /usr/local/bin/etcdctl /usr/bin/etcdctl && \
+         rm -f /tmp/etcd.tar.gz"
+
+
+    - name: Verify etcdctl version
+      delegate_to: localhost
+      become: false
+      shell: |
+        ssh {{ opt1 }} {{ opt2 }} {{ ansible_user }}@{{ ansible_host }} "etcdctl version"
+      register: etcd_check
+      changed_when: false
+
+    - name: Show etcdctl version for {{ inventory_hostname }}
+      debug:
+        msg: "{{ etcd_check.stdout_lines[0] }}"
 
 - name: Debug Firewall Output for {{ inventory_hostname }}
   debug:
@@ -29,11 +72,11 @@
 - name: Prepare Manual Initialization (Primary Master)
   block:
     # This part still runs on the remote master to fix its fstab
-    - name: Ensure Swap is off (Permanent)
-      replace:
-        path: /etc/fstab
-        regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
-        replace: '# \1'
+    # - name: Ensure Swap is off (Permanent)
+    #   replace:
+    #     path: /etc/fstab
+    #     regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+    #     replace: '# \1'
 
     # This creates the file LOCALLY on your helper machine/laptop
     - name: Create the manual init script locally
