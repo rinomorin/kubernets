@@ -101,115 +101,42 @@
       sudo nmcli con up provider
     "
 
-# - debug: 
-#       msg: "break {{ here }}"
+- name: Remove Temporary and Unwanted NICs
+  delegate_to: "{{ VM_HOST_IP }}"
+  run_once: true
+  loop: "{{ groups['hahost'] }}"
+  vars:
+    short_name: "{{ item.split('.')[0] }}"
+    # Use the map we created earlier to know which one to KEEP
+    keep_mac: "{{ lb_mac_map[item] }}"
+  shell: |
+    # 1. Get all MAC addresses currently attached to this VM
+    # Exclude the header 'MAC' and any empty lines
+    CURRENT_MACS=$(sudo virsh domiflist {{ short_name }} | awk '{print $5}' | grep -vE 'MAC|^$')
 
-# - name: Configure Provider IP via DHCP Management Link
-#   delegate_to: localhost
-#   when: inventory_hostname in groups['hahost']
-#   vars:
-#     target_mac: "{{ lb_mac_map[inventory_hostname] }}"
-#     target_ip: "{{ hostvars[inventory_hostname].ansible_host }}"
-#     target_gw: "{{ target_ip.split('.')[:3] | join('.') }}.1"
-#     dns_servers: "{{ groups['dns'] | map('extract', hostvars, 'ansible_host') | join(',') }}"
-#   shell: |
-#     ssh -o StrictHostKeyChecking=no core@{{ temp_mgmt_ip }} "
-#       # Identify which device (enp...) has the target MAC
-#       IFACE=\$(ip -o link show | grep -i '{{ target_mac }}' | awk -F': ' '{print \$2}')
-      
-#       # Create the static profile
-#       sudo nmcli con add type ethernet con-name provider ifname \$IFACE \
-#         ipv4.addresses {{ target_ip }}/24 \
-#         ipv4.gateway {{ target_gw }} \
-#         ipv4.dns {{ dns_servers }} \
-#         ipv4.method manual \
-#         connection.autoconnect yes
-      
-#       sudo nmcli con up provider
-#     "
+    for m in $CURRENT_MACS; do
+      if [ "$m" != "{{ keep_mac }}" ]; then
+        echo "Removing unwanted NIC with MAC: $m from {{ short_name }}"
+        # Detach live and update the XML config for persistence
+        sudo virsh detach-interface {{ short_name }} bridge --mac $m --live --config
+      else
+        echo "Keeping Provider NIC with MAC: $m"
+      fi
+    done
+  register: cleanup_result
 
+- name: Verify Final Network State
+  delegate_to: "{{ VM_HOST_IP }}"
+  run_once: true
+  loop: "{{ groups['hahost'] }}"
+  shell: "sudo virsh domiflist {{ item.split('.')[0] }}"
+  register: final_verify
 
-# # 01b_lb_config.yml
+- debug:
+    msg: "{{ item.stdout_lines }}"
+  loop: "{{ final_verify.results }}"
+  run_once: true
 
-# - name: Get Target MAC from Hypervisor for all LBs
-#   delegate_to: "{{ VM_HOST_IP }}"
-#   shell: "sudo virsh domiflist {{ item.split('.')[0] }} | grep 'default' | awk '{print $5}' | head -n1"
-#   register: mac_discovery
-#   loop: "{{ groups['hahost'] }}"
-#   run_once: true
-
-# - name: Hardware Surgery and IP Injection
-#   delegate_to: "{{ VM_HOST_IP }}"
-#   run_once: true
-#   loop: "{{ groups['hahost'] }}"
-#   loop_control:
-#     index_var: idx
-#   vars:
-#     # Extract data for the specific host in the loop
-#     current_lb: "{{ item }}"
-#     short_name: "{{ item.split('.')[0] }}"
-#     target_ip: "{{ hostvars[item].ansible_host }}"
-#     target_gw: "{{ hostvars[item].ansible_host.split('.')[:3] | join('.') }}.1"
-#     target_mac: "{{ mac_discovery.results[idx].stdout }}"
-#     dns_servers: "{{ groups['dns'] | map('extract', hostvars, 'ansible_host') | join(',') }}"
-#   shell: |
-#     # 1. Remove non-provider NICs
-#     MACS=$(sudo virsh domiflist {{ short_name }} | awk '/[0-9a-f]{2}:/ {print $5}')
-#     for m in $MACS; do
-#       if [ "$m" != "{{ target_mac }}" ]; then
-#         sudo virt-xml {{ short_name }} --remove-device --network mac=$m --confirm
-#       fi
-#     done
-
-#     # 2. Inject Network Config
-#     sudo virt-customize -d {{ short_name }} \
-#       --hostname {{ short_name }} \
-#       --run-command "nmcli con mod 'Wired connection 1' \
-#         ipv4.addresses {{ target_ip }}/24 \
-#         ipv4.gateway {{ target_gw }} \
-#         ipv4.dns {{ dns_servers }} \
-#         ipv4.method manual \
-#         connection.autoconnect yes" \
-#       --selinux-relabel
-
-#     # 3. Start VM
-#     sudo virsh start {{ short_name }}
-
-# # - name: Set Discovery Fact
-# #   set_fact:
-# #     target_mac: "{{ mac_discovery.stdout }}"
-# #   when: inventory_hostname in groups['hahost']
-
-# # - name: Remove Non-Provider NICs
-# #   delegate_to: "{{ VM_HOST_IP }}"
-# #   shell: |
-# #     MACS=$(sudo virsh domiflist {{ short_name }} | awk '/[0-9a-f]{2}:/ {print $5}')
-# #     for m in $MACS; do
-# #       if [ "$m" != "{{ target_mac }}" ]; then
-# #         sudo virt-xml {{ short_name }} --remove-device --network mac=$m --confirm
-# #       fi
-# #     done
-# #   when: inventory_hostname in groups['hahost']
-
-# # - name: Inject IP into Disk Image
-# #   delegate_to: "{{ VM_HOST_IP }}"
-# #   shell: >
-# #     sudo virt-customize -d {{ short_name }}
-# #     --hostname {{ short_name }}
-# #     --run-command "nmcli device set {{ target_mac }} managed yes"
-# #     --run-command "nmcli con mod 'Wired connection 1' 
-# #     ipv4.addresses {{ target_ip }}/24 
-# #     ipv4.gateway {{ target_gw }} 
-# #     ipv4.dns {{ dns_servers }} 
-# #     ipv4.method manual 
-# #     connection.autoconnect yes"
-# #     --selinux-relabel
-# #   when: inventory_hostname in groups['hahost']
-
-# # - name: Start Load Balancer
-# #   delegate_to: "{{ VM_HOST_IP }}"
-# #   shell: "sudo virsh start {{ short_name }}"
-# #   when: inventory_hostname in groups['hahost']
 
 # - name: Install and Configure HAProxy/Keepalived via SSH
 #   vars:
