@@ -3,9 +3,10 @@
   vars:
     opt1: "-o StrictHostKeyChecking=no"
     opt2: "-o UserKnownHostsFile=/dev/null"
-    opt3: "-o ConnectTimeout=10"  # Good safety for unreachable nodes
+    opt3: "-o ConnectTimeout=10"
+    opt4: "-o ProxyCommand=none"
   shell: |
-    ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} core@{{ ansible_host }} \
+    ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} {{ opt4 }} core@{{ ansible_host }} \
     "sudo systemctl enable --now firewalld && \
      sudo firewall-cmd --permanent --add-port=10250/tcp --add-port=8472/udp \
      {% if 'control_nodes' in group_names %}
@@ -25,11 +26,14 @@
     etcd_ver: "v3.5.12"
     opt1: "-o StrictHostKeyChecking=no"
     opt2: "-o UserKnownHostsFile=/dev/null"
+    opt3: "-o ConnectTimeout=10"
+    opt4: "-o ProxyCommand=none"
+  opt2: "-o UserKnownHostsFile=/dev/null"
   block:
     - name: "Bootstrap etcdctl via SSH and Curl"
       delegate_to: localhost
       shell: |
-        ssh {{ opt1 }} {{ opt2 }} core@{{ this_vm_ip }} << 'EOF'
+        ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} {{ opt4 }} core@{{ this_vm_ip }} << 'EOF'
           # Exit immediately if a command fails
           set -e
 
