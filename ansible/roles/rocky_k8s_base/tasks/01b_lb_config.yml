@@ -175,80 +175,39 @@
         dest: "/tmp/k8s_lb_configs/{{ item }}/keepalived.conf"
       loop: "{{ groups['hahost'] }}"
 
-- name: Push Configurations and Enable Services
-  vars:
-    ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-    target_ip: "{{ hostvars[item].ansible_host }}"
+- name: Push and Enable LB Services
   delegate_to: localhost
   run_once: true
   loop: "{{ groups['hahost'] }}"
+  vars:
+    ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+    target_ip: "{{ hostvars[item].ansible_host }}"
   shell: |
-    # 1. Push HAProxy Config (from the local temp dir we created earlier)
-    cat /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg | \
-    ssh {{ ssh_opts }} core@{{ target_ip }} "sudo tee /etc/haproxy/haproxy.cfg > /dev/null"
+    # 1. Push HAProxy Config
+    scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
+    ssh {{ ssh_opts }} core@{{ target_ip }} "sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg"
 
     # 2. Push Keepalived Config
-    cat /tmp/k8s_lb_configs/{{ item }}/keepalived.conf | \
-    ssh {{ ssh_opts }} core@{{ target_ip }} "sudo tee /etc/keepalived/keepalived.conf > /dev/null"
+    scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
+    ssh {{ ssh_opts }} core@{{ target_ip }} "sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf"
 
-    # 3. Set sysctl for non-local binding (Allows HAProxy to bind to the VIP)
-    ssh {{ ssh_opts }} core@{{ target_ip }} "sudo sysctl -w net.ipv4.ip_nonlocal_bind=1 && echo 'net.ipv4.ip_nonlocal_bind=1' | sudo tee -a /etc/sysctl.conf"
-
-    # 4. Configure Firewall for VRRP (Keepalived) and K8s API
-    ssh {{ ssh_opts }} core@{{ target_ip }} "sudo firewall-cmd --permanent --add-protocol=vrrp && \
-                                             sudo firewall-cmd --permanent --add-port=6443/tcp && \
-                                             sudo firewall-cmd --reload"
-
-    # 5. Start and Enable services
-    ssh {{ ssh_opts }} core@{{ target_ip }} "sudo systemctl enable --now haproxy keepalived"
-  register: service_config
-  failed_when: service_config.rc != 0
-
-# - name: Generate Local LB Configs
-#   delegate_to: localhost
-#   run_once: false # Run for each LB node to get unique Keepalived priorities
-#   block:
-#     - name: Create local temp directory for configs
-#       file:
-#         path: "/tmp/k8s_lb_configs/{{ inventory_hostname }}"
-#         state: directory
-#         mode: '0755'
-
-#     - name: Template HAProxy Config locally
-#       template:
-#         src: haproxy.cfg.j2
-#         dest: "/tmp/k8s_lb_configs/{{ inventory_hostname }}/haproxy.cfg"
-
-#     - name: Template Keepalived Config locally
-#       template:
-#         src: keepalived.conf.j2
-#         dest: "/tmp/k8s_lb_configs/{{ inventory_hostname }}/keepalived.conf"
-#   when: inventory_hostname in groups['hahost']
-
-# - name: Install and Configure HAProxy/Keepalived via SSH
-#   vars:
-#     opt1: "-o StrictHostKeyChecking=no"
-#     opt2: "-o UserKnownHostsFile=/dev/null"
-#     opt3: "-o ConnectTimeout=10"
-#     target_ip: "{{ hostvars[inventory_hostname].ansible_host }}"
-#   delegate_to: localhost
-#   shell: |
-#     # 2. Push HAProxy Config from local /tmp
-#     cat /tmp/{{ inventory_hostname }}_haproxy.cfg | \
-#     ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} core@{{ target_ip }} "sudo tee /etc/haproxy/haproxy.cfg > /dev/null"
-
-#     # 3. Push Keepalived Config from local /tmp
-#     cat /tmp/{{ inventory_hostname }}_keepalived.conf | \
-#     ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} core@{{ target_ip }} "sudo tee /etc/keepalived/keepalived.conf > /dev/null"
-
-#     # 4. Set sysctl for VIP binding (The "Link" requirement)
-#     ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} core@{{ target_ip }} "sudo sysctl -w net.ipv4.ip_nonlocal_bind=1 && echo 'net.ipv4.ip_nonlocal_bind=1' | sudo tee -a /etc/sysctl.conf"
-
-#     # 5. Open Firewall for VRRP and K8s API
-#     ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} core@{{ target_ip }} "sudo firewall-cmd --permanent --add-protocol=vrrp && sudo firewall-cmd --permanent --add-port=6443/tcp && sudo firewall-cmd --reload"
-
-#     # 6. Kick the services
-#     ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} core@{{ target_ip }} "sudo systemctl enable --now haproxy keepalived"
-#   when: inventory_hostname in groups['hahost']
-#   register: lb_setup
-#   failed_when: lb_setup.rc != 0
+    # 3. System Fixes (Crucial for HAProxy + VIP)
+    ssh {{ ssh_opts }} core@{{ target_ip }} "
+      # Allow binding to non-local IPs (the VIP)
+      sudo sysctl -w net.ipv4.ip_nonlocal_bind=1
+      echo 'net.ipv4.ip_nonlocal_bind=1' | sudo tee /etc/sysctl.d/99-k8s-lb.conf
+      
+      # SELinux: Allow HAProxy to bind to any port/IP
+      sudo setsebool -P haproxy_connect_any 1
+      
+      # Firewall
+      sudo firewall-cmd --permanent --add-protocol=vrrp
+      sudo firewall-cmd --permanent --add-port=6443/tcp
+      sudo firewall-cmd --reload
+      
+      # Start Keepalived FIRST (to get the VIP) then HAProxy
+      sudo systemctl enable --now keepalived
+      sleep 2
+      sudo systemctl enable --now haproxy
+    "
+  register: lb_push_result
