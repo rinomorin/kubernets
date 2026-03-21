@@ -110,3 +110,4 @@
   register: lb_setup
   failed_when: lb_setup.rc != 0
 
+- debug: msg="break {{ here }}"
