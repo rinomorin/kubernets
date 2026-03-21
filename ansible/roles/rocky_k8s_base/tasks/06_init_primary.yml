@@ -80,9 +80,16 @@
 - name: Prepare Manual Initialization (Primary Master)
   block:
       # This creates the file LOCALLY on your helper machine/laptop
+- name: Prepare Manual Initialization (Primary Master)
+  block:
     - name: Create the manual init script locally
       delegate_to: localhost
       become: false
+      vars:
+        # Calculate the internal VIP (.30) based on the provision network
+        first_master: "{{ groups['control_nodes'][0] }}"
+        provision_net: "{{ hostvars[first_master]['provision_ip'].split('.')[:3] | join('.') }}"
+        internal_vip: "{{ provision_net }}.30"
       copy:
         dest: /tmp/manual_k8s_init.sh
         mode: '0755'
@@ -96,12 +103,13 @@
           sudo systemctl enable --now crio
           
           echo "--- Initializing Cluster ---"
+          # Fixed: kubeadm init (removed the extra dash)
           sudo kubeadm init \
           {% endraw %}
-            --control-plane-endpoint '{{ hostvars[groups["control_nodes"][0]].inventory_hostname }}:6443' \
+            --control-plane-endpoint '{{ internal_vip }}:6443' \
             --upload-certs \
             --pod-network-cidr=10.244.0.0/16 \
-            --apiserver-advertise-address={{ hostvars[groups["control_nodes"][0]].ansible_host }} \
+            --apiserver-advertise-address={{ hostvars[first_master]['provision_ip'] }} \
             --cri-socket unix:///var/run/crio/crio.sock \
             --ignore-preflight-errors=Swap,SystemVerification | tee /tmp/kubeadm_output
           
@@ -111,48 +119,30 @@
           HASH=$(grep "sha256:" /tmp/kubeadm_output | head -n 1 | awk '{print $2}')
           CERT_KEY=$(grep -A 1 "Using certificate key:" /tmp/kubeadm_output | tail -n 1 | xargs)
 
-          if [ -z "$CERT_KEY" ] || [ ${#CERT_KEY} -lt 60 ]; then
-             CERT_KEY=$(grep -E '^[a-f0-9]{64}$' /tmp/kubeadm_output | head -n 1)
-          fi
-
           echo -e "\n\n=========================================================="
           echo "K8S INITIALIZATION COMPLETE"
           echo "=========================================================="
           {% endraw %}
 
-          echo ############################
-          echo # hint run the config
-          echo ############################
           echo "--- To configure kubectl for your user, run: ---"
           echo "mkdir -p \$HOME/.kube"
           echo "sudo cp -i /etc/kubernetes/admin.conf \$HOME/.kube/config"
-          # Escape both the $ and the opening ( to prevent immediate execution
-          echo "sudo chown \$(id -u):\$(id -g) \$HOME/.kube/config"          echo
-          echo kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
-
-          echo ETCD_VER=v3.5.12
-          echo ETCD_GOOGLE_URL=https://storage.googleapis.com/etcd
-          echo DOWNLOAD_URL=\${GOOGLE_URL}
+          echo "sudo chown \$(id -u):\$(id -g) \$HOME/.kube/config"
           echo
-          echo  curl -L \${DOWNLOAD_URL}/\${ETCD_VER}/etcd-\${ETCD_VER}-linux-amd64.tar.gz -o /tmp/etcd.tar.gz
-          echo  tar xzvf /tmp/etcd.tar.gz -C /tmp/ --strip-components=1
-          echo  sudo mv /tmp/etcdctl /usr/local/bin/
-          echo  rm -f /tmp/etcd.tar.gzS
-          echo  sudo ln -s /usr/local/bin/etcdctl /usr/bin/etcdctl
-          echo  sudo -f /tmp/etcd.tar.gz
-          echo
+          echo "kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml"
 
           echo -e "\n--- COPY THIS FOR SECONDARY MASTERS ---"
-          echo "sudo kubeadm join {{ hostvars[groups['control_nodes'][0]].ansible_host }}:6443 \\"
-          echo "  --token $TOKEN \\"
-          echo "  --discovery-token-ca-cert-hash $HASH \\"
-          echo "  --control-plane --certificate-key $CERT_KEY \\"
+          echo "sudo kubeadm join {{ internal_vip }}:6443 \\"
+          echo "  --token \$TOKEN \\"
+          echo "  --discovery-token-ca-cert-hash \$HASH \\"
+          echo "  --control-plane --certificate-key \$CERT_KEY \\"
+          echo "  --apiserver-advertise-address=<LOCAL_PROVISION_IP> \\"
           echo "  --ignore-preflight-errors=Swap,SystemVerification"
 
           echo -e "\n--- COPY THIS FOR WORKER NODES ---"
-          echo "sudo kubeadm join {{ hostvars[groups['control_nodes'][0]].ansible_host }}:6443 \\"
-          echo "  --token $TOKEN \\"
-          echo "  --discovery-token-ca-cert-hash $HASH \\"
+          echo "sudo kubeadm join {{ internal_vip }}:6443 \\"
+          echo "  --token \$TOKEN \\"
+          echo "  --discovery-token-ca-cert-hash \$HASH \\"
           echo "  --ignore-preflight-errors=Swap,SystemVerification"
           echo -e "\n==========================================================\n"
 
