@@ -175,7 +175,7 @@
         dest: "/tmp/k8s_lb_configs/{{ item }}/keepalived.conf"
       loop: "{{ groups['hahost'] }}"
 
-- name: Push and Enable LB Services (The Nuclear Option)
+- name: Push and Enable LB Services (Fixed Permissions)
   delegate_to: localhost
   run_once: true
   loop: "{{ groups['hahost'] }}"
@@ -190,34 +190,30 @@
     sed -i "s|interface .*|interface $REAL_IFACE|" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
     sed -i 's|killall -0 haproxy|pgrep -x haproxy|' /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
     
-    # 3. Ensure a different router ID to avoid network conflicts
-    # Using 100 + the last octet of the IP is a safe way to ensure uniqueness
-    NEW_ID=$(echo {{ target_ip }} | cut -d. -f4)
-    sed -i "s|virtual_router_id .*|virtual_router_id $NEW_ID|" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
-
-    # 4. Push Configs
+    # 3. Push Configs
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
     
     ssh {{ ssh_opts }} core@{{ target_ip }} "
+      # 4. Move and Fix Permissions/Context
       sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
       sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf
       
-      # 5. Fix Environment & Permissions
+      # Set ownership to root
+      sudo chown root:root /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
+      # Set standard permissions (readable by service)
+      sudo chmod 644 /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
+      
+      # RELABEL for SELinux (This is the critical part for Rocky/RHEL)
+      sudo restorecon -v /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
+      
+      # 5. System Fixes
       sudo sysctl -w net.ipv4.ip_nonlocal_bind=1
-      sudo setenforce 0  # Temporarily set to Permissive to rule out SELinux
+      sudo setsebool -P haproxy_connect_any 1
       
-      # 6. Force Start
+      # 6. Restart Services
       sudo systemctl stop haproxy keepalived
-      sudo systemctl daemon-reload
-      
-      # Try Keepalived first
-      if ! sudo systemctl start keepalived; then
-        echo 'Keepalived failed. Config dump:'
-        sudo keepalived -t -f /etc/keepalived/keepalived.conf
-        exit 1
-      fi
-      
+      sudo systemctl enable --now keepalived
       sleep 2
-      sudo systemctl start haproxy || (sudo journalctl -u haproxy --no-pager | tail -n 10 && exit 1)
+      sudo systemctl enable --now haproxy
     "
