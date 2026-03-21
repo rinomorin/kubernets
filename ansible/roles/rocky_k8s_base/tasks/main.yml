@@ -1,3 +1,8 @@
+---
+- name: Ensure Python requirements are met locally
+  pip:
+    requirements: "{{ role_path }}/requirements.txt"
+  # This ensures 'netaddr' is present in the current venv
 
 - debug:
     msg: "Current node is {{ inventory_hostname }} in group(s) {{ group_names }}" 
