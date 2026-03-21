@@ -45,7 +45,7 @@
         default_net_device: "{{ lookup('env', 'default_net_device') }}"
         cluster_net_device: "{{ lookup('env', 'cluster_net_device') }}"
         nat_net_device: "{{ lookup('env', 'nat_net_device') }}"
-        default_ansible_pwd: "{{ lookup('env', 'secops_pwd') }}
+        default_ansible_pwd: "{{ lookup('env', 'secops_pwd') }}"
         secops_key: "{{ lookup('env','secops_key') }}"
         secops_edkey: "{{ lookup('env','secops_edkey') }}"
         ssh_key_path: "{{ lookup('env', 'ssh_key_path')| to_json }}"
