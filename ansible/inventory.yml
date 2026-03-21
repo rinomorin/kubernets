@@ -89,6 +89,12 @@ all:
         msrlv9mast02:
         msrlv9mast03:
 
+    hahost:
+      hosts:
+        msrlv9l01:
+        msrlv9l02:
+        msrlv9l03:
+
     helper_nodes:
       hosts:
         helper:
