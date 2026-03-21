@@ -1,8 +1,11 @@
 - name: Set Network Facts for Injection
   set_fact:
+    # Use split to get 'msrlv9l01' instead of the full FQDN
     short_name: "{{ inventory_hostname.split('.')[0] }}"
     target_ip: "{{ hostvars[inventory_hostname].ansible_host }}"
+    # Logic: 192.168.100.21 -> 192.168.100.1
     target_gw: "{{ hostvars[inventory_hostname].ansible_host.split('.')[:3] | join('.') }}.1"
+    # Logic: Pull IPs for all nodes in 'dns' group
     dns_servers: "{{ groups['dns'] | map('extract', hostvars, 'ansible_host') | join(',') }}"
   when: "'hahost' in group_names"
 
@@ -14,7 +17,7 @@
     TARGET_MAC=$(sudo virsh domiflist {{ short_name }} | grep 'default' | awk '{print $5}' | head -n1)
     
     if [ -z "$TARGET_MAC" ]; then
-      echo "Error: Could not find a NIC attached to the 'default' network."
+      echo "No NIC on default network found for {{ short_name }}"
       exit 1
     fi
 
@@ -22,20 +25,16 @@
     ALL_MACS=$(sudo virsh domiflist {{ short_name }} | awk '/[0-9a-f]{2}:/ {print $5}')
     for m in $ALL_MACS; do
       if [ "$m" != "$TARGET_MAC" ]; then
-        echo "Deleting non-provider NIC: $m"
         sudo virt-xml {{ short_name }} --remove-device --network mac=$m --confirm
       fi
     done
 
-    # 3. Inject IP using the detected MAC to find the interface inside the VM
-    # Note: We use double backslashes for shell variables inside the virt-customize command
+    # 3. Inject IP using the detected MAC
+    # We use \$ for shell variables we want evaluated INSIDE the VM disk
     sudo virt-customize -d {{ short_name }} \
       --hostname {{ short_name }} \
       --run-command "
-        # Identify the connection name associated with the MAC we kept
         CON_NAME=\$(nmcli -t -f general.connection device show | grep -B1 $TARGET_MAC | head -n1 | cut -d: -f2)
-        
-        # Fallback if nmcli hasn't named it yet
         if [ -z \"\$CON_NAME\" ]; then CON_NAME=\$(nmcli -t -f NAME con show | head -n1); fi
 
         nmcli con mod \"\$CON_NAME\" \
@@ -49,7 +48,6 @@
 
     # 4. Start the Load Balancer
     sudo virsh start {{ short_name }}
-  register: lb_init_out
 
 - name: Install and Configure HAProxy/Keepalived via SSH
   vars:
