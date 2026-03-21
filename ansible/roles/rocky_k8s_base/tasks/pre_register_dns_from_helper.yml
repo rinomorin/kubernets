@@ -1,11 +1,13 @@
 ---
-- name: Register DNS Records via Helper
-  delegate_to: local
+- name: Register DNS Records via Localhost
+  run_once: true
+  delegate_to: localhost
   become: no
   block:
     - name: Authenticate with FreeIPA
       shell: "echo '{{ ipa_admin_password }}' | kinit admin"
       no_log: true
+      check_mode: no
 
     - name: Ensure DNS Forward and Reverse Zones exist
       command: "ipa dnszone-add {{ item }} --name-server={{ ipa_master_fqdn }}."
