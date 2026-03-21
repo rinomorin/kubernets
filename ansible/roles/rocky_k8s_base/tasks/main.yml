@@ -38,7 +38,6 @@
     import_tasks: pre_register_dns_from_helper.yml
     delegate_to: "{{ VM_HOST_IP }}"
 
-
   - name: Build Rocky Linux base image
     import_tasks: 00_create_golden.yml
     delegate_to: "{{ VM_HOST_IP }}"
@@ -47,8 +46,9 @@
     import_tasks: 01_wait_for_shutdown.yml
     delegate_to: "{{ VM_HOST_IP }}"
   
-  - name: add load balancers
+  - name: config load balancers
     import_tasks: 01b_lb_config.yml
+    when: "'hahost' in group_names"
 
   - name: wait for power up
     import_tasks: 02_wait_for_poweron.yml
