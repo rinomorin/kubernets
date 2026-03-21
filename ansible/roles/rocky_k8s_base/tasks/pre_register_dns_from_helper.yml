@@ -43,3 +43,41 @@
       failed_when: false
       register: prov_reg
       changed_when: "'Added record' in prov_reg.stdout"
+
+# 2. Register the Load Balancer VIP in FreeIPA DNS
+- name: Register K8s Infrastructure in FreeIPA
+  delegate_to: localhost
+  run_once: true
+  block:
+    - name: Authenticate with FreeIPA
+      # Use single quotes around the variable to protect special characters
+      shell: "echo '{{ ipa_admin_password }}' | kinit admin"
+      no_log: true
+      delegate_to: localhost
+      run_once: true
+
+    - name: Add Forward A Record for VIP (.30)
+      command: >
+        ipa dnsrecord-add {{ cloud_zone }} k8s-api 
+        --a-rec={{ k8s_api_vip }}
+      register: dns_vip
+      failed_when: dns_vip.rc != 0 and 'already exists' not in dns_vip.stderr
+
+    - name: Add Reverse PTR Record for VIP (.30)
+      command: >
+        ipa dnsrecord-add {{ rev_cloud_zone }} {{ k8s_api_vip.split('.')[-1] }} 
+        --ptr-rec=k8s-api.{{ cloud_zone }}.
+      register: ptr_vip
+      failed_when: ptr_vip.rc != 0 and 'already exists' not in ptr_vip.stderr
+
+    - name: Add Forward & Reverse for individual LB nodes
+      shell: |
+        # Add A record
+        ipa dnsrecord-add {{ cloud_zone }} {{ item }} --a-rec={{ hostvars[item].ansible_host }}
+        # Add PTR record (using the last octet of the ansible_host)
+        ipa dnsrecord-add {{ rev_cloud_zone }} {{ hostvars[item].ansible_host.split('.')[-1] }} --ptr-rec={{ item }}.{{ cloud_zone }}.
+      loop: "{{ groups['hahost'] }}"
+      register: dns_nodes
+      failed_when: 
+        - dns_nodes.rc != 0 
+        - "'already exists' not in dns_nodes.stder
