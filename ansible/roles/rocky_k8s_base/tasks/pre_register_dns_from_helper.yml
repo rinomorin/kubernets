@@ -80,4 +80,4 @@
       register: dns_nodes
       failed_when: 
         - dns_nodes.rc != 0 
-        - "'already exists' not in dns_nodes.stder
+        - "'already exists' not in dns_nodes.stder"
