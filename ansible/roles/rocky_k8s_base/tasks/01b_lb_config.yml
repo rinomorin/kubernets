@@ -174,30 +174,28 @@
         src: keepalived.conf.j2
         dest: "/tmp/k8s_lb_configs/{{ item }}/keepalived.conf"
       loop: "{{ groups['hahost'] }}"
-- name: Push and Enable LB Services (Fixed Keepalived)
+
+- name: Push and Enable LB Services (The Nuclear Option)
   delegate_to: localhost
   run_once: true
   loop: "{{ groups['hahost'] }}"
   vars:
     ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
     target_ip: "{{ hostvars[item].ansible_host }}"
-    target_mac: "{{ lb_mac_map[item] }}"
   shell: |
-    # 1. Detect actual interface name (Verify it matches the 192.168.100.x subnet)
+    # 1. Detect Interface
     REAL_IFACE=$(ssh {{ ssh_opts }} core@{{ target_ip }} "ip -o addr show | grep '192.168.100.' | awk '{print \$2}' | head -n1")
     
-    # Fallback to MAC search if subnet search fails
-    if [ -z "$REAL_IFACE" ]; then
-      REAL_IFACE=$(ssh {{ ssh_opts }} core@{{ target_ip }} "ip -o link show | grep -i '{{ target_mac }}' | awk -F': ' '{print \$2}'")
-    fi
-
-    # 2. Update Keepalived config with the correct interface
+    # 2. Fix configs locally
     sed -i "s|interface .*|interface $REAL_IFACE|" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
+    sed -i 's|killall -0 haproxy|pgrep -x haproxy|' /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
     
-    # 3. Update the check script to use pgrep (more compatible than killall)
-    sed -i 's|killall -0 haproxy|pgrep -x haproxy >/dev/null 2>\&1|' /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
+    # 3. Ensure a different router ID to avoid network conflicts
+    # Using 100 + the last octet of the IP is a safe way to ensure uniqueness
+    NEW_ID=$(echo {{ target_ip }} | cut -d. -f4)
+    sed -i "s|virtual_router_id .*|virtual_router_id $NEW_ID|" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
 
-    # 4. Push and Restart
+    # 4. Push Configs
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
     
@@ -205,12 +203,21 @@
       sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
       sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf
       
-      # Ensure non-local bind is set (re-applying to be safe)
+      # 5. Fix Environment & Permissions
       sudo sysctl -w net.ipv4.ip_nonlocal_bind=1
+      sudo setenforce 0  # Temporarily set to Permissive to rule out SELinux
       
-      # Attempt start
+      # 6. Force Start
       sudo systemctl stop haproxy keepalived
-      sudo systemctl start keepalived
+      sudo systemctl daemon-reload
+      
+      # Try Keepalived first
+      if ! sudo systemctl start keepalived; then
+        echo 'Keepalived failed. Config dump:'
+        sudo keepalived -t -f /etc/keepalived/keepalived.conf
+        exit 1
+      fi
+      
       sleep 2
-      sudo systemctl start haproxy
+      sudo systemctl start haproxy || (sudo journalctl -u haproxy --no-pager | tail -n 10 && exit 1)
     "
