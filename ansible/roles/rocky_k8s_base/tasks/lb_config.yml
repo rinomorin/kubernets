@@ -1,3 +1,11 @@
+- name: Set Network Facts for Injection
+  set_fact:
+    short_name: "{{ inventory_hostname.split('.')[0] }}"
+    target_ip: "{{ hostvars[inventory_hostname].ansible_host }}"
+    target_gw: "{{ hostvars[inventory_hostname].ansible_host.split('.')[:3] | join('.') }}.1"
+    dns_servers: "{{ groups['dns'] | map('extract', hostvars, 'ansible_host') | join(',') }}"
+  when: "'hahost' in group_names"
+
 - name: Get Target MAC from Hypervisor
   delegate_to: "{{ VM_HOST_IP }}"
   shell: "sudo virsh domiflist {{ short_name }} | grep 'default' | awk '{print $5}' | head -n1"
