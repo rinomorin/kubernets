@@ -59,11 +59,13 @@
         ssh {{ opt1 }} {{ opt2 }} {{ ansible_user }}@{{ ansible_host }} "etcdctl version"
       register: etcd_check
       changed_when: false
+      when: "'kvm' not in group_names"
+    
 
     - name: Show etcdctl version for {{ inventory_hostname }}
       debug:
         msg: "{{ etcd_check.stdout_lines[0] }}"
-
+      when: "'kvm' not in group_names"
 - name: Debug Firewall Output for {{ inventory_hostname }}
   debug:
     msg: "{{ firewall_out.stdout_lines }}"
