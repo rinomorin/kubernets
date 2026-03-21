@@ -4,6 +4,9 @@
   delegate_to: localhost
   become: no
   block:
+    - debug:
+        msg: "{{ ipa_admin_password }}"
+    
     - name: Authenticate with FreeIPA
       # Use single quotes around the variable to protect special characters
       shell: "echo '{{ ipa_admin_password }}' | kinit admin"
