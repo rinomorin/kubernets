@@ -28,7 +28,6 @@
     opt2: "-o UserKnownHostsFile=/dev/null"
     opt3: "-o ConnectTimeout=10"
     opt4: "-o ProxyCommand=none"
-  opt2: "-o UserKnownHostsFile=/dev/null"
   block:
     - name: "Bootstrap etcdctl via SSH and Curl"
       delegate_to: localhost
