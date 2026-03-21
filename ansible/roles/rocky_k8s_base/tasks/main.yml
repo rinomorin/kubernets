@@ -46,6 +46,7 @@
     import_tasks: 01_wait_for_shutdown.yml
     delegate_to: "{{ VM_HOST_IP }}"
   
+
   - name: config load balancers
     import_tasks: 01b_lb_config.yml
 
