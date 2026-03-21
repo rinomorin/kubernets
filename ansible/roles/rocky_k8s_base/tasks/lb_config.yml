@@ -1,13 +1,113 @@
+- name: Hardware Surgery and IP Injection (Dynamic MAC)
+  delegate_to: "{{ VM_HOST_IP }}"
+  when: "'hahost' in group_names"
+  vars:
+    short_name: "{{ inventory_hostname.split('.')[0] }}"
+    target_ip: "{{ hostvars[inventory_hostname].ansible_host }}"
+    # Logic: 192.168.100.21 -> 192.168.100.1
+    target_gw: "{{ target_ip.split('.')[:3] | join('.') }}.1"
+    # Logic: Pull IPs for all nodes in the 'dns' group
+    dns_servers: "{{ groups['dns'] | map('extract', hostvars, 'ansible_host') | join(',') }}"
+  shell: |
+    # 1. Dynamically find the MAC address attached to the 'default' network
+    # We look for the line containing 'default' and extract the MAC (column 5)
+    TARGET_MAC=$(sudo virsh domiflist {{ short_name }} | grep 'default' | awk '{print $5}' | head -n1)
+    
+    if [ -z "$TARGET_MAC" ]; then
+      echo "Error: Could not find a NIC attached to the 'default' network."
+      exit 1
+    fi
 
+    # 2. Identify ALL MACs and remove the ones that DON'T match our Target
+    ALL_MACS=$(sudo virsh domiflist {{ short_name }} | awk '/[0-9a-f]{2}:/ {print $5}')
+    for m in $ALL_MACS; do
+      if [ "$m" != "$TARGET_MAC" ]; then
+        echo "Deleting non-provider NIC: $m"
+        sudo virt-xml {{ short_name }} --remove-device --network mac=$m --confirm
+      fi
+    done
 
-- name: Deploy HAProxy Configuration
-  template:
-    src: haproxy.cfg.j2
-    dest: /etc/haproxy/haproxy.cfg
-  notify: Restart HAProxy
+    # 3. Inject IP using the detected MAC to find the interface inside the VM
+    sudo virt-customize -d {{ short_name }} \
+      --hostname {{ short_name }} \
+      --run-command "
+        # Identify the connection name associated with the MAC we kept
+        CON_NAME=\$(nmcli -t -f general.connection device show | grep -B1 $TARGET_MAC | head -n1 | cut -d: -f2)
+        
+        # Fallback if nmcli hasn't named it yet
+        if [ -z \"\$CON_NAME\" ]; then CON_NAME=\$(nmcli -t -f NAME con show | head -n1); fi
 
-- name: Deploy Keepalived Configuration
-  template:
-    src: keepalived.conf.j2
-    dest: /etc/keepalived/keepalived.conf
-  notify: Restart Keepalived
+        nmcli con mod \"\$CON_NAME\" \
+          ipv4.addresses {{ target_ip }}/24 \
+          ipv4.gateway {{ target_gw }} \
+          ipv4.dns {{ dns_servers }} \
+          ipv4.method manual \
+          connection.autoconnect yes
+      " \
+      --selinux-relabel
+
+    # 4. Start the Load Balancer
+    sudo virsh start {{ short_name }}
+
+- name: Install and Configure HAProxy/Keepalived via SSH
+  vars:
+    opt1: "-o StrictHostKeyChecking=no"
+    opt2: "-o UserKnownHostsFile=/dev/null"
+    opt3: "-o ConnectTimeout=10"
+    target_ip: "{{ hostvars[inventory_hostname].ansible_host }}"
+  delegate_to: localhost
+  shell: |
+    ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} core@{{ target_ip }} "sudo dnf install -y haproxy keepalived"
+  when: "'hahost' in group_names"
+  register: lb_setup
+  failed_when: lb_setup.rc != 0
+
+- name: Generate Local LB Configs
+  delegate_to: localhost
+  run_once: false # Run for each LB node to get unique Keepalived priorities
+  block:
+    - name: Create local temp directory for configs
+      file:
+        path: "/tmp/k8s_lb_configs/{{ inventory_hostname }}"
+        state: directory
+        mode: '0755'
+
+    - name: Template HAProxy Config locally
+      template:
+        src: haproxy.cfg.j2
+        dest: "/tmp/k8s_lb_configs/{{ inventory_hostname }}/haproxy.cfg"
+
+    - name: Template Keepalived Config locally
+      template:
+        src: keepalived.conf.j2
+        dest: "/tmp/k8s_lb_configs/{{ inventory_hostname }}/keepalived.conf"
+  when: "'hahost' in group_names"
+
+- name: Install and Configure HAProxy/Keepalived via SSH
+  vars:
+    opt1: "-o StrictHostKeyChecking=no"
+    opt2: "-o UserKnownHostsFile=/dev/null"
+    opt3: "-o ConnectTimeout=10"
+    target_ip: "{{ hostvars[inventory_hostname].ansible_host }}"
+  delegate_to: localhost
+  shell: |
+    # 2. Push HAProxy Config from local /tmp
+    cat /tmp/{{ inventory_hostname }}_haproxy.cfg | \
+    ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} core@{{ target_ip }} "sudo tee /etc/haproxy/haproxy.cfg > /dev/null"
+
+    # 3. Push Keepalived Config from local /tmp
+    cat /tmp/{{ inventory_hostname }}_keepalived.conf | \
+    ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} core@{{ target_ip }} "sudo tee /etc/keepalived/keepalived.conf > /dev/null"
+
+    # 4. Set sysctl for VIP binding (The "Link" requirement)
+    ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} core@{{ target_ip }} "sudo sysctl -w net.ipv4.ip_nonlocal_bind=1 && echo 'net.ipv4.ip_nonlocal_bind=1' | sudo tee -a /etc/sysctl.conf"
+
+    # 5. Open Firewall for VRRP and K8s API
+    ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} core@{{ target_ip }} "sudo firewall-cmd --permanent --add-protocol=vrrp && sudo firewall-cmd --permanent --add-port=6443/tcp && sudo firewall-cmd --reload"
+
+    # 6. Kick the services
+    ssh {{ opt1 }} {{ opt2 }} {{ opt3 }} core@{{ target_ip }} "sudo systemctl enable --now haproxy keepalived"
+  when: "'hahost' in group_names"
+  register: lb_setup
+  failed_when: lb_setup.rc != 0
+
