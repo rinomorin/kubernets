@@ -54,7 +54,9 @@
             echo "etcdctl already exists, skipping download."
           fi
         EOF
-      when: inventory_hostname in groups['cluster_nodes']
+      when: 
+        - inventory_hostname in groups['cluster_nodes']
+        - "'helper_nodes' not in group_names"
       register: etcd_bootstrap_out
       changed_when: "'installed successfully' in etcd_bootstrap_out.stdout"
 
@@ -65,14 +67,7 @@
 
 - name: Prepare Manual Initialization (Primary Master)
   block:
-    # This part still runs on the remote master to fix its fstab
-    # - name: Ensure Swap is off (Permanent)
-    #   replace:
-    #     path: /etc/fstab
-    #     regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
-    #     replace: '# \1'
-
-    # This creates the file LOCALLY on your helper machine/laptop
+      # This creates the file LOCALLY on your helper machine/laptop
     - name: Create the manual init script locally
       delegate_to: localhost
       become: false
