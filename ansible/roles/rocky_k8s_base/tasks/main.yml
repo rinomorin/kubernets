@@ -17,7 +17,6 @@
 
 - name: Build Rocky Linux base image
   block:
-
   - name: "Forcefully scrub Lab IPs from known_hosts"
     delegate_to: localhost
     run_once: true
@@ -47,6 +46,9 @@
   - name: wait for power down
     import_tasks: 01_wait_for_shutdown.yml
     delegate_to: "{{ VM_HOST_IP }}"
+  
+  - name: add load balancers
+    import_tasks: 01b_lb_config.yml
 
   - name: wait for power up
     import_tasks: 02_wait_for_poweron.yml
