@@ -12,7 +12,6 @@
     - lb_clones.rc != 0 
     - "'already exists' not in lb_clones.stderr"
 
-
 - name: Set Network Facts for Injection
   set_fact:
     short_name: "{{ inventory_hostname.split('.')[0] }}"
