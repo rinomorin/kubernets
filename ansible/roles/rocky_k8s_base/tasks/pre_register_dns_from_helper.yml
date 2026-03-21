@@ -75,12 +75,12 @@
 
     - name: Add Forward & Reverse for individual LB nodes
       shell: |
-        # Add A record
         ipa dnsrecord-add {{ c_zone }} {{ item }} --a-rec={{ hostvars[item].ansible_host }}
-        # Add PTR record
-        ipa dnsrecord-add {{ rev_cloud }} {{ hostvars[item].ansible_host.split('.')[-1] }} --ptr-rec={{ item }}.{{ c_zone }}.
+        ipa dnsrecord-add {{ rev_cloud }} {{ hostvars[item].ansible_host.split('.')[-1] }} --ptr-rec={{ item.split('.')[0] }}.{{ c_zone }}.
       loop: "{{ groups['hahost'] }}"
       register: dns_nodes
+      # This logic now ignores the "no modifications" error and the "already exists" error
       failed_when: 
         - dns_nodes.rc != 0 
-        - "'already exists' not in dns_nodes.stderr" # Fixed the 'stder' typo here
+        - "'already exists' not in dns_nodes.stderr"
+        - "'no modifications' not in dns_nodes.stderr"

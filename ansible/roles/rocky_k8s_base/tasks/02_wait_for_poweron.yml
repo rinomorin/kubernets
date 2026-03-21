@@ -57,7 +57,7 @@
   delegate_to: "{{ VM_HOST_IP }}"
   run_once: true
   command: >
-    virt-clone --original golden-base 
+    sudo virt-clone --original golden-base 
     --name {{ item }} 
     --file /var/lib/libvirt/images/{{ item }}.qcow2
   loop: "{{ groups['hahost'] }}"
