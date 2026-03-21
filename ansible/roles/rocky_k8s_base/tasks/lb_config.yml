@@ -1,16 +1,16 @@
+- name: Set Network Facts for Injection
+  set_fact:
+    short_name: "{{ inventory_hostname.split('.')[0] }}"
+    target_ip: "{{ hostvars[inventory_hostname].ansible_host }}"
+    target_gw: "{{ hostvars[inventory_hostname].ansible_host.split('.')[:3] | join('.') }}.1"
+    dns_servers: "{{ groups['dns'] | map('extract', hostvars, 'ansible_host') | join(',') }}"
+  when: "'hahost' in group_names"
+
 - name: Hardware Surgery and IP Injection (Dynamic MAC)
   delegate_to: "{{ VM_HOST_IP }}"
   when: "'hahost' in group_names"
-  vars:
-    short_name: "{{ inventory_hostname.split('.')[0] }}"
-    target_ip: "{{ hostvars[inventory_hostname].ansible_host }}"
-    # Logic: 192.168.100.21 -> 192.168.100.1
-    target_gw: "{{ target_ip.split('.')[:3] | join('.') }}.1"
-    # Logic: Pull IPs for all nodes in the 'dns' group
-    dns_servers: "{{ groups['dns'] | map('extract', hostvars, 'ansible_host') | join(',') }}"
   shell: |
     # 1. Dynamically find the MAC address attached to the 'default' network
-    # We look for the line containing 'default' and extract the MAC (column 5)
     TARGET_MAC=$(sudo virsh domiflist {{ short_name }} | grep 'default' | awk '{print $5}' | head -n1)
     
     if [ -z "$TARGET_MAC" ]; then
@@ -28,6 +28,7 @@
     done
 
     # 3. Inject IP using the detected MAC to find the interface inside the VM
+    # Note: We use double backslashes for shell variables inside the virt-customize command
     sudo virt-customize -d {{ short_name }} \
       --hostname {{ short_name }} \
       --run-command "
@@ -48,6 +49,7 @@
 
     # 4. Start the Load Balancer
     sudo virsh start {{ short_name }}
+  register: lb_init_out
 
 - name: Install and Configure HAProxy/Keepalived via SSH
   vars:
