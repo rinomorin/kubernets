@@ -65,7 +65,7 @@
 
     - name: Add Reverse PTR Record for VIP (.30)
       command: >
-        ipa dnsrecord-add {{ rev_cloud_zone }} {{ k8s_api_vip.split('.')[-1] }} 
+        ipa dnsrecord-add {{ rev_cloud }} {{ k8s_api_vip.split('.')[-1] }} 
         --ptr-rec=k8s-api.{{ cloud_zone }}.
       register: ptr_vip
       failed_when: ptr_vip.rc != 0 and 'already exists' not in ptr_vip.stderr
@@ -75,7 +75,7 @@
         # Add A record
         ipa dnsrecord-add {{ cloud_zone }} {{ item }} --a-rec={{ hostvars[item].ansible_host }}
         # Add PTR record (using the last octet of the ansible_host)
-        ipa dnsrecord-add {{ rev_cloud_zone }} {{ hostvars[item].ansible_host.split('.')[-1] }} --ptr-rec={{ item }}.{{ cloud_zone }}.
+        ipa dnsrecord-add {{ rev_cloud }} {{ hostvars[item].ansible_host.split('.')[-1] }} --ptr-rec={{ item }}.{{ cloud_zone }}.
       loop: "{{ groups['hahost'] }}"
       register: dns_nodes
       failed_when: 
