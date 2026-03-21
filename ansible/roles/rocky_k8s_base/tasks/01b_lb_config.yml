@@ -28,8 +28,6 @@
   delegate_to: localhost
   run_once: true
 
----
-# 1. Start the VMs (Already working in your logs)
 - name: Start all cloned Load Balancer VMs
   delegate_to: "{{ VM_HOST_IP }}"
   community.libvirt.virt:
