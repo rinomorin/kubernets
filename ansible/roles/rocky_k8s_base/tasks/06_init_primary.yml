@@ -1,7 +1,7 @@
 ---
 - name: Configure Firewalld via SSH (Bypass Python dependency)
   vars:
-    ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o BatchMode=yes"
+    ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"
     target_ip: "{{ hostvars[inventory_hostname].ansible_host }}"
   shell: |
     rm -f ~/.ssh/known_hosts*

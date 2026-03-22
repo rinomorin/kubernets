@@ -89,7 +89,7 @@
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
     # 1. Get the list of VMs we are tracking
-    VMS=$(sudo virsh list --all | grep msrlv | awk '{print $2}')
+    VMS=$(sudo virsh list --all | grep msrlv |grep -E "mast|wrk"  awk '{print $2}')
     TOTAL_VMS=$(echo "$VMS" | wc -l)
     
     # 2. Get the network prefix (e.g., "172.16") to ensure we grab the right lease
@@ -123,7 +123,7 @@
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
     # Re-run once to get the final list for Ansible looping
-    # for i in $(sudo virsh list --all | grep msrlv|grep -E "mast|wrk" | awk '{print $2}'); do 
+    for i in $(sudo virsh list --all | grep msrlv|grep -E "mast|wrk" | awk '{print $2}'); do 
       MAC=$(sudo virsh domiflist $i | grep br-nat | awk '{print $NF}')
       IP=$(sudo virsh net-dhcp-leases br-nat | grep "$MAC" | awk '{print $5}' | sed 's/\/24$//')
       echo "$i=$IP"
@@ -137,6 +137,7 @@
   loop_control:
     loop_var: vm_mapping
   when: "'kvm' in groups"
+
 
 # - name: Render Manual Init Script Locally
 #   delegate_to: localhost

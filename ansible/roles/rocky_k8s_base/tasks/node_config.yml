@@ -3,36 +3,11 @@
     this_vm_name: "{{ vm_mapping.split('=')[0] }}"
     this_vm_ip: "{{ vm_mapping.split('=')[1] }}"
 
-- name: "Remove old SSH key if it exists"
-  delegate_to: localhost
-  # This command checks if the IP is in known_hosts. 
-  # If found (rc 0), it runs the second command to remove it.
-  shell: |
-    if ssh-keygen -F {{ this_vm_ip }}; then
-      ssh-keygen -R {{ this_vm_ip }}
-    else
-      exit 0
-    fi
-  register: key_removal
-  changed_when: "'updated' in key_removal.stdout or key_removal.rc == 0"
-  when: this_vm_ip is defined
-
-- name: "Accept new SSH key silently"
-  delegate_to: localhost
-  # We check if the key is already there to avoid duplicate entries
-  shell: |
-    if ! ssh-keygen -F {{ this_vm_ip }}; then
-      ssh-keyscan -H {{ this_vm_ip }} >> ~/.ssh/known_hosts
-    fi
-  register: key_scan
-  changed_when: "key_scan.stdout != ''"
-  when: this_vm_ip is defined
-
 - name: "Wait for SSH Login to {{ this_vm_name }}"
   delegate_to: localhost
   shell: |
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-        -o ConnectTimeout=5 -o BatchMode=yes \
+        -o ConnectTimeout=5  \
         core@{{ this_vm_ip }} /bin/true
   register: ssh_check
   until: ssh_check.rc == 0
