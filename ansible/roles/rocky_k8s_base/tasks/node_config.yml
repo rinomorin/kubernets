@@ -42,6 +42,7 @@
 - name: "Force Persistent Static Networking"
   delegate_to: localhost
   shell: |
+    rm ~/.ssh/known_host*
     # Explicitly pull the provision_ip of the node we are currently processing
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ hostvars[inventory_hostname]['ansible_host'] }} << 'EOF'
     (
@@ -71,6 +72,7 @@
 - name: "Final Verification of {{ this_vm_name }}"
   delegate_to: localhost
   shell: |
+    rm ~/.ssh/known_host*
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ this_vm_ip }} "ip -4 -br addr show"
   register: final_ipa
   

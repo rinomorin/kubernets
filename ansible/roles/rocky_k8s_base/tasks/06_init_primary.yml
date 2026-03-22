@@ -149,6 +149,7 @@
       delegate_to: localhost
       become: false
       shell: |
+        rm ~/.ssh/known_host*
         scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
         /tmp/manual_k8s_init.sh core@{{ ansible_host }}:~/manual_k8s_init.sh
 
