@@ -33,9 +33,6 @@
 - set_fact:
     golden_ip: "{{ gold_ip.stdout }}"
 
-- name: show golden_ip
-  debug:
-    msg: "{{ golden_ip }}"
 
 - name: Probe ssh until service is ready on golden-base
   delegate_to: localhost
