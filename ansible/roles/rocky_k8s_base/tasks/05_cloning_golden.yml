@@ -85,58 +85,96 @@
     state: running
   loop: "{{ clone_nodes }}"
 
-- name: Wait for all msrlv VMs to obtain a DHCP lease
+# ------------------------------------------------------------
+# 1. Wait for DHCP Leases (Robust Version)
+# ------------------------------------------------------------
+- name: Wait for all nodes to obtain IPs on br-nat
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
-    # 1. Get the list of VMs we are tracking
-    VMS=$(sudo virsh list --all | grep msrlv |grep -E "mast|wrk"  awk '{print $2}')
-    TOTAL_VMS=$(echo "$VMS" | wc -l)
+    sudo virsh net-dhcp-leases br-nat | grep -i "{{ item }}" | awk '{print $5}' | cut -d'/' -f1
+  register: dhcp_check
+  until: dhcp_check.stdout != ""
+  retries: 40
+  delay: 10
+  loop: "{{ clone_nodes }}"
+  # We loop per node to make debugging easier
+
+# ------------------------------------------------------------
+# 2. Build the "Grand Inventory" List
+# ------------------------------------------------------------
+- name: Construct the Cluster Node Fact List
+  set_fact:
+    cluster_node_data: >-
+      {% set node_list = [] %}
+      {% for node in clone_nodes %}
+        {% set nat_ip = hostvars[inventory_hostname]['dhcp_check']['results'] | selectattr('item', 'equalto', node) | map(attribute='stdout') | first %}
+        {% set prov_ip = hostvars[node].ansible_host | default('N/A') %}
+        {% set is_master = node in groups['control_nodes'] %}
+        {% do node_list.append({
+          'hostname': node,
+          'nat_ip': nat_ip,
+          'provision_ip': prov_ip,
+          'role': 'master' if is_master else 'worker'
+        }) %}
+      {% endfor %}
+      {{ node_list }}
+
+- name: Debug Collected Node Info
+  debug:
+    var: cluster_node_data
+
+# - name: Wait for all msrlv VMs to obtain a DHCP lease
+#   delegate_to: "{{ VM_HOST_IP }}"
+#   shell: |
+#     # 1. Get the list of VMs we are tracking
+#     VMS=$(sudo virsh list --all | grep msrlv |grep -E "mast|wrk"  awk '{print $2}')
+#     TOTAL_VMS=$(echo "$VMS" | wc -l)
     
-    # 2. Get the network prefix (e.g., "172.16") to ensure we grab the right lease
-    NET_PREFIX=$(sudo virsh net-dumpxml br-nat | grep range | cut -d\' -f2 | cut -d\. -f1-2)
+#     # 2. Get the network prefix (e.g., "172.16") to ensure we grab the right lease
+#     NET_PREFIX=$(sudo virsh net-dumpxml br-nat | grep range | cut -d\' -f2 | cut -d\. -f1-2)
 
-    while true; do
-      FOUND_COUNT=0
-      for i in $VMS; do
-        # Check if this specific VM has a lease in our prefix
-        MAC=$(sudo virsh domiflist $i | grep br-nat | awk '{print $NF}')
-        HAS_IP=$(sudo virsh net-dhcp-leases br-nat | grep "$MAC" | grep "$NET_PREFIX" | wc -l)
+#     while true; do
+#       FOUND_COUNT=0
+#       for i in $VMS; do
+#         # Check if this specific VM has a lease in our prefix
+#         MAC=$(sudo virsh domiflist $i | grep br-nat | awk '{print $NF}')
+#         HAS_IP=$(sudo virsh net-dhcp-leases br-nat | grep "$MAC" | grep "$NET_PREFIX" | wc -l)
         
-        if [ "$HAS_IP" -gt 0 ]; then
-          ((FOUND_COUNT++))
-        fi
-      done
+#         if [ "$HAS_IP" -gt 0 ]; then
+#           ((FOUND_COUNT++))
+#         fi
+#       done
 
-      # If we found them all, exit the loop
-      if [ "$FOUND_COUNT" -eq "$TOTAL_VMS" ] && [ "$TOTAL_VMS" -gt 0 ]; then
-        echo "All $TOTAL_VMS VMs are up with IPs."
-        break
-      fi
+#       # If we found them all, exit the loop
+#       if [ "$FOUND_COUNT" -eq "$TOTAL_VMS" ] && [ "$TOTAL_VMS" -gt 0 ]; then
+#         echo "All $TOTAL_VMS VMs are up with IPs."
+#         break
+#       fi
 
-      echo "Waiting... Found $FOUND_COUNT out of $TOTAL_VMS"
-      sleep 5
-    done
-  register: wait_result
-  when: "'kvm' in groups"
+#       echo "Waiting... Found $FOUND_COUNT out of $TOTAL_VMS"
+#       sleep 5
+#     done
+#   register: wait_result
+#   when: "'kvm' in groups"
 
-- name: Collect final mapping of Name to IP
-  delegate_to: "{{ VM_HOST_IP }}"
-  shell: |
-    # Re-run once to get the final list for Ansible looping
-    for i in $(sudo virsh list --all | grep msrlv|grep -E "mast|wrk" | awk '{print $2}'); do 
-      MAC=$(sudo virsh domiflist $i | grep br-nat | awk '{print $NF}')
-      IP=$(sudo virsh net-dhcp-leases br-nat | grep "$MAC" | awk '{print $5}' | sed 's/\/24$//')
-      echo "$i=$IP"
-    done
-  register: kvm_ips_output
-  when: "'kvm' in groups"
+# - name: Collect final mapping of Name to IP
+#   delegate_to: "{{ VM_HOST_IP }}"
+#   shell: |
+#     # Re-run once to get the final list for Ansible looping
+#     for i in $(sudo virsh list --all | grep msrlv|grep -E "mast|wrk" | awk '{print $2}'); do 
+#       MAC=$(sudo virsh domiflist $i | grep br-nat | awk '{print $NF}')
+#       IP=$(sudo virsh net-dhcp-leases br-nat | grep "$MAC" | awk '{print $5}' | sed 's/\/24$//')
+#       echo "$i=$IP"
+#     done
+#   register: kvm_ips_output
+#   when: "'kvm' in groups"
 
-- name: Trigger configuration for discovered VMs
-  include_tasks: node_config.yml
-  loop: "{{ hostvars[groups['kvm'][0]].kvm_ips_output.stdout_lines | default([]) }}"
-  loop_control:
-    loop_var: vm_mapping
-  when: "'kvm' in groups"
+# - name: Trigger configuration for discovered VMs
+#   include_tasks: node_config.yml
+#   loop: "{{ hostvars[groups['kvm'][0]].kvm_ips_output.stdout_lines | default([]) }}"
+#   loop_control:
+#     loop_var: vm_mapping
+#   when: "'kvm' in groups"
 
 
 # - name: Render Manual Init Script Locally
