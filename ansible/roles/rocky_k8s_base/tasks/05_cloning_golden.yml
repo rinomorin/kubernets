@@ -67,19 +67,27 @@
 - name: Wait for and Collect Node Networking Data
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
-    # Loop until all nodes have an IP in the DHCP leases table
     timeout=300
     start_time=$(date +%s)
+    
+    # Define the nodes we care about from the Ansible list
+    TARGETS="{{ all_target_nodes | join(' ') }}"
     
     while true; do
       results="["
       all_found=true
       
-      for node in {{ all_target_nodes | join(' ') }}; do
+      # Only iterate over VMs that contain 'mast' or 'wrk' in their name
+      for node in $TARGETS; do
+        if [[ ! "$node" =~ "mast" && ! "$node" =~ "wrk" ]]; then
+          continue
+        fi
+
         # 1. Get the MAC for the provisioning interface (br-nat)
         MAC=$(sudo virsh domiflist "$node" | grep 'br-nat' | awk '{print $NF}')
         
         # 2. Look up the IP in the DHCP leases by MAC
+        # We grep the IP and the MAC to ensure the lease is active
         LEASE=$(sudo virsh net-dhcp-leases br-nat | grep -i "$MAC" | awk '{print $5}' | sed 's/\/24//')
         
         if [ -n "$LEASE" ]; then
@@ -89,21 +97,22 @@
         fi
       done
       
-      # Check if we are done or timed out
       if [ "$all_found" = true ]; then
-        # Close JSON array (remove trailing comma)
+        # Remove trailing comma and close JSON array
         echo "${results%,}]"
         exit 0
       fi
       
-      current_time=$(date +%s)
-      if [ $((current_time - start_time)) -gt $timeout ]; then
-        echo "Timeout waiting for DHCP leases" >&2
+      if [ $(($(date +%s) - start_time)) -gt $timeout ]; then
+        echo "Timeout: Not all nodes obtained a lease." >&2
         exit 1
       fi
       sleep 5
     done
   register: kvm_discovery_json
+
+- debug:
+    msg: kvm_discovery_json
 
 - name: Construct Cluster Node Facts
   set_fact:

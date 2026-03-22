@@ -92,6 +92,48 @@
   changed_when: false
   failed_when: crictl_check.rc != 0
 
+- name: setup kube config permissions and placeholder
+  become: false
+  delegate_to: localhost
+  shell: |
+    ssh core@"{{ golden_ip }}" "{{item}}"
+  loop:
+    - "mkdir -p /home/core/.kube"
+    - "chmod 750 /home/core/.kube"
+    - "echo 'kubeconfig will be populated after cluster bootstrap' > /home/core/.kube/config"
+    - "chmod 600 /home/core/.kube/config"    
+
+- name: upload crictl to golden-base and extract
+  become: False
+  delegate_to: localhost
+  shell: |
+    scp /tmp/crictl-{{ crictl_version }}.tar.gz core@{{ golden_ip }}:/tmp/crictl.tar.gz
+    ssh core@"{{ golden_ip }}" sudo tar xzf /tmp/crictl.tar.gz -C /usr/local/bin/
+    ssh core@"{{ golden_ip }}" sudo chmod 755 /usr/local/bin/crictl
+    ssh core@"{{ golden_ip }}" sudo ln -s /usr/local/bin/crictl /usr/bin/crictl
+    ssh core@"{{ golden_ip }}" rm -f /tmp/crictl.tar.gz
+
+- name: set etcd_ver
+  set_fact:
+    etcd_ver: "{{ lookup('env','etcd_ver') | default('v3.5.12', true) }}"
+
+- name: Download ectd
+  become: false
+  get_url:
+    url: "https://github.com/etcd-io/etcd/releases/download/v3.5.12/etcd-{{ etcd_ver }}-linux-amd64.tar.gz"
+    dest: "/tmp/etcd-{{ etcd_ver }}-linux-amd64.tar.gz"
+
+- name: upload crictl to golden-base and extract
+  become: False
+  delegate_to: localhost
+  shell: |
+    scp /tmp/etcd-{{ etcd_ver }}-linux-amd64.tar.gz core@{{ golden_ip }}:/tmp/etcd-{{ etcd_ver }}-linux-amd64.tar.gz
+    ssh core@"{{ golden_ip }}" sudo tar xzf /tmp/etcd-{{ etcd_ver }}-linux-amd64.tar.gz -C /tmp --strip-components=1 etcd-{{ etcd_ver}}-linux-amd64/etcdctl
+    ssh core@"{{ golden_ip }}" sudo mv /tmp/etcdctl /usr/local/bin/etcdctl
+    ssh core@"{{ golden_ip }}" sudo chmod +x /usr/local/bin/etcdctl
+    ssh core@"{{ golden_ip }}" sudo ln -s /usr/local/bin/etcdctl /usr/bin/etcdctl
+    ssh core@"{{ golden_ip }}" sudo rm -f /tmp/etcd-{{ etcd_ver }}-linux-amd64.tar.gz
+
 # --------------------------------------------------------
 # Clean dynamic state before freezing image
 # --------------------------------------------------------
