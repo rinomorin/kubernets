@@ -64,16 +64,64 @@
   loop: "{{ all_target_nodes }}"
   delegate_to: "{{ VM_HOST_IP }}"
 
-- name: Wait for DHCP Leases on Provisioning Network
-  shell: |
-    sudo virsh net-dhcp-leases br-nat | grep -i "{{ item }}" | awk '{print $5}' | cut -d'/' -f1
-  register: dhcp_results
-  until: dhcp_results.stdout != ""
-  retries: 50
-  delay: 5
-  loop: "{{ all_target_nodes }}"
+- name: Wait for and Collect Node Networking Data
   delegate_to: "{{ VM_HOST_IP }}"
+  shell: |
+    # Loop until all nodes have an IP in the DHCP leases table
+    timeout=300
+    start_time=$(date +%s)
+    
+    while true; do
+      results="["
+      all_found=true
+      
+      for node in {{ all_target_nodes | join(' ') }}; do
+        # 1. Get the MAC for the provisioning interface (br-nat)
+        MAC=$(sudo virsh domiflist "$node" | grep 'br-nat' | awk '{print $NF}')
+        
+        # 2. Look up the IP in the DHCP leases by MAC
+        LEASE=$(sudo virsh net-dhcp-leases br-nat | grep -i "$MAC" | awk '{print $5}' | sed 's/\/24//')
+        
+        if [ -n "$LEASE" ]; then
+          results+="{\"name\": \"$node\", \"mac\": \"$MAC\", \"temp_ip\": \"$LEASE\"},"
+        else
+          all_found=false
+        fi
+      done
+      
+      # Check if we are done or timed out
+      if [ "$all_found" = true ]; then
+        # Close JSON array (remove trailing comma)
+        echo "${results%,}]"
+        exit 0
+      fi
+      
+      current_time=$(date +%s)
+      if [ $((current_time - start_time)) -gt $timeout ]; then
+        echo "Timeout waiting for DHCP leases" >&2
+        exit 1
+      fi
+      sleep 5
+    done
+  register: kvm_discovery_json
 
+- name: Construct Cluster Node Facts
+  set_fact:
+    cluster_node_data: >-
+      {% set discovered = kvm_discovery_json.stdout | from_json %}
+      {% set node_list = [] %}
+      {% for item in discovered %}
+        {% do node_list.append({
+          'name': item.name,
+          'mac': item.mac,
+          'temp_ip': item.temp_ip,
+          'final_provision_ip': hostvars[item.name]['provision_ip'],
+          'final_provider_ip': hostvars[item.name]['provider_ip'],
+          'is_master': (item.name in groups['control_nodes'])
+        }) %}
+      {% endfor %}
+      {{ node_list }}
+  # Note: If your Ansible version still complains about 'do', use the JSON template format from the previous response.
 # ------------------------------------------------------------
 # BUILD THE HANDOFF DATA
 # ------------------------------------------------------------
