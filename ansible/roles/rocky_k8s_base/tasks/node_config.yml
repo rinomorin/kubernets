@@ -42,23 +42,31 @@
 - name: "Force Persistent Static Networking"
   delegate_to: localhost
   shell: |
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ provision_ip }} << 'EOF'
-    # Use a subshell to run in background so SSH can exit
+    # Explicitly pull the provision_ip of the node we are currently processing
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ hostvars[inventory_hostname]['ansible_host'] }} << 'EOF'
     (
       sleep 2
-      sudo nmcli con mod enp2s0 connection.interface-name enp2s0 ipv4.address {{ hostvars[this_vm_name]['provision_ip'] }}/24 ipv4.method manual connection.autoconnect yes
-      sudo nmcli con mod enp3s0 connection.interface-name enp3s0 ipv4.address {{ hostvars[this_vm_name]['provider_ip'] }}/24 ipv4.method manual connection.autoconnect yes
+      # Apply Static Provisioning IP (enp2s0)
+      sudo nmcli con mod enp2s0 connection.interface-name enp2s0 \
+        ipv4.address {{ hostvars[inventory_hostname]['provision_ip'] }}/24 \
+        ipv4.method manual connection.autoconnect yes
+      
+      # Apply Static Provider IP (enp3s0)
+      sudo nmcli con mod enp3s0 connection.interface-name enp3s0 \
+        ipv4.address {{ hostvars[inventory_hostname]['provider_ip'] }}/24 \
+        ipv4.method manual connection.autoconnect yes
       
       # Disable Cloud-Init network management
       echo "network: {config: disabled}" | sudo tee /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
       
-      # Apply the changes. This WILL break the pipe, which is expected.
+      # Restart interfaces in background
       sudo nmcli con up enp2s0 &
       sudo nmcli con up enp3s0 &
     ) > /dev/null 2>&1 &
     EOF
   register: fix_ip_result
-  when: this_vm_name in groups['cluster_nodes']
+  # Use the standard group check
+  when: inventory_hostname in groups['cluster_nodes']
 
 - name: "Final Verification of {{ this_vm_name }}"
   delegate_to: localhost
