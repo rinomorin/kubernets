@@ -1,45 +1,30 @@
 ---
-# ============================================================
-# 05_cloning_golden.yml — TASKS ONLY (role‑compatible)
-# ============================================================
+# 05_cloning_golden.yml - Orchestrate Clones on KVM Host
 
-# Golden image is always the same
 - name: Set golden image variables
   set_fact:
     golden_vm: "golden-base"
     golden_disk: "/var/lib/libvirt/images/golden-base.qcow2"
+    # Combine groups for processing
+    all_target_nodes: "{{ groups['control_nodes'] + groups['worker_nodes'] }}"
 
-# Build clone list from inventory groups
-- name: Build clone node list (control + worker)
-  set_fact:
-    clone_nodes: "{{ groups['control_nodes'] + groups['worker_nodes'] }}"
-
-- name: Show clone targets
-  debug:
-    msg: "Cloning nodes: {{ clone_nodes }} from golden image {{ golden_vm }}"
-
-# ------------------------------------------------------------
-# Ensure golden-base is powered off
-# ------------------------------------------------------------
-- name: Ensure golden-base VM is shut down
+- name: Ensure golden-base is powered off
   community.libvirt.virt:
     name: "{{ golden_vm }}"
     state: shutdown
   delegate_to: "{{ VM_HOST_IP }}"
+  ignore_errors: yes
 
 - name: Wait for golden image to be powered off
-  shell: sudo virsh domstate golden-base
+  shell: sudo virsh domstate {{ golden_vm }}
   register: golden_power
   until: golden_power.stdout == "shut off"
-  retries: 30
-  delay: 2
+  retries: 15
+  delay: 3
   delegate_to: "{{ VM_HOST_IP }}"
 
-# ------------------------------------------------------------
-# Define cloned VMs using virt-clone
-# ------------------------------------------------------------
-- name: Define cloned VMs
-  loop: "{{ clone_nodes }}"
+- name: Clone VMs from Golden Base
+  loop: "{{ all_target_nodes }}"
   loop_control:
     loop_var: node
   shell: |
@@ -52,76 +37,192 @@
     creates: "/etc/libvirt/qemu/{{ node }}.xml"
   delegate_to: "{{ VM_HOST_IP }}"
 
-# ------------------------------------------------------------
-# Remove default NAT NIC from worker nodes (keep only br-*)
-# ------------------------------------------------------------
-- name: Remove default network interface from worker nodes
-  loop: "{{ groups['worker_nodes'] }}"
-  loop_control:
-    loop_var: node
-  shell: |
-    # Find the NIC attached to the default network (usually 'default')
-    nic=$(sudo virsh domiflist "{{ node }}" | awk '/default/ {print $1}')
-    if [ -n "$nic" ]; then
-      sudo virsh detach-interface "{{ node }}" network --mac $(sudo virsh domiflist "{{ node }}" | awk '/default/ {print $5}') --persistent
-    fi
-  delegate_to: "{{ VM_HOST_IP }}"
-
-- name: Attach NoCloud ISO to each cloned VM
+- name: Adjust NICs and Attach NoCloud ISOs
   delegate_to: "{{ VM_HOST_IP }}"
   block:
-    - name: Run node check tasks
+    - name: Remove default NAT NIC from specific nodes if required
+      loop: "{{ groups['worker_nodes'] }}"
+      shell: |
+        MAC=$(sudo virsh domiflist {{ item }} | awk '/default/ {print $5}')
+        if [ -n "$MAC" ]; then
+          sudo virsh detach-interface {{ item }} network --mac $MAC --config --persistent
+        fi
+      loop_control:
+        loop_var: item
+      ignore_errors: yes
+
+    - name: Attach NoCloud ISOs
       include_tasks: chck_node.yml
-      loop: "{{ clone_nodes }}"
+      loop: "{{ all_target_nodes }}"
       loop_control:
         loop_var: node
-      vars:
-        iso_path: "/var/lib/libvirt/images/nocloud/{{ node }}.iso"
-  
+
 - name: Start all cloned VMs
-  delegate_to: "{{ VM_HOST_IP }}"
   community.libvirt.virt:
     name: "{{ item }}"
     state: running
-  loop: "{{ clone_nodes }}"
-
-# ------------------------------------------------------------
-# 1. Wait for DHCP Leases (Robust Version)
-# ------------------------------------------------------------
-- name: Wait for all nodes to obtain IPs on br-nat
+  loop: "{{ all_target_nodes }}"
   delegate_to: "{{ VM_HOST_IP }}"
+
+- name: Wait for DHCP Leases on Provisioning Network
   shell: |
     sudo virsh net-dhcp-leases br-nat | grep -i "{{ item }}" | awk '{print $5}' | cut -d'/' -f1
-  register: dhcp_check
-  until: dhcp_check.stdout != ""
-  retries: 40
-  delay: 10
-  loop: "{{ clone_nodes }}"
-  # We loop per node to make debugging easier
+  register: dhcp_results
+  until: dhcp_results.stdout != ""
+  retries: 50
+  delay: 5
+  loop: "{{ all_target_nodes }}"
+  delegate_to: "{{ VM_HOST_IP }}"
 
 # ------------------------------------------------------------
-# 2. Build the "Grand Inventory" List
+# BUILD THE HANDOFF DATA
 # ------------------------------------------------------------
-- name: Construct the Cluster Node Fact List
+- name: Construct Node Data Fact
   set_fact:
     cluster_node_data: >-
       {% set node_list = [] %}
-      {% for node in clone_nodes %}
-        {% set nat_ip = hostvars[inventory_hostname]['dhcp_check']['results'] | selectattr('item', 'equalto', node) | map(attribute='stdout') | first %}
-        {% set prov_ip = hostvars[node].ansible_host | default('N/A') %}
-        {% set is_master = node in groups['control_nodes'] %}
+      {% for result in dhcp_results.results %}
+        {% set node_name = result.item %}
+        {% set current_temp_ip = result.stdout %}
         {% do node_list.append({
-          'hostname': node,
-          'nat_ip': nat_ip,
-          'provision_ip': prov_ip,
-          'role': 'master' if is_master else 'worker'
+          'name': node_name,
+          'temp_ip': current_temp_ip,
+          'final_provision_ip': hostvars[node_name]['provision_ip'],
+          'final_provider_ip': hostvars[node_name]['provider_ip'],
+          'is_master': (node_name in groups['control_nodes'])
         }) %}
       {% endfor %}
       {{ node_list }}
 
-- name: Debug Collected Node Info
+- name: Debug Summary for Handoff
   debug:
-    var: cluster_node_data
+    msg: "Node {{ item.name }} is reachable at {{ item.temp_ip }}. Will be set to {{ item.final_provision_ip }}"
+  loop: "{{ cluster_node_data }}"
+
+# ---
+# # ============================================================
+# # 05_cloning_golden.yml — TASKS ONLY (role‑compatible)
+# # ============================================================
+
+# # Golden image is always the same
+# - name: Set golden image variables
+#   set_fact:
+#     golden_vm: "golden-base"
+#     golden_disk: "/var/lib/libvirt/images/golden-base.qcow2"
+
+# # Build clone list from inventory groups
+# - name: Build clone node list (control + worker)
+#   set_fact:
+#     clone_nodes: "{{ groups['control_nodes'] + groups['worker_nodes'] }}"
+
+# - name: Show clone targets
+#   debug:
+#     msg: "Cloning nodes: {{ clone_nodes }} from golden image {{ golden_vm }}"
+
+# # ------------------------------------------------------------
+# # Ensure golden-base is powered off
+# # ------------------------------------------------------------
+# - name: Ensure golden-base VM is shut down
+#   community.libvirt.virt:
+#     name: "{{ golden_vm }}"
+#     state: shutdown
+#   delegate_to: "{{ VM_HOST_IP }}"
+
+# - name: Wait for golden image to be powered off
+#   shell: sudo virsh domstate golden-base
+#   register: golden_power
+#   until: golden_power.stdout == "shut off"
+#   retries: 30
+#   delay: 2
+#   delegate_to: "{{ VM_HOST_IP }}"
+
+# # ------------------------------------------------------------
+# # Define cloned VMs using virt-clone
+# # ------------------------------------------------------------
+# - name: Define cloned VMs
+#   loop: "{{ clone_nodes }}"
+#   loop_control:
+#     loop_var: node
+#   shell: |
+#     sudo virt-clone \
+#       --original "{{ golden_vm }}" \
+#       --name "{{ node }}" \
+#       --file "/var/lib/libvirt/images/{{ node }}.qcow2" \
+#       --auto-clone
+#   args:
+#     creates: "/etc/libvirt/qemu/{{ node }}.xml"
+#   delegate_to: "{{ VM_HOST_IP }}"
+
+# # ------------------------------------------------------------
+# # Remove default NAT NIC from worker nodes (keep only br-*)
+# # ------------------------------------------------------------
+# - name: Remove default network interface from worker nodes
+#   loop: "{{ groups['worker_nodes'] }}"
+#   loop_control:
+#     loop_var: node
+#   shell: |
+#     # Find the NIC attached to the default network (usually 'default')
+#     nic=$(sudo virsh domiflist "{{ node }}" | awk '/default/ {print $1}')
+#     if [ -n "$nic" ]; then
+#       sudo virsh detach-interface "{{ node }}" network --mac $(sudo virsh domiflist "{{ node }}" | awk '/default/ {print $5}') --persistent
+#     fi
+#   delegate_to: "{{ VM_HOST_IP }}"
+
+# - name: Attach NoCloud ISO to each cloned VM
+#   delegate_to: "{{ VM_HOST_IP }}"
+#   block:
+#     - name: Run node check tasks
+#       include_tasks: chck_node.yml
+#       loop: "{{ clone_nodes }}"
+#       loop_control:
+#         loop_var: node
+#       vars:
+#         iso_path: "/var/lib/libvirt/images/nocloud/{{ node }}.iso"
+  
+# - name: Start all cloned VMs
+#   delegate_to: "{{ VM_HOST_IP }}"
+#   community.libvirt.virt:
+#     name: "{{ item }}"
+#     state: running
+#   loop: "{{ clone_nodes }}"
+
+# # ------------------------------------------------------------
+# # 1. Wait for DHCP Leases (Robust Version)
+# # ------------------------------------------------------------
+# - name: Wait for all nodes to obtain IPs on br-nat
+#   delegate_to: "{{ VM_HOST_IP }}"
+#   shell: |
+#     sudo virsh net-dhcp-leases br-nat | grep -i "{{ item }}" | awk '{print $5}' | cut -d'/' -f1
+#   register: dhcp_check
+#   until: dhcp_check.stdout != ""
+#   retries: 40
+#   delay: 10
+#   loop: "{{ clone_nodes }}"
+#   # We loop per node to make debugging easier
+
+# # ------------------------------------------------------------
+# # 2. Build the "Grand Inventory" List
+# # ------------------------------------------------------------
+# - name: Construct the Cluster Node Fact List
+#   set_fact:
+#     cluster_node_data: >-
+#       {% set node_list = [] %}
+#       {% for node in clone_nodes %}
+#         {% set nat_ip = hostvars[inventory_hostname]['dhcp_check']['results'] | selectattr('item', 'equalto', node) | map(attribute='stdout') | first %}
+#         {% set prov_ip = hostvars[node].ansible_host | default('N/A') %}
+#         {% set is_master = node in groups['control_nodes'] %}
+#         {% do node_list.append({
+#           'hostname': node,
+#           'nat_ip': nat_ip,
+#           'provision_ip': prov_ip,
+#           'role': 'master' if is_master else 'worker'
+#         }) %}
+#       {% endfor %}
+#       {{ node_list }}
+
+# - name: Debug Collected Node Info
+#   debug:
+#     var: cluster_node_data
 
 # - name: Wait for all msrlv VMs to obtain a DHCP lease
 #   delegate_to: "{{ VM_HOST_IP }}"
