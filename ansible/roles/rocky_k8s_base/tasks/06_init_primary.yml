@@ -4,6 +4,7 @@
     ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o BatchMode=yes"
     target_ip: "{{ hostvars[inventory_hostname].ansible_host }}"
   shell: |
+    rm -f ~/.ssh/known_hosts*
     ssh {{ ssh_opts }} core@{{ target_ip }} << 'EOF'
       # Start and enable service
       sudo systemctl enable --now firewalld

@@ -138,16 +138,18 @@
     loop_var: vm_mapping
   when: "'kvm' in groups"
 
-- name: Create Manual Init Script with Firewall Config
+- name: Render Manual Init Script Locally
+  delegate_to: localhost
+  run_once: true
   copy:
-    dest: /home/core/manual_k8s_init.sh
+    dest: "/tmp/manual_k8s_init_{{ groups['control_nodes'][0] }}.sh"
     mode: '0755'
-    owner: core
-    group: core
     content: |
       #!/bin/bash
+      set -e
       echo "--- Configuring Firewalld for Master ---"
       sudo systemctl enable --now firewalld
+      
       # Open Master specific ports
       for port in 6443/tcp 2379-2380/tcp 10250/tcp 10257/tcp 10259/tcp 8472/udp; do
         sudo firewall-cmd --permanent --add-port=$port
@@ -164,11 +166,27 @@
         --cri-socket unix:///var/run/crio/crio.sock \
         --ignore-preflight-errors=Swap,SystemVerification | tee /tmp/kubeadm_output
       
-      # Extract variables and display join commands (as we did before)
-      TOKEN=$(grep "kubeadm join" /tmp/kubeadm_output | head -n 1 | awk '{print $5}')
+      # Extract variables for join commands
+      TOKEN=$(grep "token " /tmp/kubeadm_output | head -n 1 | awk '{print $2}')
       HASH=$(grep "sha256:" /tmp/kubeadm_output | head -n 1 | awk '{print $2}')
-      CERT_KEY=$(grep -A 1 "upload-certs" /tmp/kubeadm_output | tail -n 1 | xargs)
+      CERT_KEY=$(grep -A 1 "certificate-key" /tmp/kubeadm_output | tail -n 1 | xargs)
 
       echo -e "\n--- JOIN COMMAND FOR MASTERS ---"
       echo "sudo kubeadm join {{ hostvars[groups['control_nodes'][0]].ansible_host }}:6443 --token $TOKEN --discovery-token-ca-cert-hash $HASH --control-plane --certificate-key $CERT_KEY --ignore-preflight-errors=Swap,SystemVerification"
-  when: inventory_hostname == groups['control_nodes'][0]
+
+- name: Transfer and Run Init Script on Primary Master
+  delegate_to: localhost
+  run_once: true
+  vars:
+    ssh_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
+    target_host: "{{ hostvars[groups['control_nodes'][0]].ansible_host }}"
+    local_script: "/tmp/manual_k8s_init_{{ groups['control_nodes'][0] }}.sh"
+  shell: |
+    scp {{ ssh_args }} {{ local_script }} core@{{ target_host }}:/home/core/manual_k8s_init.sh
+    ssh {{ ssh_args }} core@{{ target_host }} "chmod +x /home/core/manual_k8s_init.sh && /home/core/manual_k8s_init.sh"
+  register: kube_init_manual_output
+
+- name: Show Kubeadm Join Details
+  debug:
+    var: kube_init_manual_output.stdout_lines
+  run_once: true
