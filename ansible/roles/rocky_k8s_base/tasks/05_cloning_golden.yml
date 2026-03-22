@@ -1,40 +1,30 @@
 ---
 # 05_cloning_golden.yml - Orchestrate Clones on KVM Host
-# ------------------------------------------------------------
-# 1. Ensure golden-base is powered off (Clean then Force)
-# ------------------------------------------------------------
-- name: Request clean shutdown of golden image
-  shell: sudo virsh shutdown {{ golden_vm }}
-  delegate_to: "{{ VM_HOST_IP }}"
-  failed_when: false
-  changed_when: false
-  ignore_errors: true
 
-- name: Wait for golden image to reach 'shut off' state
+- name: Set golden image variables
+  set_fact:
+    golden_vm: "golden-base"
+    golden_disk: "/var/lib/libvirt/images/golden-base.qcow2"
+    # Combine groups for processing
+    all_target_nodes: "{{ groups['control_nodes'] + groups['worker_nodes'] }}"
+
+- name: Ensure golden-base is powered off
+  community.libvirt.virt:
+    name: "{{ golden_vm }}"
+    state: shutdown
+  delegate_to: "{{ VM_HOST_IP }}"
+  ignore_errors: yes
+
+- name: Wait for golden image to be powered off
   shell: sudo virsh domstate {{ golden_vm }}
   register: golden_power
   until: golden_power.stdout == "shut off"
-  retries: 30
-  delay: 2
+  retries: 15
+  delay: 3
   delegate_to: "{{ VM_HOST_IP }}"
-  ignore_errors: true
 
-- name: Force destroy if still running (Safety Fallback)
-  shell: sudo virsh destroy {{ golden_vm }}
-  delegate_to: "{{ VM_HOST_IP }}"
-  when: golden_power.stdout != "shut off"
-  failed_when: false
-  changed_when: true
-
-# ------------------------------------------------------------
-# 2. Build Clone List & Execute virt-clone
-# ------------------------------------------------------------
-- name: Build clone node list
-  set_fact:
-    clone_nodes: "{{ groups['control_nodes'] + groups['worker_nodes'] }}"
-
-- name: Define cloned VMs from golden-base
-  loop: "{{ clone_nodes }}"
+- name: Clone VMs from Golden Base
+  loop: "{{ all_target_nodes }}"
   loop_control:
     loop_var: node
   shell: |
@@ -47,68 +37,68 @@
     creates: "/etc/libvirt/qemu/{{ node }}.xml"
   delegate_to: "{{ VM_HOST_IP }}"
 
-# ------------------------------------------------------------
-# 3. NIC Cleanup & ISO Attachment
-# ------------------------------------------------------------
-- name: Detach default NAT NIC (Specific to Worker Nodes)
-  loop: "{{ groups['worker_nodes'] }}"
-  shell: |
-    MAC=$(sudo virsh domiflist {{ item }} | awk '/default/ {print $5}')
-    if [ -n "$MAC" ]; then
-      sudo virsh detach-interface {{ item }} network --mac $MAC --config --persistent
-    fi
+- name: Adjust NICs and Attach NoCloud ISOs
   delegate_to: "{{ VM_HOST_IP }}"
-  ignore_errors: yes
+  block:
+    - name: Remove default NAT NIC from specific nodes if required
+      loop: "{{ groups['worker_nodes'] }}"
+      shell: |
+        MAC=$(sudo virsh domiflist {{ item }} | awk '/default/ {print $5}')
+        if [ -n "$MAC" ]; then
+          sudo virsh detach-interface {{ item }} network --mac $MAC --config --persistent
+        fi
+      loop_control:
+        loop_var: item
+      ignore_errors: yes
 
-- name: Attach NoCloud ISOs via helper task
-  include_tasks: chck_node.yml
-  loop: "{{ clone_nodes }}"
-  loop_control:
-    loop_var: node
+    - name: Attach NoCloud ISOs
+      include_tasks: chck_node.yml
+      loop: "{{ all_target_nodes }}"
+      loop_control:
+        loop_var: node
+
+- name: Start all cloned VMs
+  community.libvirt.virt:
+    name: "{{ item }}"
+    state: running
+  loop: "{{ all_target_nodes }}"
   delegate_to: "{{ VM_HOST_IP }}"
 
-# ------------------------------------------------------------
-# 4. Start & Capture DHCP Handoff
-# ------------------------------------------------------------
-- name: Start cloned VMs
-  shell: sudo virsh start {{ item }}
-  loop: "{{ clone_nodes }}"
-  delegate_to: "{{ VM_HOST_IP }}"
-
-- name: Wait for DHCP Leases on br-nat
+- name: Wait for DHCP Leases on Provisioning Network
   shell: |
     sudo virsh net-dhcp-leases br-nat | grep -i "{{ item }}" | awk '{print $5}' | cut -d'/' -f1
   register: dhcp_results
   until: dhcp_results.stdout != ""
-  retries: 40
+  retries: 50
   delay: 5
-  loop: "{{ clone_nodes }}"
+  loop: "{{ all_target_nodes }}"
   delegate_to: "{{ VM_HOST_IP }}"
+
+# ------------------------------------------------------------
+# BUILD THE HANDOFF DATA
+# ------------------------------------------------------------
 # ------------------------------------------------------------
 # BUILD THE HANDOFF DATA
 # ------------------------------------------------------------
 - name: Construct Node Data Fact
   set_fact:
     cluster_node_data: >-
-      {% set node_list = [] %}
+      [
       {% for result in dhcp_results.results %}
-        {% set node_name = result.item %}
-        {% set current_temp_ip = result.stdout %}
-        {% do node_list.append({
-          'name': node_name,
-          'temp_ip': current_temp_ip,
-          'final_provision_ip': hostvars[node_name]['provision_ip'],
-          'final_provider_ip': hostvars[node_name]['provider_ip'],
-          'is_master': (node_name in groups['control_nodes'])
-        }) %}
+        {
+          "name": "{{ result.item }}",
+          "temp_ip": "{{ result.stdout }}",
+          "final_provision_ip": "{{ hostvars[result.item]['provision_ip'] }}",
+          "final_provider_ip": "{{ hostvars[result.item]['provider_ip'] }}",
+          "is_master": {{ result.item in groups['control_nodes'] | lower }}
+        }{{ '' if loop.last else ',' }}
       {% endfor %}
-      {{ node_list }}
+      ]
 
 - name: Debug Summary for Handoff
   debug:
-    msg: "Node {{ item.name }} is reachable at {{ item.temp_ip }}. Will be set to {{ item.final_provision_ip }}"
-  loop: "{{ cluster_node_data }}"
-
+    msg: "Node {{ item.name }} is reachable at {{ item.temp_ip }}. Final IP will be {{ item.final_provision_ip }}"
+  loop: "{{ cluster_node_data | from_json }}"
 # ---
 # # ============================================================
 # # 05_cloning_golden.yml — TASKS ONLY (role‑compatible)
