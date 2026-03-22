@@ -74,22 +74,22 @@
       {% endfor %}
   run_once: true
 
-- name: "Inject /etc/hosts entries via SSH to {{ this_vm_name }}"
-  delegate_to: localhost
-  shell: |
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR core@{{ this_vm_ip }} << 'EOF'
-    # Use a temporary file to construct the block
-    cat << 'HOSTSBLOCK' > /tmp/k8s_hosts
-    # BEGIN ANSIBLE MANAGED K8S CLUSTER NODES
-    {{ cluster_hosts_string }}
-    # END ANSIBLE MANAGED K8S CLUSTER NODES
-    HOSTSBLOCK
+# - name: "Inject /etc/hosts entries via SSH to {{ this_vm_name }}"
+#   delegate_to: localhost
+#   shell: |
+#     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR core@{{ this_vm_ip }} << 'EOF'
+#     # Use a temporary file to construct the block
+#     cat << 'HOSTSBLOCK' > /tmp/k8s_hosts
+#     # BEGIN ANSIBLE MANAGED K8S CLUSTER NODES
+#     {{ cluster_hosts_string }}
+#     # END ANSIBLE MANAGED K8S CLUSTER NODES
+#     HOSTSBLOCK
 
-    # Remove old block if it exists and append new one to avoid duplicates
-    sudo sed -i '/# BEGIN ANSIBLE MANAGED/,/# END ANSIBLE MANAGED/d' /etc/hosts
-    cat /tmp/k8s_hosts | sudo tee -a /etc/hosts > /dev/null
-    rm /tmp/k8s_hosts
-    EOF
+#     # Remove old block if it exists and append new one to avoid duplicates
+#     sudo sed -i '/# BEGIN ANSIBLE MANAGED/,/# END ANSIBLE MANAGED/d' /etc/hosts
+#     cat /tmp/k8s_hosts | sudo tee -a /etc/hosts > /dev/null
+#     rm /tmp/k8s_hosts
+#     EOF
   # when: 
   #   - this_vm_name == inventory_hostname
   #   - this_vm_name in groups['cluster_nodes']
