@@ -28,9 +28,7 @@
     - name: Verify ISO on KVM Host via Root Shell
       delegate_to: "{{ lookup('env', 'VM_HOST_IP') | trim }}"
       become: false
-      shell: |
-        # We wrap the command in bash -c to use root's environment and globbing
-        sudo /bin/bash -c "ls -1 /var/lib/libvirt/images/Rocky-9*.iso"
+      shell: 'sudo /bin/bash -c "ls -1 /var/lib/libvirt/images/Rocky-9*.iso"'
       register: iso_found
       failed_when: iso_found.rc != 0 or iso_found.stdout == ""
 
@@ -39,9 +37,6 @@
         that:
           - "lookup('env', 'iso_path') | trim == iso_found.stdout | trim"
         fail_msg: |
-          PATH MISMATCH!
-          Environment: [{{ lookup('env', 'iso_path') }}]
+          PATH MISMATCH DETECTED!
+          Env Script: [{{ lookup('env', 'iso_path') }}]
           Actual File: [{{ iso_found.stdout }}]
-    - name: Final Validation Success
-      debug:
-        msg: "Environment is VALID. Proceeding to Golden Base build."
