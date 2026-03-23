@@ -16,74 +16,74 @@
         - kubernetes.core  # Highly recommended for your FCOS/K8s work
       changed_when: false # These commands check for updates every time
 
-    - name: Configure local SSH to auto-accept lab keys
-      delegate_to: localhost
-      become: false
-      blockinfile:
-        path: "~/.ssh/config"
-        create: yes
-        mode: '0600'
-        block: |
-          # Lab Environment Auto-Accept
-          Host 172.16.0.* 10.0.0.* 192.168.100.*
-              StrictHostKeyChecking accept-new
-              UserKnownHostsFile ~/.ssh/known_hosts
-              LogLevel ERROR
+    # - name: Configure local SSH to auto-accept lab keys
+    #   delegate_to: localhost
+    #   become: false
+    #   blockinfile:
+    #     path: "~/.ssh/config"
+    #     create: yes
+    #     mode: '0600'
+    #     block: |
+    #       # Lab Environment Auto-Accept
+    #       Host 172.16.0.* 10.0.0.* 192.168.100.*
+    #           StrictHostKeyChecking accept-new
+    #           UserKnownHostsFile ~/.ssh/known_hosts
+    #           LogLevel ERROR
 
-    - name: load environment
-      set_fact:
-        VM_HOST: "{{ lookup('env','VM_HOST')}}"
-        ipa_admin_password: "{{ lookup('env','ipa_admin_password')}}"
-        VM_HOST_IP: "{{ lookup('env','VM_HOST_IP')}}"
-        secops_id: "{{ lookup('env', 'secops_id') }}"
-        cloud_id: "{{ lookup('env', 'cloud_id') }}"
-        secops_pwd: "{{ lookup('env', 'secops_pwd') }}"
-        cluster_ip_addr: "{{ lookup('env', 'cluster_ip_addr') }}"
-        cluster_netmask: "{{ lookup('env', 'cluster_netmask') }}"
-        cloud_zone: "{{ lookup('env', 'cloud_zone') }}"
-        cloud_provision: "{{ lookup('env', 'cloud_provision') }}"
-        cluster_gateway: "{{ lookup('env', 'cluster_gateway') }}"
-        default_netmask: "{{ lookup('env', 'default_netmask') }}"
-        default_net_device: "{{ lookup('env', 'default_net_device') }}"
-        cluster_net_device: "{{ lookup('env', 'cluster_net_device') }}"
-        nat_net_device: "{{ lookup('env', 'nat_net_device') }}"
-        default_ansible_pwd: "{{ lookup('env', 'secops_pwd') }}"
-        secops_key: "{{ lookup('env','secops_key') }}"
-        secops_edkey: "{{ lookup('env','secops_edkey') }}"
-        ssh_key_path: "{{ lookup('env', 'ssh_key_path')| to_json }}"
-        account_name: "{{ lookup('env', 'account_name') }}"
-        masters: "{{ groups['control_nodes'] | default([]) }}"
-        workers: "{{ groups['worker_nodes'] | default([]) }}"
-        helper_node: "{{ groups['helpers'][0] | default([]) }}"
-        helper_node_ip: "{{ hostvars[groups['helpers'][0]].ansible_host }}"
-        node_list: "{{ groups['control_nodes'] + groups['worker_nodes'] }}"
-        cloud_helper_workdir: "{{ lookup('env','cloud_helper_workdir') | default('/opt/cloud_helper', true) }}"
-        cloud_helper_user: "{{ lookup('env', 'CLOUD_HELPER_USER') | default('cloud_helper') }}"
+    # - name: load environment
+    #   set_fact:
+    #     VM_HOST: "{{ lookup('env','VM_HOST')}}"
+    #     ipa_admin_password: "{{ lookup('env','ipa_admin_password')}}"
+    #     VM_HOST_IP: "{{ lookup('env','VM_HOST_IP')}}"
+    #     secops_id: "{{ lookup('env', 'secops_id') }}"
+    #     cloud_id: "{{ lookup('env', 'cloud_id') }}"
+    #     secops_pwd: "{{ lookup('env', 'secops_pwd') }}"
+    #     cluster_ip_addr: "{{ lookup('env', 'cluster_ip_addr') }}"
+    #     cluster_netmask: "{{ lookup('env', 'cluster_netmask') }}"
+    #     cloud_zone: "{{ lookup('env', 'cloud_zone') }}"
+    #     cloud_provision: "{{ lookup('env', 'cloud_provision') }}"
+    #     cluster_gateway: "{{ lookup('env', 'cluster_gateway') }}"
+    #     default_netmask: "{{ lookup('env', 'default_netmask') }}"
+    #     default_net_device: "{{ lookup('env', 'default_net_device') }}"
+    #     cluster_net_device: "{{ lookup('env', 'cluster_net_device') }}"
+    #     nat_net_device: "{{ lookup('env', 'nat_net_device') }}"
+    #     default_ansible_pwd: "{{ lookup('env', 'secops_pwd') }}"
+    #     secops_key: "{{ lookup('env','secops_key') }}"
+    #     secops_edkey: "{{ lookup('env','secops_edkey') }}"
+    #     ssh_key_path: "{{ lookup('env', 'ssh_key_path')| to_json }}"
+    #     account_name: "{{ lookup('env', 'account_name') }}"
+    #     masters: "{{ groups['control_nodes'] | default([]) }}"
+    #     workers: "{{ groups['worker_nodes'] | default([]) }}"
+    #     helper_node: "{{ groups['helpers'][0] | default([]) }}"
+    #     helper_node_ip: "{{ hostvars[groups['helpers'][0]].ansible_host }}"
+    #     node_list: "{{ groups['control_nodes'] + groups['worker_nodes'] }}"
+    #     cloud_helper_workdir: "{{ lookup('env','cloud_helper_workdir') | default('/opt/cloud_helper', true) }}"
+    #     cloud_helper_user: "{{ lookup('env', 'CLOUD_HELPER_USER') | default('cloud_helper') }}"
 
 
-        # Network layout
-        cloud_networks:
-          house: "192.168.100.0/24"
-          private: "10.0.0.0/24"
-          nat: "172.16.0.0/24"
+    #     # Network layout
+    #     cloud_networks:
+    #       house: "192.168.100.0/24"
+    #       private: "10.0.0.0/24"
+    #       nat: "172.16.0.0/24"
 
-        # Interface mapping
-        cloud_interfaces:
-          house: "enp1s0"
-          private: "enp2s0"
-          nat: "enp3s0"
+    #     # Interface mapping
+    #     cloud_interfaces:
+    #       house: "enp1s0"
+    #       private: "enp2s0"
+    #       nat: "enp3s0"
 
-    - name: global variables ror rocky cloud
-      set_fact:
-        build_root: "{{ cloud_helper_workdir }}/rocky_build"
-        output_dir: "{{ cloud_helper_workdir }}/ignition"
-        disk_size: "10G"
-        kubetnet_version: "{{ lookup('env', 'kubetnet_version') }}"
-        crio_version: "{{ lookup('env', 'kubetnet_version') }}"
-        crio_stream: "stable"
-        cloud_helper_shell: "/bin/bash"
+    # - name: global variables ror rocky cloud
+    #   set_fact:
+    #     build_root: "{{ cloud_helper_workdir }}/rocky_build"
+    #     output_dir: "{{ cloud_helper_workdir }}/ignition"
+    #     disk_size: "10G"
+    #     kubetnet_version: "{{ lookup('env', 'kubetnet_version') }}"
+    #     crio_version: "{{ lookup('env', 'kubetnet_version') }}"
+    #     crio_stream: "stable"
+    #     cloud_helper_shell: "/bin/bash"
 
-# - import_playbook: ../check_env.yml
+- import_playbook: ../check_env.yml
 
 - name: Build Golden Base
   gather_facts: false
