@@ -37,13 +37,12 @@
       delegate_to: "{{ lookup('env', 'VM_HOST_IP') | trim }}"
       become: false
       shell: |
-        if [ -f /var/lib/libvirt/images/Rocky-9-latest-x86_64-dvd.iso ]; then echo "FOUND"; fi
+        ls -la /var/lib/libvirt/images/Rocky-9-latest-x86_64-dvd.iso
       register: iso_found
-      failed_when: iso_found.stdout != "FOUND"
-
+      
     - name: Success Message
       debug:
-        msg: "ISO found and verified on remote KVM storage."
+        msg: "ISO found and verified on remote KVM storage. {{ iso_found.stdout | trim }}"
 
     - name: Final Path Validation
       assert:
