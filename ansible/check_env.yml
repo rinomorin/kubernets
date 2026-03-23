@@ -25,23 +25,23 @@
           - "CRI-O Version:   {{ lookup('env', 'crio_version') }}"
           - "ISO Source:     {{ lookup('env', 'iso_path') }}"
 
-    - name: Update  ISO on KVM Host
+    - name: Verify ISO on KVM Host via Root Shell
       delegate_to: "{{ lookup('env', 'VM_HOST_IP') | trim }}"
       become: false
       shell: |
-        # Update the mlocate/plocate database first
-        sudo /bin/sh -c /usr/sbin/updatedb
-      register: mlocate_iso
-      failed_when: mlocate_iso.stdout == ""
+        # We wrap the command in bash -c to use root's environment and globbing
+        sudo /bin/bash -c "ls -1 /var/lib/libvirt/images/Rocky-9*.iso"
+      register: iso_found
+      failed_when: iso_found.rc != 0 or iso_found.stdout == ""
 
-    - name: Update and Locate ISO on KVM Host
-      delegate_to: "{{ lookup('env', 'VM_HOST_IP') | trim }}"
-      become: false
-      shell: |
-        # Search for the ISO filename regardless of the directory string
-        locate Rocky-9-latest-x86_64-dvd.iso
-      register: locate_iso
-      failed_when: locate_iso.stdout == ""
+    - name: Final Path Validation
+      assert:
+        that:
+          - "lookup('env', 'iso_path') | trim == iso_found.stdout | trim"
+        fail_msg: |
+          PATH MISMATCH!
+          Environment: [{{ lookup('env', 'iso_path') }}]
+          Actual File: [{{ iso_found.stdout }}]
 
     - name: Verify Locate Result matches Environment
       assert:
