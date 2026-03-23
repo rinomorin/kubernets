@@ -47,6 +47,9 @@
   when: not existing_vms
   register: iso_perms
 
+- debug:
+    msg: "{{ core_ssh_key }}"
+
 - name: Generate Kickstart from template for golden-base
   template:
     src: "golden.ks.j2"
