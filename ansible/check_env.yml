@@ -26,6 +26,7 @@
           - "ISO Source:     {{ lookup('env', 'iso_path') }}"
 
     - name: who am I?
+      become: false
       shell: "whoami"
       register: whoami
 
@@ -36,13 +37,13 @@
     - name: Verify ISO on KVM Host via Root Shell
       delegate_to: "{{ lookup('env', 'VM_HOST_IP') | trim }}"
       become: false
-      shell: |
-        ls -la /var/lib/libvirt/images/Rocky-9-latest-x86_64-dvd.iso
+      shell: 'sudo /bin/bash -c "if [ -f /var/lib/libvirt/images/Rocky-9-latest-x86_64-dvd.iso ]; then echo \"FOUND\"; fi"'
       register: iso_found
-      
+      failed_when: iso_found.stdout != "FOUND"
+
     - name: Success Message
       debug:
-        msg: "ISO found and verified on remote KVM storage. {{ iso_found.stdout | trim }}"
+        msg: "ISO found and verified on remote KVM storage."
 
     - name: Final Path Validation
       assert:
