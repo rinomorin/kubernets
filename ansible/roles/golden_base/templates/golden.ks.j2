@@ -68,6 +68,10 @@ python3-pyyaml
 # ------------------------------------------------------------
 
 %post --log=/root/ks-post.log
+# Inject Build Metadata for tracking upgrades
+echo "IMAGE_TYPE=golden-base" > /etc/golden-release
+echo "BUILD_TIMESTAMP={{ build_timestamp }}" >> /etc/golden-release
+echo "K8S_VERSION={{ kubernetes_repo_ver }}" >> /etc/golden-release
 
 mkdir -p /home/core/.ssh
 chmod 700 /home/core/.ssh
@@ -76,7 +80,7 @@ cat << 'EOF' >> /etc/sudoers
 %wheel ALL=(ALL) NOPASSWD: ALL
 EOF
 cat << 'EOF' > /home/core/.ssh/authorized_keys
-{{ core_ssh_key }}
+{{ rawcore_ssh_key }}
 EOF
 
 chmod 600 /home/core/.ssh/authorized_keys

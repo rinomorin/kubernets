@@ -57,7 +57,7 @@
     force: true
   vars:
     hostname: "{{ vm_host }}.{{ cloud_zone }}"
-    core_ssh_key: "{{ core_ssh_key }}" # Pulled from defaults/env lookup
+    rawcore_ssh_key: "{{ core_ssh_key }}" # Pulled from defaults/env lookup
     my_os_variant: "{{ tos_variant }}"
     crio_repo_ver: "{{ crio_version }}"
     kubernetes_repo_ver: "{{ kubernetes_version }}"
