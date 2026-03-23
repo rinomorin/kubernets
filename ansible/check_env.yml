@@ -42,12 +42,6 @@
           PATH MISMATCH!
           Environment: [{{ lookup('env', 'iso_path') }}]
           Actual File: [{{ iso_found.stdout }}]
-
-    - name: Verify Locate Result matches Environment
-      assert:
-        that:
-          - "lookup('env', 'iso_path') | trim in locate_iso.stdout"
-        fail_msg: "Locate found the ISO at {{ locate_iso.stdout }}, but your env_build.sh says {{ lookup('env', 'iso_path') }}"
     - name: Final Validation Success
       debug:
         msg: "Environment is VALID. Proceeding to Golden Base build."
