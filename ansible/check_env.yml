@@ -30,7 +30,7 @@
       become: false
       shell: |
         # Update the mlocate/plocate database first
-        sudo /bin/sh -c "/usr/sbin/updatedb"
+        sudo /bin/sh -c /usr/bin/updatedb
         # Search for the ISO filename regardless of the directory string
         sudo locate Rocky-9-latest-x86_64-dvd.iso
       register: locate_iso
