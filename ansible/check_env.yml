@@ -25,11 +25,23 @@
           - "CRI-O Version:   {{ lookup('env', 'crio_version') }}"
           - "ISO Source:     {{ lookup('env', 'iso_path') }}"
 
-    - name: Verify ISO on KVM Host (Elevated)
+    - name: Verify ISO on KVM Host (Using Find to bypass string issues)
       delegate_to: "{{ lookup('env', 'VM_HOST_IP') | trim }}"
-      become: false  # Important: We are using manual sudo in the command
-      shell: "sudo ls -l /var/lib/libvirt/images/Rocky-9-latest-x86_64-dvd.iso"
+      become: false
+      # We search the directory for any file containing 'Rocky-9' and 'dvd.iso'
+      shell: 'sudo find /var/lib/libvirt/images/ -name "Rocky-9*dvd.iso" -print'
       register: iso_found
+      failed_when: iso_found.stdout == ""
+
+    - name: Debug The Real Path Found
+      debug:
+        msg: 
+          - "System found the file at: [{{ iso_found.stdout }}]"
+          - "Your Env Variable says:  [{{ lookup('env', 'iso_path') }}]"
+
+    - name: Force Update Env Path Fact
+      set_fact:
+        sanitized_iso_path: "{{ iso_found.stdout | trim }}"
 
     - name: Final Validation Success
       debug:
