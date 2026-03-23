@@ -25,6 +25,14 @@
           - "CRI-O Version:   {{ lookup('env', 'crio_version') }}"
           - "ISO Source:     {{ lookup('env', 'iso_path') }}"
 
+    - name: who am I?
+      shell: "whoami"
+      register: whoami
+
+    - debug:
+        msg: "Current user is {{ whoami.stdout }}"
+  
+
     - name: Verify ISO on KVM Host via Root Shell
       delegate_to: "{{ lookup('env', 'VM_HOST_IP') | trim }}"
       become: false
