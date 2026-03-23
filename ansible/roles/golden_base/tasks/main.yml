@@ -19,9 +19,9 @@
     # - name: Scrub Lab IPs from known_hosts
     #   import_tasks: scrub_known_hosts.yml
 
-    - name: Register Infrastructure DNS (IPA)
-      import_tasks: pre_register_dns_from_helper.yml
-      delegate_to: localhost
+    # - name: Register Infrastructure DNS (IPA)
+    #   import_tasks: pre_register_dns_from_helper.yml
+    #   delegate_to: localhost
 
     - name: Run virt-install for golden-base
       import_tasks: 00_create_golden.yml
