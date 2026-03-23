@@ -28,6 +28,7 @@
     - name: Check if ISO exists on KVM Host
       delegate_to: "{{ lookup('env', 'VM_HOST_IP') | trim }}"
       become: true
+      become_user: "root"
       shell: "ls -la '{{ lookup('env', 'iso_path') | trim }}'"
       register: iso_check
 
