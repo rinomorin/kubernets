@@ -86,6 +86,7 @@
       --graphics none
       --console pty,target_type=serial
       --noautoconsole
+      --noreboot
       --wait=-1
   when: not existing_vms
 

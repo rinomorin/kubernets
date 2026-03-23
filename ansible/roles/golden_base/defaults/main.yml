@@ -39,3 +39,4 @@ iso_path: "{{ lookup('env', 'ISO_PATH') | default('/var/lib/libvirt/images/Rocky
 vm_host: "golden-base"
 tos_name: "rocky"
 tos_variant: "9"
+build_loops: "{{ bl|default(120)}}"
