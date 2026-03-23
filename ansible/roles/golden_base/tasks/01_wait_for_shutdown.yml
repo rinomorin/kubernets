@@ -1,15 +1,36 @@
 ---
-- name: Probe golden-base until powers down
+- name: Calculate wait time in minutes
+  set_fact:
+    wait_time_to_shutdown_or_fail: "{{ ((build_loops | int) * 10 // 60) }}"
+
+- name: Display wait time
+  debug:
+    msg: "Probe VM will wait up to {{ wait_time_to_shutdown_or_fail }} minutes before resuming to next tasks"
+
+- name: Probe VM with virsh until VM powers down
   shell: |
-    sudo virsh domstate {{ vm_host }}
+    sudo virsh list --all | sed 's/shut off/shutdown/' | grep -i "^.*{{ vm_host }}.*" | awk '{print $NF}'
   register: vm_state
-  until: '"shut off" in vm_state.stdout'
-  retries: 100
-  delay: 20
   delegate_to: "{{ VM_HOST_IP }}"
-  failed_when: 
-    - vm_state.rc != 0
-    - '"not found" in vm_state.stderr'
+  failed_when: false
+  changed_when: false
+  until: vm_state.stdout_lines[-1] == "shutdown"
+  retries: "{{ build_loops|int }}"
+  delay: 10
+
+
+
+# - name: Probe golden-base until powers down
+#   shell: |
+#     sudo virsh domstate {{ vm_host }}
+#   register: vm_state
+#   until: '"shut off" in vm_state.stdout'
+#   retries: 100
+#   delay: 20
+#   delegate_to: "{{ VM_HOST_IP }}"
+#   failed_when: 
+#     - vm_state.rc != 0
+#     - '"not found" in vm_state.stderr'
 
 - name: Record Build Completion
   debug:
