@@ -3,6 +3,7 @@
 - import_playbook: ../check_env.yml
 
 - name: Build Golden Base
+  gather_facts: false
   hosts: kvm
   roles:
     - golden_base
