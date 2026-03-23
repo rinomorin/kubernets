@@ -6,13 +6,29 @@
     - name: Authenticate with FreeIPA
       shell: "echo '{{ ipa_admin_password }}' | kinit admin"
       # no_log: true
+    
+    - name: Extract CIDRs and generate Reverse DNS Zone names
+      set_fact:
+        # Logic: Filter the list for 'br-cluster', take the first match, extract cidr, convert to revdns
+        cloud_rev_zone: >-
+          {{ 
+            (libvirt_networks | selectattr('name', 'equalto', 'br-cluster') | map(attribute='cidr') | first) 
+            | ipaddr('network') | ipaddr('revdns') 
+          }}
+        # Logic: Filter the list for 'br-nat', take the first match, extract cidr, convert to revdns
+        nat_rev_zone: >-
+          {{ 
+            (libvirt_networks | selectattr('name', 'equalto', 'br-nat') | map(attribute='cidr') | first) 
+            | ipaddr('network') | ipaddr('revdns') 
+          }}
+      when: libvirt_networks is defined
 
     - name: Ensure DNS Forward and Reverse Zones exist
       command: "ipa dnszone-add {{ item }} --name-server={{ ipa_master_fqdn }}."
       loop: 
         - "{{ cloud_zone }}"      # e.g., example.ca
         - "{{ cloud_rev_zone }}"  # e.g., 0.168.192.in-addr.arpa.
-        - "{{ nat_rev_zone }}"    # e.g., 0.0.10.in-addr.arpa.
+        - "{{ nat_rev_zone }}"    # e.g., 0.0.10.in-addr.arpa.  
       register: zone_create
       failed_when: 
         - zone_create.rc != 0 
