@@ -25,14 +25,21 @@
           - "CRI-O Version:   {{ lookup('env', 'crio_version') }}"
           - "ISO Source:     {{ lookup('env', 'iso_path') }}"
 
-    - name: Update and Locate ISO on KVM Host
+    - name: Update  ISO on KVM Host
       delegate_to: "{{ lookup('env', 'VM_HOST_IP') | trim }}"
       become: false
       shell: |
         # Update the mlocate/plocate database first
         sudo /bin/sh -c /usr/sbin/updatedb
+      register: mlocate_iso
+      failed_when: mlocate_iso.stdout == ""
+
+    - name: Update and Locate ISO on KVM Host
+      delegate_to: "{{ lookup('env', 'VM_HOST_IP') | trim }}"
+      become: false
+      shell: |
         # Search for the ISO filename regardless of the directory string
-        sudo locate Rocky-9-latest-x86_64-dvd.iso
+        locate Rocky-9-latest-x86_64-dvd.iso
       register: locate_iso
       failed_when: locate_iso.stdout == ""
 
