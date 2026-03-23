@@ -13,10 +13,16 @@
   block:
     - name: Destroy and Undefine existing golden-base
       shell: |
-        sudo virsh destroy {{ vm_host }} || true
-        sudo virsh undefine {{ vm_host }} --remove-all-storage
+        # Only run if the domain actually exists in virsh
+        if sudo virsh list --all | grep -q "{{ vm_host }}"; then
+          sudo virsh destroy {{ vm_host }} || true
+          sudo virsh undefine {{ vm_host }} --remove-all-storage
+        fi
       register: wipe_out
-      when: (force_new_image | default(false)) or ("new-image" in ansible_run_tags)
+      # This ensures it only runs if force_new_image is true OR the user passed --tags new-image
+      when: >
+        (force_new_image | default(false) | bool) or 
+        ('new-image' in ansible_run_tags)
 
     - name: Set existing_vms fact based on check and wipe
       set_fact:
