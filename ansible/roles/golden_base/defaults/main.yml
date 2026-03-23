@@ -5,7 +5,7 @@
 # 3. Fallback to the standard local path
 core_ssh_key: >-
   {{ 
-    lookup('env', 'secops_key') | default(
+    lookup('env', 'core_ssh_key') | default(
       lookup('file', lookup('env', 'helper_ssh_pubkey_path') | default('~/.ssh/id_rsa.pub', true)),
       true
     ) 
