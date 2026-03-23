@@ -1,0 +1,34 @@
+---
+- name: Ensure Python requirements are met locally
+  run_once: true
+  become: false
+  delegate_to: localhost
+  pip:
+    requirements: "{{ role_path }}/files/requirements.txt"
+
+- name: Initialize golden-base facts
+  set_fact: 
+    existing_vms: false
+    vm_host: "golden-base"
+    golden_ip: "unknown"
+    # Create a timestamp for version tracking
+    build_timestamp: "{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}"
+
+- name: Build Rocky Linux base image block
+  block:
+    # - name: Scrub Lab IPs from known_hosts
+    #   import_tasks: scrub_known_hosts.yml
+
+    - name: Register Infrastructure DNS (IPA)
+      import_tasks: pre_register_dns_from_helper.yml
+      delegate_to: localhost
+
+    - name: Run virt-install for golden-base
+      import_tasks: 00_create_golden.yml
+      delegate_to: "{{ VM_HOST_IP }}"
+  
+    - name: Wait for Auto-Install shutdown
+      import_tasks: 01_wait_for_shutdown.yml
+      delegate_to: "{{ VM_HOST_IP }}"
+  when: 
+    - "'kvm' in group_names"

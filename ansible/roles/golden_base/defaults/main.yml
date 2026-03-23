@@ -1,0 +1,40 @@
+---
+# SSH Key Logic
+# 1. Try to get the raw string from 'secops_key' env var
+# 2. If empty, try to read the file from 'helper_ssh_pubkey_path' env var
+# 3. Fallback to the standard local path
+core_ssh_key: >-
+  {{ 
+    lookup('env', 'secops_key') | default(
+      lookup('file', lookup('env', 'helper_ssh_pubkey_path') | default('~/.ssh/id_rsa.pub', true)),
+      true
+    ) 
+  }}
+
+# Existing defaults
+cloud_helper_user: "{{ lookup('env', 'USER') | default('cloud_helper', true) }}"
+vm_host: "golden-base"
+VM_HOST_IP: "{{ lookup('env', 'VM_HOST_IP') }}"
+
+# Infrastructure
+cloud_zone: "{{ lookup('env', 'CLOUD_ZONE') | default('morinsoft.ca', true) }}"
+ipa_admin_password: "{{ lookup('env', 'IPA_ADMIN_PWD') }}"
+ipa_master_fqdn: "{{ lookup('env', 'IPA_MASTER') | default('ipa.' ~ cloud_zone, true) }}"
+
+# Resource Defaults
+tram_size: "{{ lookup('env', 'VM_RAM') | default(4096, true) }}"
+tcpu_count: "{{ lookup('env', 'VM_CPUS') | default(2, true) }}"
+tdisk_size: "{{ lookup('env', 'VM_DISK') | default(50, true) }}"
+
+# OS & Repo Versions
+tos_name: "rocky"
+tos_variant: "{{ lookup('env', 'OS_VERSION') | default('9.4', true) }}"
+crio_version: "{{ lookup('env', 'CRIO_VERSION') | default('1.28', true) }}"
+kubernetes_version: "{{ lookup('env', 'K8S_VERSION') | default('1.28', true) }}"
+# iso_path: "{{ lookup('env', 'ISO_PATH') | default('https://download.rockylinux.org/pub/rocky/9/BaseOS/x86_64/os/', true) }}"
+iso_path: "{{ lookup('env', 'ISO_PATH') | default('/var/lib/libvirt/images/Rocky-9-latest-x86_64-dvd.iso', true) }}"
+
+# Other defaults remain the same...
+vm_host: "golden-base"
+tos_name: "rocky"
+tos_variant: "9"

@@ -1,0 +1,17 @@
+---
+- name: Probe golden-base until powers down
+  shell: |
+    sudo virsh domstate {{ vm_host }}
+  register: vm_state
+  until: '"shut off" in vm_state.stdout'
+  retries: 100
+  delay: 20
+  delegate_to: "{{ VM_HOST_IP }}"
+  failed_when: 
+    - vm_state.rc != 0
+    - '"not found" in vm_state.stderr'
+
+- name: Record Build Completion
+  debug:
+    msg: "Golden Base Version {{ build_timestamp }} is now offline and ready."
+
