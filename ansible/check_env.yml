@@ -25,11 +25,11 @@
           - "CRI-O Version:   {{ lookup('env', 'crio_version') }}"
           - "ISO Source:     {{ lookup('env', 'iso_path') }}"
 
-    - name: Check if ISO exists on KVM Host
+    - name: Verify ISO on KVM Host (Elevated)
       delegate_to: "{{ lookup('env', 'VM_HOST_IP') | trim }}"
-      become: false
-      shell: "ls -la '{{ lookup('env', 'iso_path') | trim }}'"
-      register: iso_check
+      become: false  # Important: We are using manual sudo in the command
+      shell: "sudo ls -l /var/lib/libvirt/images/Rocky-9-latest-x86_64-dvd.iso"
+      register: iso_found
 
     - name: Final Validation Success
       debug:
