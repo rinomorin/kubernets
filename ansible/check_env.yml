@@ -29,7 +29,7 @@
       delegate_to: "{{ lookup('env', 'VM_HOST_IP') | trim }}"
       become: false
       # We search the directory for any file containing 'Rocky-9' and 'dvd.iso'
-      shell: 'sudo find /var/lib/libvirt/images/ -name "Rocky-9*dvd.iso" -print'
+      shell: 'sudo find /var/lib/libvirt/images/|grep "Rocky-9*dvd.iso"'
       register: iso_found
       failed_when: iso_found.stdout == ""
 
