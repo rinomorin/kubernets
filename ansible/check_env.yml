@@ -30,7 +30,7 @@
       become: false
       # We search the directory for any file containing 'Rocky-9' and 'dvd.iso'
       shell: |
-        ssh {{ lookup('env', 'VM_HOST_IP') }} sudo find /var/lib/libvirt
+        ssh {{ lookup('env', 'VM_HOST_IP') }} sudo find /var/lib/libvirt/images/ -name "Rocky-9*dvd.iso" -print
       register: iso_found
       failed_when: iso_found.stdout == ""
 
