@@ -25,10 +25,14 @@
           - "CRI-O Version:   {{ lookup('env', 'crio_version') }}"
           - "ISO Source:     {{ lookup('env', 'iso_path') }}"
 
+    - name: Set path fact to sanitize string
+      set_fact:
+        remote_iso: "{{ lookup('env', 'iso_path') | trim }}"
+
     - name: Check if ISO exists on KVM Host
       delegate_to: "{{ lookup('env', 'VM_HOST_IP') | trim }}"
       become: false
-      shell: "sudo ls -la '{{ lookup('env', 'iso_path') | trim }}'"
+      shell: "sudo ls -la '{{ remote_iso }}'"
       register: iso_check
 
     - name: Final Validation Success
