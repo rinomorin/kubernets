@@ -26,10 +26,10 @@
           - "ISO Source:     {{ lookup('env', 'iso_path') }}"
 
     - name: Verify ISO on KVM Host (Using Find to bypass string issues)
-      delegate_to: "{{ lookup('env', 'VM_HOST_IP') | trim }}"
+      delegate_to: localhost
       become: false
       # We search the directory for any file containing 'Rocky-9' and 'dvd.iso'
-      shell: 'sudo find /var/lib/libvirt'
+      shell: 'ssh {{ VM_HOST_IP }} sudo find /var/lib/libvirt'
       register: iso_found
       failed_when: iso_found.stdout == ""
 
