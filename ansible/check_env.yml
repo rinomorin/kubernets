@@ -28,7 +28,7 @@
     - name: Check if ISO exists on KVM Host
       delegate_to: "{{ lookup('env', 'VM_HOST_IP') | trim }}"
       become: false
-      shell: "sudo ls -la '{{ lookup('env', 'iso_path') | trim }}'"
+      shell: "ls -la '{{ lookup('env', 'iso_path') | trim }}'"
       register: iso_check
 
     - name: Final Validation Success
