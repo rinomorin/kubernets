@@ -6,29 +6,28 @@
   loop: "{{ groups['hahost'] }}"
 
 - name: Push HAProxy and Keepalived Configs
-  delegate_to: localhost
-  vars:
-    target_ip: "{{ hostvars[item].ansible_host }}"
-    ssh_cmd: "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }}"
-    scp_cmd: "scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }}"
-  shell: |
   block:
     - name: Local Templating
+      delegate_to: localhost
       template:
-        src: "{{ file_item }}.j2"
-        dest: "/tmp/{{ item }}_{{ file_item }}"
+        src: "{{ item.1 }}.j2"
+        dest: "/tmp/{{ item.0 }}_{{ item.1 }}"
       loop: "{{ groups['hahost'] | product(['haproxy.cfg', 'keepalived.conf']) | list }}"
-      loop_control:
-        loop_var: file_pair
       vars:
-        item: "{{ file_pair.0 }}"
-        file_item: "{{ file_pair.1 }}"
+        # item.0 is the hostname, item.1 is the filename
+        target_hostname: "{{ item.0 }}" 
 
     - name: Deploy and Enable Services
+      delegate_to: localhost
+      vars:
+        target_ip: "{{ hostvars[item].ansible_host }}"
+        key_path: "/home/cloud_helper/.ssh/id_rsa"
+        ssh_cmd: "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }}"
+        scp_cmd: "scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }}"
       shell: |
-        {{ scp_cmd}} /tmp/{{ item }}_haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
-        {{ ssh_cmd }} /tmp/{{ item }}_keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
-        {{  ssh_cmd }} core@{{ target_ip }} << 'EOF'
+        {{ scp_cmd }} /tmp/{{ item }}_haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
+        {{ scp_cmd }} /tmp/{{ item }}_keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
+        {{ ssh_cmd }} core@{{ target_ip }} << 'EOF'
           sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
           sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf
           sudo sysctl -w net.ipv4.ip_nonlocal_bind=1
@@ -37,9 +36,13 @@
         EOF
       loop: "{{ groups['hahost'] }}"
 
-- name: Final Cleanup - Remove Bootstrap NIC
+- name: Final Cleanup - Remove Bootstrap NIC (NAT)
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
-    MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'default' | awk '{print $5}')
-    sudo virsh detach-interface {{ item.split('.')[0] }} bridge --mac $MAC --config --live
+    # TARGET THE NAT INTERFACE, NOT THE DEFAULT/PROVIDER ONE
+    MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'br-nat' | awk '{print $5}')
+    if [ -n "$MAC" ]; then
+      sudo virsh detach-interface {{ item.split('.')[0] }} bridge --mac $MAC --config --live
+    fi
   loop: "{{ groups['hahost'] }}"
+
