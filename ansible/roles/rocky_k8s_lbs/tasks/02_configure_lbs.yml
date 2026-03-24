@@ -36,36 +36,40 @@
         {{ ssh_cmd }} core@{{ target_ip }} sudo dnf install -y haproxy keepalived
       loop: "{{ groups['hahost'] }}"
           
-
 - name: Push and Enable LB Services (Fixed LF and SELinux)
   delegate_to: localhost
-  run_once: true
+  # REMOVED run_once: true
   loop: "{{ groups['hahost'] }}"
   vars:
+    # Ensure this is the PRIVATE key path as we discussed
     ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
     target_ip: "{{ hostvars[item].ansible_host }}"
   shell: |
-    # 1. Detect Interface
+    # 1. Detect Interface on the VM
     REAL_IFACE=$(ssh {{ ssh_opts }} core@{{ target_ip }} "ip -o addr show | grep '192.168.' | awk '{print \$2}' | head -n1")
     
-    # 2. Local Cleanup
+    # 2. Update local config with the real interface name
+    # Using 'item' here refers to the current host in the loop (e.g., msrlv9l01)
     sed -i "s|interface .*|interface $REAL_IFACE|" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
     sed -i 's|killall -0 haproxy|pgrep -x haproxy|' /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
-    # Ensure newline (using printf is safer for YAML blocks)
     printf '\n' >> /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg
 
-    # 3. Transfer
+    # 3. Transfer files
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
     
-    # 4. Remote Execution (Avoid nested double quotes)
+    # 4. Remote Execution (Fixed the 'ta!rget_ip' typo)
     ssh {{ ssh_opts }} core@{{ target_ip }} << 'EOF'
       sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
       sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf
       sudo chown root:root /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
       sudo chmod 644 /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
       sudo restorecon -Rv /etc/haproxy /etc/keepalived
+      
+      # Persistence for non-local bind (vital for Keepalived VIPs)
       sudo sysctl -w net.ipv4.ip_nonlocal_bind=1
+      echo "net.ipv4.ip_nonlocal_bind=1" | sudo tee /etc/sysctl.d/99-haproxy.conf
+      
       sudo setsebool -P haproxy_connect_any 1
       sudo systemctl stop haproxy keepalived
       
@@ -78,7 +82,6 @@
       sleep 2
       sudo systemctl enable --now haproxy
     EOF
-
 - name: Create Isolated Dummy Network
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
