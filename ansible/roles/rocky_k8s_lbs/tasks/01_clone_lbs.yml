@@ -45,30 +45,51 @@
     } }) }}"
   loop: "{{ nic_discovery.results }}"
 
-- name: Configure Production NICs (Conditional Assignment)
+- name: Configure Production NICs (Forceful & Persistent)
   delegate_to: localhost
   vars:
     node: "{{ discovery_data[item] }}"
-    cloud_ip: "{{ hostvars[item].ansible_host | default('') }}"
+    # Renamed to provider_ip per your request
+    provider_ip: "{{ hostvars[item].ansible_host | default('') }}"
     prov_ip: "{{ hostvars[item].provision_ip | default('') }}"
+    
+    # Calculate gateway (.1) from the 'default' network CIDR in inventory
+    gateway_ip: "{{ hostvars['kvmdc01'].libvirt_networks | selectattr('name', 'equalto', 'default') | map(attribute='cidr') | first | ipaddr('net') | ipaddr('1') | cut -d/ -f1 }}"
+    
     key_path: "/home/cloud_helper/.ssh/id_rsa"
   shell: |
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ node.bootstrap_ip }} << 'EOF'
       
-      # 1. Configure Cloud Interface (default bridge)
-      if [ -n "{{ cloud_ip }}" ] && [ "{{ node.cloud_mac }}" != "NONE" ]; then
-        CLOUD_DEV=$(nmcli -t -f DEVICE,MAC-ADDRESS device show | grep -i "{{ node.cloud_mac }}" | cut -d: -f1 | head -n1)
-        sudo nmcli con add type ethernet con-name cloud-net ifname $CLOUD_DEV \
-          ipv4.addresses {{ cloud_ip }}/24 ipv4.method manual connection.autoconnect yes
-        sudo nmcli con up cloud-net
+      # 1. Configure Provider/Cloud Interface (Primary)
+      if [ -n "{{ provider_ip }}" ] && [ "{{ node.cloud_mac }}" != "NONE" ]; then
+        # Identify the device by MAC
+        PROV_DEV=$(nmcli -t -f DEVICE,MAC-ADDRESS device show | grep -i "{{ node.cloud_mac }}" | cut -d: -f1 | head -n1)
+        
+        # Force-delete any existing active connections on this specific hardware
+        for uuid in $(nmcli -t -f UUID,DEVICE connection show --active | grep "$PROV_DEV" | cut -d: -f1); do
+          sudo nmcli con down "$uuid" || true
+          sudo nmcli con delete "$uuid" || true
+        done
+
+        # Add the Static IP and the Dynamic Gateway
+        sudo nmcli con add type ethernet con-name provider-net ifname $PROV_DEV \
+          ipv4.addresses {{ provider_ip }}/24 \
+          ipv4.gateway {{ gateway_ip }} \
+          ipv4.method manual \
+          connection.autoconnect yes
+        
+        sudo nmcli con up provider-net
       fi
 
-      # 2. Configure Provisioning Interface (br-cluster)
+      # 2. Configure Internal Provisioning Interface (Optional)
       if [ -n "{{ prov_ip }}" ] && [ "{{ node.prov_mac }}" != "NONE" ]; then
-        PROV_DEV=$(nmcli -t -f DEVICE,MAC-ADDRESS device show | grep -i "{{ node.prov_mac }}" | cut -d: -f1 | head -n1)
-        sudo nmcli con add type ethernet con-name prov-net ifname $PROV_DEV \
+        INT_DEV=$(nmcli -t -f DEVICE,MAC-ADDRESS device show | grep -i "{{ node.prov_mac }}" | cut -d: -f1 | head -n1)
+        for uuid in $(nmcli -t -f UUID,DEVICE connection show --active | grep "$INT_DEV" | cut -d: -f1); do
+          sudo nmcli con delete "$uuid" || true
+        done
+        sudo nmcli con add type ethernet con-name internal-net ifname $INT_DEV \
           ipv4.addresses {{ prov_ip }}/24 ipv4.method manual connection.autoconnect yes
-        sudo nmcli con up prov-net
+        sudo nmcli con up internal-net
       fi
     EOF
   loop: "{{ groups['hahost'] }}"
