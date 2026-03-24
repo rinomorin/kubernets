@@ -1,0 +1,26 @@
+vrrp_script check_haproxy {
+    script "pgrep -x haproxy"
+    interval 2
+    weight 2
+}
+
+vrrp_instance VI_1 {
+    state {{ 'MASTER' if inventory_hostname == groups['hahost'][0] else 'BACKUP' }}
+    interface eth0  # This will be replaced by your sed command in the task
+    virtual_router_id 51
+    priority {{ 100 - (groups['hahost'].index(inventory_hostname) * 10) }}
+    advert_int 1
+    
+    authentication {
+        auth_type PASS
+        auth_pass 42
+    }
+
+    virtual_ipaddress {
+        {{ k8s_api_vip }}/24
+    }
+
+    track_script {
+        check_haproxy
+    }
+}

@@ -10,20 +10,25 @@
           - lookup('env', 'VM_HOST_IP') != ""
           - lookup('env', 'ipa_admin_password') != ""
           - lookup('env', 'secops_key') != ""
+          - lookup('env', 'core_ssh_key') != ""
           - lookup('env', 'iso_path') != ""
+          - lookup('env', 'cloud_zone') != ""
         fail_msg: |
           FATAL: Environment not loaded! 
           Please run 'source env_build.sh' before executing this playbook.
-          Missing one or more: VM_HOST_IP, ipa_admin_password, secops_key, iso_path.
+          Missing one or more: VM_HOST_IP, ipa_admin_password, secops_key, core_ssh_key, iso_path, cloud_zone.
 
     - name: Report Detected Build Profile
       debug:
         msg: 
           - "Target KVM Host: {{ lookup('env', 'VM_HOST_IP') }}"
           - "Domain:          {{ lookup('env', 'ipa_domain') }}"
-          - "K8s Version:    {{ lookup('env', 'kubetnet_version') }}"
-          - "CRI-O Version:   {{ lookup('env', 'crio_version') }}"
-          - "ISO Source:     {{ lookup('env', 'iso_path') }}"
+          - "Cloud Zone:      {{ lookup('env', 'cloud_zone') }}"
+          - "Provision Zone:  {{ lookup('env', 'cloud_provision') }}"
+          - "K8s VIP:         {{ lookup('env', 'ingress_ip') }}"
+          - "K8s Version:     {{ lookup('env', 'kubetnet_version') }}"
+          - "CRI-O Version:    {{ lookup('env', 'crio_version') }}"
+          - "ISO Source:      {{ lookup('env', 'iso_path') }}"
 
     - name: Verify ISO on KVM Host (Using Find to bypass string issues)
       delegate_to: localhost

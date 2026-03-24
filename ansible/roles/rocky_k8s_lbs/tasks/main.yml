@@ -1,0 +1,9 @@
+---
+# 00: Prep DNS so the network identity exists
+- import_tasks: 00_dns_registration.yml
+
+# 01: Create the hardware (VMs) and flip them to static IPs
+- import_tasks: 01_clone_lbs.yml
+
+# 02: Install services and push HA configurations
+- import_tasks: 02_configure_lbs.yml

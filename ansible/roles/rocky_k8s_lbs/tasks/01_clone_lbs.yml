@@ -1,0 +1,62 @@
+---
+- name: Clone Load Balancer nodes from Golden Image
+  delegate_to: "{{ VM_HOST_IP }}"
+  command: >
+    sudo virt-clone --original golden-base 
+    --name {{ item.split('.')[0] }} 
+    --file /var/lib/libvirt/images/{{ item.split('.')[0] }}.qcow2
+  loop: "{{ groups['hahost'] }}"
+  register: lb_clones
+  failed_when: 
+    - lb_clones.rc != 0 
+    - "'already exists' not in lb_clones.stderr"
+
+- name: Start cloned VMs
+  delegate_to: "{{ VM_HOST_IP }}"
+  community.libvirt.virt:
+    name: "{{ item.split('.')[0] }}"
+    state: running
+  loop: "{{ groups['hahost'] }}"
+
+- name: Wait for DHCP on Management Bridge
+  delegate_to: "{{ VM_HOST_IP }}"
+  shell: |
+    MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'default' | awk '{print $5}')
+    while ! sudo virsh net-dhcp-leases default | grep -q "$MAC"; do sleep 2; done
+  loop: "{{ groups['hahost'] }}"
+
+- name: Map DHCP IPs and MACs
+  delegate_to: "{{ VM_HOST_IP }}"
+  shell: |
+    MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'default' | awk '{print $5}')
+    IP=$(sudo virsh net-dhcp-leases default | grep "$MAC" | awk '{print $5}' | cut -d/ -f1)
+    echo "$MAC|$IP"
+  register: lb_net_raw
+  loop: "{{ groups['hahost'] }}"
+
+- name: Set Discovery Facts
+  set_fact:
+    lb_dhcp_map: "{{ lb_dhcp_map | default({}) | combine({ item.item: item.stdout.split('|')[1] }) }}"
+    lb_mac_map: "{{ lb_mac_map | default({}) | combine({ item.item: item.stdout.split('|')[0] }) }}"
+  loop: "{{ lb_net_raw.results }}"
+
+- name: Inject Static IP via SSH Jump
+  delegate_to: localhost
+  vars:
+    temp_ip: "{{ lb_dhcp_map[item] }}"
+    target_ip: "{{ hostvars[item].ansible_host }}"
+  shell: |
+    ssh -o StrictHostKeyChecking=no core@{{ temp_ip }} \
+    "sudo nmcli con add type ethernet con-name provider ifname enp1s0 \
+     ipv4.addresses {{ target_ip }}/24 ipv4.method manual connection.autoconnect yes && \
+     sudo nmcli con up provider"
+  async: 45
+  poll: 0
+  loop: "{{ groups['hahost'] }}"
+
+- name: Verify SSH reachability on Static IP
+  wait_for:
+    host: "{{ hostvars[item].ansible_host }}"
+    port: 22
+    timeout: 60
+  loop: "{{ groups['hahost'] }}"
