@@ -1,18 +1,19 @@
 ---
 # 1. Prepare Environment
-- name: Load environment and install requirements
+- name: load environment
   hosts: all
   gather_facts: false
   tasks:
-    - name: Ensure latest stable collections are installed
+    - name: Ensure latest stable collections are installed on controller
       delegate_to: localhost
+      become: false
       run_once: true
       command: "ansible-galaxy collection install {{ item }} --upgrade"
       loop:
         - community.general
         - ansible.posix
-        - kubernetes.core
-      changed_when: false
+        - kubernetes.core  # Highly recommended for your FCOS/K8s work
+      changed_when: false # These commands check for updates every time
 
 # 2. Run your environment check playbook
 - import_playbook: ../check_env.yml
