@@ -30,25 +30,20 @@
     CLOUD_MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'default' | awk '{print $5}' || echo "NONE")
     PROV_MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'br-cluster' | awk '{print $5}' || echo "NONE")
 
-    echo "$B_IP|$CLOUD_MAC|$PROV_MAC"
+    # Output string for Ansible to parse (4 values)
+    echo "$B_IP|$B_MAC|$CLOUD_MAC|$PROV_MAC"
   register: nic_discovery
   loop: "{{ groups['hahost'] }}"
 
-- name: Set Discovery Facts
+- name: Set Network Discovery Facts
   set_fact:
     discovery_data: "{{ discovery_data | default({}) | combine({ item.item: {
       'bootstrap_ip': item.stdout.split('|')[0],
-      'cloud_mac': item.stdout.split('|')[1],
-      'prov_mac': item.stdout.split('|')[2]
+      'bootstrap_mac': item.stdout.split('|')[1],
+      'cloud_mac': item.stdout.split('|')[2],
+      'prov_mac': item.stdout.split('|')[3]
     } }) }}"
   loop: "{{ nic_discovery.results }}"
-
-- name: who am I
-  delegate_to: localhost
-  shell: whoami
-  register: whoami_out
-- debug:
-    msg: "Current user is {{ whoami_out.stdout }}"
 
 - name: Configure Production NICs (Conditional Assignment)
   delegate_to: localhost
@@ -56,14 +51,12 @@
     node: "{{ discovery_data[item] }}"
     cloud_ip: "{{ hostvars[item].ansible_host | default('') }}"
     prov_ip: "{{ hostvars[item].provision_ip | default('') }}"
-    # FIXED: Pointing to the PRIVATE key, not the .pub
     key_path: "/home/cloud_helper/.ssh/id_rsa"
   shell: |
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ node.bootstrap_ip }} << 'EOF'
       
       # 1. Configure Cloud Interface (default bridge)
       if [ -n "{{ cloud_ip }}" ] && [ "{{ node.cloud_mac }}" != "NONE" ]; then
-        # Find device name based on discovered MAC
         CLOUD_DEV=$(nmcli -t -f DEVICE,MAC-ADDRESS device show | grep -i "{{ node.cloud_mac }}" | cut -d: -f1 | head -n1)
         sudo nmcli con add type ethernet con-name cloud-net ifname $CLOUD_DEV \
           ipv4.addresses {{ cloud_ip }}/24 ipv4.method manual connection.autoconnect yes
@@ -99,16 +92,14 @@
       failed_when: false
 
     - name: Remove br-nat Interface from Config
-      delegate_to: "{{ VM_HOST_IP }}"
       vars:
-        # Use the bootstrap MAC we discovered and stored earlier
         target_mac: "{{ discovery_data[item].bootstrap_mac }}"
       shell: |
-        if sudo virsh domiflist {{ item.split('.')[0] }} | grep -q "{{ target_mac }}"; then
+        # Verify the interface exists in the XML before attempting removal
+        if sudo virsh dumpxml {{ item.split('.')[0] }} | grep -q "{{ target_mac }}"; then
           sudo virsh detach-interface {{ item.split('.')[0] }} bridge --mac {{ target_mac }} --config
         else
-          echo "Interface {{ target_mac }} already removed from {{ item.split('.')[0] }}"
-          exit 0
+          echo "Interface {{ target_mac }} not found in config, skipping."
         fi
       loop: "{{ groups['hahost'] }}"
       register: detach_result
@@ -119,3 +110,11 @@
         name: "{{ item.split('.')[0] }}"
         state: running
       loop: "{{ groups['hahost'] }}"
+
+- name: Verify SSH reachability on Static IPs
+  wait_for:
+    host: "{{ hostvars[item].ansible_host }}"
+    port: 22
+    state: started
+    timeout: 60
+  loop: "{{ groups['hahost'] }}"
