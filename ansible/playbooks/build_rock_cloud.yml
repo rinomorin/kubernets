@@ -17,6 +17,24 @@
       changed_when: false # These commands check for updates every time
     
 - import_playbook: ../check_env.yml
+- name: Build Golden Base
+  hosts: kvm
+  gather_facts: false
+  vars:
+    # Set this at the top level so it's available everywhere
+    golden_image_name: "{{ lookup('env', 'golden_image_name') | default('golden-base', true) }}"
+
+  # Now we wrap the role in a block or use a dynamic include
+  tasks:
+    - name: Run Golden Image Build Role
+      include_role:
+        name: rocky_k8s_golden
+      # ONLY run this if the virsh command failed (rc != 0)
+      when: base_check.rc != 0
+
+    - name: Confirm Image is now ready
+      debug:
+        msg: "Golden image {{ golden_image_name }} is present or has been built."
 
 - name: Build Golden Base
   gather_facts: false

@@ -13,7 +13,7 @@ core_ssh_key: >-
 
 # Existing defaults
 cloud_helper_user: "{{ lookup('env', 'CLOUD_HELPER_USER') | default('cloud_helper', true) }}"
-vm_host: "golden-base"
+vm_host: "{{ lookup('env', 'golden_image_name') | default('golden-base', true) }}"
 VM_HOST_IP: "{{ lookup('env', 'VM_HOST_IP') }}"
 
 # Infrastructure
