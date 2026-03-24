@@ -45,7 +45,7 @@
 
 - name: who am I
   delegate_to: localhost
-  shell: whoami
+  shell: who am i
   register: whoami_out
 - debug:
     msg: "Current user is {{ whoami_out.stdout }}"
