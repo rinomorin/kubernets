@@ -55,30 +55,27 @@
 - name: 2.2 - Configure Provider IP via Maintenance Tunnel
   delegate_to: localhost
   vars:
-    # Inventory values
     provider_ip: "{{ hostvars[item].ansible_host }}"
-    # Calculated .1 Gateway
     provider_gw: "{{ hostvars['kvmdc01'].libvirt_networks | selectattr('name', 'equalto', 'default') | map(attribute='cidr') | first | ansible.utils.ipaddr('net') | ansible.utils.ipaddr('1') | split('/') | first }}"
-    # Connections
     m_ip: "{{ maintenance_map[item] }}"
-    p_mac: "{{ provider_mac_raw.results | selectattr('item', 'equalto', item) | map(attribute='stdout') | first }}"
+    # Extract the specific MAC for this specific loop item
+    p_mac: "{{ (provider_mac_raw.results | selectattr('item', 'equalto', item) | first).stdout }}"
     key_path: "/home/cloud_helper/.ssh/id_rsa"
-    dns_servers: "{{ groups['dns'] | map('extract', hostvars, 'ansible_host') | join(',') }}"
+    dns_servers: "{{ groups['dns'] | map('extract', hostvars, 'ansible_host') | join(' ') }}"
+    # Standard SSH prefix to keep the shell block readable
+    ssh_cmd: "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ m_ip }}"
   shell: |
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ m_ip }} "
-      # Identify the OS device name (ethX) using the Provider MAC
-      DEV=\$(nmcli -t -f DEVICE,MAC-ADDRESS device show | grep -i "{{ p_mac }}" | cut -d: -f1 | head -n1)
-      
-      # Set Static IP and Gateway on the provider interface
-      sudo nmcli con add type ethernet con-name provider ifname \$DEV \
-        ipv4.addresses {{ provider_ip }}/24 \
-        ipv4.gateway {{ provider_gw }} \
-        ipv4.dns {{ dns_servers }} \
-        ipv4.method manual \
-        connection.autoconnect yes
-      
-      sudo nmcli con up provider-static
-      "
+    # 1. Get the Device name (ethX) from the VM matching the Provider MAC
+    DEV=$({{ ssh_cmd }} "nmcli -t -f DEVICE,MAC-ADDRESS device show | grep -i '{{ p_mac }}' | cut -d: -f1 | head -n1")
+
+    # 2. Add the connection profile
+    {{ ssh_cmd }} "sudo nmcli con add type ethernet con-name provider ifname $DEV"
+
+    # 3. Configure IP, Gateway, and DNS
+    {{ ssh_cmd }} "sudo nmcli con mod provider ipv4.addresses {{ provider_ip }}/24 ipv4.gateway {{ provider_gw }} ipv4.dns '{{ dns_servers }}' ipv4.method manual connection.autoconnect yes"
+
+    # 4. Bring the connection up
+    {{ ssh_cmd }} "sudo nmcli con up provider"
   loop: "{{ groups['hahost'] }}"
 
 # - name: Final Cleanup - Remove Bootstrap NIC
