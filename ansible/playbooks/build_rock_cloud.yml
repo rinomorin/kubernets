@@ -31,7 +31,7 @@
     
     - name: Verify Golden Base exists on KVM Host
       delegate_to: "{{ VM_HOST_IP }}"
-      shell: "virsh list --all | grep {{ golden_image_name }}"
+      shell: "sudo virsh list --all | grep {{ golden_image_name }}"
       register: base_check
       failed_when: base_check.rc != 0
       changed_when: false
