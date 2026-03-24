@@ -5,45 +5,99 @@
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }} core@{{ hostvars[item].ansible_host }} "sudo dnf install -y haproxy keepalived"
   loop: "{{ groups['hahost'] }}"
 
+
+
 - name: Push HAProxy and Keepalived Configs
   block:
-    - name: Local Templating
-      delegate_to: localhost
-      template:
-        src: "{{ item.1 }}.j2"
-        dest: "/tmp/{{ item.0 }}_{{ item.1 }}"
-      loop: "{{ groups['hahost'] | product(['haproxy.cfg', 'keepalived.conf']) | list }}"
-      vars:
-        # item.0 is the hostname, item.1 is the filename
-        target_hostname: "{{ item.0 }}" 
 
-    - name: Deploy and Enable Services
+    - name: Create local temp directories for each LB
+      file:
+        path: "/tmp/k8s_lb_configs/{{ item }}"
+        state: directory
+        mode: '0755'
+      loop: "{{ groups['hahost'] }}"
+
+    - name: Template HAProxy Config
+      template:
+        src: haproxy.cfg.j2
+        dest: "/tmp/k8s_lb_configs/{{ item }}/haproxy.cfg"
+      loop: "{{ groups['hahost'] }}"
+
+    - name: Template Keepalived Config
+      template:
+        src: keepalived.conf.j2
+        dest: "/tmp/k8s_lb_configs/{{ item }}/keepalived.conf"
+      loop: "{{ groups['hahost'] }}"
+
+    - name: install haproxy and keepalived on target
       delegate_to: localhost
       vars:
         target_ip: "{{ hostvars[item].ansible_host }}"
         ssh_cmd: "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
-        scp_cmd: "scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
       shell: |
-        {{ scp_cmd }} /tmp/{{ item }}_haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
-        {{ scp_cmd }} /tmp/{{ item }}_keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
-        {{ ssh_cmd }} core@{{ target_ip }} << 'EOF'
-          sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
-          sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf
-          sudo sysctl -w net.ipv4.ip_nonlocal_bind=1
-          sudo setsebool -P haproxy_connect_any 1
-          sudo systemctl enable --now keepalived haproxy
-        EOF
+        {{ ssh_cmd }} core@{{ target_ip }} sudo dnf install -y haproxy keepalived
       loop: "{{ groups['hahost'] }}"
+          
+    # - name: Deploy and Enable Services
+    #   delegate_to: localhost
+    #   vars:
+    #     target_ip: "{{ hostvars[item].ansible_host }}"
+    #     ssh_cmd: "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
+    #     scp_cmd: "scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
+    #   shell: |
+    #     {{ scp_cmd }} /tmp/{{ item }}_haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
+    #     {{ scp_cmd }} /tmp/{{ item }}_keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
+    #     {{ ssh_cmd }} core@{{ target_ip }} << 'EOF'
+    #       sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
+    #       sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf
+    #       sudo sysctl -w net.ipv4.ip_nonlocal_bind=1
+    #       sudo setsebool -P haproxy_connect_any 1
+    #       sudo systemctl enable --now keepalived haproxy
+    #     EOF
+    #   loop: "{{ groups['hahost'] }}"
 
-- name: Final Cleanup - Remove Bootstrap NIC (NAT)
-  delegate_to: "{{ VM_HOST_IP }}"
-  shell: |
-    # TARGET THE NAT INTERFACE, NOT THE DEFAULT/PROVIDER ONE
-    MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'br-nat' | awk '{print $5}')
-    if [ -n "$MAC" ]; then
-      sudo virsh detach-interface {{ item.split('.')[0] }} bridge --mac $MAC --config --live
-    fi
+- name: Push and Enable LB Services (Fixed LF and SELinux)
+  delegate_to: localhost
+  run_once: true
   loop: "{{ groups['hahost'] }}"
+  vars:
+    ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+    target_ip: "{{ hostvars[item].ansible_host }}"
+  shell: |
+    # 1. Detect Interface
+    REAL_IFACE=$(ssh {{ ssh_opts }} core@{{ target_ip }} "ip -o addr show | grep '192.168.100.' | awk '{print \$2}' | head -n1")
+    
+    # 2. Local Cleanup
+    sed -i "s|interface .*|interface $REAL_IFACE|" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
+    sed -i 's|killall -0 haproxy|pgrep -x haproxy|' /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
+    # Ensure newline (using printf is safer for YAML blocks)
+    printf '\n' >> /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg
+
+    # 3. Transfer
+    scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
+    scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
+    
+    # 4. Remote Execution (Avoid nested double quotes)
+    ssh {{ ssh_opts }} core@{{ target_ip }} << 'EOF'
+      sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
+      sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf
+      sudo chown root:root /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
+      sudo chmod 644 /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
+      sudo restorecon -Rv /etc/haproxy /etc/keepalived
+      sudo sysctl -w net.ipv4.ip_nonlocal_bind=1
+      sudo setsebool -P haproxy_connect_any 1
+      sudo systemctl stop haproxy keepalived
+      
+      if ! sudo haproxy -c -f /etc/haproxy/haproxy.cfg; then
+          echo "HAProxy config invalid"
+          exit 1
+      fi
+
+      sudo systemctl enable --now keepalived
+      sleep 2
+      sudo systemctl enable --now haproxy
+    EOF
+
 - name: Final Cleanup - Remove Bootstrap NIC
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
