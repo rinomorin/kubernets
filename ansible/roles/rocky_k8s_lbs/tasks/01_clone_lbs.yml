@@ -92,18 +92,23 @@
       failed_when: false
 
     - name: Remove br-nat Interface from Config
+      delegate_to: "{{ VM_HOST_IP }}"
       vars:
         target_mac: "{{ discovery_data[item].bootstrap_mac }}"
       shell: |
-        # Verify the interface exists in the XML before attempting removal
+        # Create a temporary XML file containing only the MAC address we want to kill
+        printf "<interface><mac address='{{ target_mac }}'/></interface>" > /tmp/{{ item.split('.')[0] }}-mac.xml
+        
+        # Use detach-device with the --persistent (or --config) flag
         if sudo virsh dumpxml {{ item.split('.')[0] }} | grep -q "{{ target_mac }}"; then
-          sudo virsh detach-interface {{ item.split('.')[0] }} bridge --mac {{ target_mac }} --config
+          sudo virsh detach-device {{ item.split('.')[0] }} /tmp/{{ item.split('.')[0] }}-mac.xml --config
+          rm /tmp/{{ item.split('.')[0] }}-mac.xml
         else
           echo "Interface {{ target_mac }} not found in config, skipping."
         fi
       loop: "{{ groups['hahost'] }}"
       register: detach_result
-      changed_when: "'detached' in detach_result.stdout"
+      changed_when: "'Device detached successfully' in detach_result.stdout"    
 
     - name: Power on Production LBs
       community.libvirt.virt:
