@@ -53,10 +53,13 @@ export cluster_gateway="10.0.0.1"
 export kubetnet_version="1.34"
 export crio_version="1.34"
 
-echo "-------------------------------------------------------"
-echo " MorinSoft Environment Loaded Successfully "
-echo " Target KVM: $VM_HOST ($VM_HOST_IP) "
-echo "-------------------------------------------------------"export golden_image_name=golden_base
+export golden_image_name=golden_base
 export ipa_admin_password="On32L00kUpToo~"
 export ipa_admin_principal="admin@HOME.MORINSOFT.CA"
 export secops_key='ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDY7mVnfYbrUphqCWkm0QxIwH3stJPi/Vqtt2ddDOwN5DhXQaRG+4IJQE3TOsYheoo/jYkS52nsYyXZWCZCNtXT4/htMAZlqAmOy/Bz5Lid31NIZoFRKN5GsxrzRU3jyRGnDLnjJifhrchTrSb1RNeb+FDWr4wpqTHDkZ5Zfh4OLkaLWJ0hqHWBE/H9t1AZ/VHvPj6i0fNfp+QM4uwg82dwS1a5GtjwrCxyEl37KRKdZsTZnByVG6zUlT6gOAVJ7y0dkhcL9zHi1NpnJPCO6EhhVNZpicHVEyVO+17GCfQfTb/EKjKo/7r6/CmTRvAHoen16dBs8iTfS0faSctC9YNZg65xt2e2PQRfodCtmYZdVsqYtsyvjbKM2qdNiTKQGhlfl8dgGh/N4xsh7vadkPznFLmluFJlWukEWw+9FnnAi69xaCbOq9uz6+JhY+4a16C//NbnEVzTTyK8l3MbxedeZ7FNaHlfYiPfj4ZogbOaoNYARF24eDzavEucHKcsyFylAPU/aV0C+XfDsZiHnfFf1o2hkPaDJUd+37Qyu8vBojcaACFIE4JbTe7vI36A4hWuJrckRKbY8NRIbWhpzlnc7yM3+YzI8SjjrFTH4vFPVnVrDrSPrd6zFE6KMaFu4XZxDSj6CxURPY9Eo4Rnw6GRTMH14clYKLKa4ZYwTLgcUQ== rmorin@rl-10.morinsoft.ca'
+
+
+echo "-------------------------------------------------------"
+echo " MorinSoft Environment Loaded Successfully "
+echo " Target KVM: $VM_HOST ($VM_HOST_IP) "
+echo "-------------------------------------------------------"
