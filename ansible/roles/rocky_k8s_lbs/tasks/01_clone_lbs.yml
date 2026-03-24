@@ -18,24 +18,17 @@
     state: running
   loop: "{{ groups['hahost'] }}"
 
-- name: Wait for DHCP on Management Bridge (check)
-  delegate_to: "{{ VM_HOST_IP }}"
-  shell: |
-    echo MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'default' | awk '{print $5}')
-    echo while ! sudo virsh net-dhcp-leases default | grep -q "$MAC"; do sleep 2; done
-  loop: "{{ groups['hahost'] }}"
-
 - name: Wait for DHCP on Management Bridge
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
-    MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'default' | awk '{print $5}')
+    MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'br-nat' | awk '{print $5}')
     while ! sudo virsh net-dhcp-leases default | grep -q "$MAC"; do sleep 2; done
   loop: "{{ groups['hahost'] }}"
 
 - name: Map DHCP IPs and MACs
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
-    MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'default' | awk '{print $5}')
+    MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'br-nat' | awk '{print $5}')
     IP=$(sudo virsh net-dhcp-leases default | grep "$MAC" | awk '{print $5}' | cut -d/ -f1)
     echo "$MAC|$IP"
   register: lb_net_raw
