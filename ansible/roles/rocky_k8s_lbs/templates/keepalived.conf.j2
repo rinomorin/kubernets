@@ -5,10 +5,12 @@ vrrp_script check_haproxy {
 }
 
 vrrp_instance VI_1 {
-    state {{ 'MASTER' if inventory_hostname == groups['hahost'][0] else 'BACKUP' }}
-    interface eth0  # This will be replaced by your sed command in the task
+    # Use 'item' because we are looping through the VM names
+    state {{ 'MASTER' if item == groups['hahost'][0] else 'BACKUP' }}
+    interface eth0  
     virtual_router_id 51
-    priority {{ 100 - (groups['hahost'].index(inventory_hostname) * 10) }}
+    # Use 'item' to find the index for priority
+    priority {{ 100 - (groups['hahost'].index(item) * 10) }}
     advert_int 1
     
     authentication {
