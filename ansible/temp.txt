@@ -56,4 +56,4 @@ export crio_version="1.34"
 echo "-------------------------------------------------------"
 echo " MorinSoft Environment Loaded Successfully "
 echo " Target KVM: $VM_HOST ($VM_HOST_IP) "
-echo "-------------------------------------------------------"
+echo "-------------------------------------------------------"export golden_image_name=golden_base

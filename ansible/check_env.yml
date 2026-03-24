@@ -13,10 +13,11 @@
           - lookup('env', 'core_ssh_key') != ""
           - lookup('env', 'iso_path') != ""
           - lookup('env', 'cloud_zone') != ""
+          - lookup('env', 'golden_image_name') != ""
         fail_msg: |
           FATAL: Environment not loaded! 
           Please run 'source env_build.sh' before executing this playbook.
-          Missing one or more: VM_HOST_IP, ipa_admin_password, secops_key, core_ssh_key, iso_path, cloud_zone.
+          Missing one or more: VM_HOST_IP, golden_image_name, ipa_admin_password, secops_key, core_ssh_key, iso_path, cloud_zone.
 
     - name: Report Detected Build Profile
       debug:
@@ -29,6 +30,7 @@
           - "K8s Version:     {{ lookup('env', 'kubetnet_version') }}"
           - "CRI-O Version:    {{ lookup('env', 'crio_version') }}"
           - "ISO Source:      {{ lookup('env', 'iso_path') }}"
+          - "Golden Image:    {{ lookup('env', 'golden_image_name') }}"
 
     - name: Verify ISO on KVM Host (Using Find to bypass string issues)
       delegate_to: localhost
