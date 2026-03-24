@@ -24,6 +24,7 @@
   gather_facts: false
   vars:
     golden_image_name: "{{ lookup('env', 'golden_image_name') | default('golden-base', true) }}"
+    VM_HOST_IP: "{{ lookup('env', 'VM_HOST_IP') }}"
   
   pre_tasks:
     - name: Check if Golden Base already exists
