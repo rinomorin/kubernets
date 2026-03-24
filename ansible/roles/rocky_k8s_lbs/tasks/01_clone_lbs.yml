@@ -49,13 +49,10 @@
   delegate_to: localhost
   vars:
     node: "{{ discovery_data[item] }}"
-    # Renamed to provider_ip per your request
     provider_ip: "{{ hostvars[item].ansible_host | default('') }}"
     prov_ip: "{{ hostvars[item].provision_ip | default('') }}"
-    
-    # Calculate gateway (.1) from the 'default' network CIDR in inventory
-    gateway_ip: "{{ hostvars['kvmdc01'].libvirt_networks | selectattr('name', 'equalto', 'default') | map(attribute='cidr') | first | ipaddr('net') | ipaddr('1') | cut -d/ -f1 }}"
-    
+    # Updated logic
+    gateway_ip: "{{ hostvars['kvmdc01'].libvirt_networks | selectattr('name', 'equalto', 'default') | map(attribute='cidr') | first | ansible.utils.ipaddr('net') | ansible.utils.ipaddr('1') | split('/') | first }}"
     key_path: "/home/cloud_helper/.ssh/id_rsa"
   shell: |
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ node.bootstrap_ip }} << 'EOF'
