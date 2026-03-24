@@ -2,13 +2,16 @@
 - name: Install HA Software Stack
   delegate_to: localhost
   shell: |
-    ssh core@{{ hostvars[item].ansible_host }} "sudo dnf install -y haproxy keepalived"
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ hostvars[item].ansible_host }} "sudo dnf install -y haproxy keepalived"
   loop: "{{ groups['hahost'] }}"
 
 - name: Push HAProxy and Keepalived Configs
   delegate_to: localhost
   vars:
     target_ip: "{{ hostvars[item].ansible_host }}"
+    ssh_cmd: "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }}"
+    scp_cmd: "scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }}"
+  shell: |
   block:
     - name: Local Templating
       template:
@@ -23,9 +26,9 @@
 
     - name: Deploy and Enable Services
       shell: |
-        scp /tmp/{{ item }}_haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
-        scp /tmp/{{ item }}_keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
-        ssh core@{{ target_ip }} << 'EOF'
+        {{ scp_cmd}} /tmp/{{ item }}_haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
+        {{ ssh_cmd }} /tmp/{{ item }}_keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
+        {{  ssh_cmd }} core@{{ target_ip }} << 'EOF'
           sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
           sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf
           sudo sysctl -w net.ipv4.ip_nonlocal_bind=1
