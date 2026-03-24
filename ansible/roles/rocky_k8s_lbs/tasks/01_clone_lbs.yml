@@ -58,23 +58,22 @@
     provider_ip: "{{ hostvars[item].ansible_host }}"
     provider_gw: "{{ hostvars['kvmdc01'].libvirt_networks | selectattr('name', 'equalto', 'default') | map(attribute='cidr') | first | ansible.utils.ipaddr('net') | ansible.utils.ipaddr('1') | split('/') | first }}"
     m_ip: "{{ maintenance_map[item] }}"
-    # Extract the specific MAC for this specific loop item
     p_mac: "{{ (provider_mac_raw.results | selectattr('item', 'equalto', item) | first).stdout }}"
     key_path: "/home/cloud_helper/.ssh/id_rsa"
     dns_servers: "{{ groups['dns'] | map('extract', hostvars, 'ansible_host') | join(' ') }}"
-    # Standard SSH prefix to keep the shell block readable
     ssh_cmd: "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ m_ip }}"
   shell: |
-    # 1. Get the Device name (ethX) from the VM matching the Provider MAC
-    DEV=$({{ ssh_cmd }} "nmcli -t -f DEVICE,MAC-ADDRESS device show | grep -i '{{ p_mac }}' | cut -d: -f1 | head -n1")
+    # 1. Get the Device name (e.g. eth1) by looking for the line AFTER the MAC match
+    # nmcli -t output usually puts GENERAL.DEVICE right above GENERAL.HWADDR
+    DEV=$({{ ssh_cmd }} "nmcli -t -f GENERAL.DEVICE,GENERAL.HWADDR device show" | grep -B 1 -i "{{ p_mac }}" | head -n 1 | cut -d: -f2)
 
-    # 2. Add the connection profile
-    {{ ssh_cmd }} "sudo nmcli con add type ethernet con-name provider ifname $DEV"
+    # 2. Cleanup existing profile
+    {{ ssh_cmd }} "sudo nmcli con delete provider || true"
 
-    # 3. Configure IP, Gateway, and DNS
-    {{ ssh_cmd }} "sudo nmcli con mod provider ipv4.addresses {{ provider_ip }}/24 ipv4.gateway {{ provider_gw }} ipv4.dns '{{ dns_servers }}' ipv4.method manual connection.autoconnect yes"
+    # 3. Add and Configure the connection
+    {{ ssh_cmd }} "sudo nmcli con add type ethernet con-name provider ifname $DEV ipv4.method manual ipv4.addresses {{ provider_ip }}/24 ipv4.gateway {{ provider_gw }} ipv4.dns '{{ dns_servers }}' connection.autoconnect yes"
 
-    # 4. Bring the connection up
+    # 4. Bring it up
     {{ ssh_cmd }} "sudo nmcli con up provider"
   loop: "{{ groups['hahost'] }}"
 
