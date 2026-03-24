@@ -45,6 +45,7 @@
 
 - name: Configure Production NICs (Conditional Assignment)
   delegate_to: localhost
+  become: false
   vars:
     node: "{{ discovery_data[item] }}"
     # Use ansible_host for the default/cloud bridge
