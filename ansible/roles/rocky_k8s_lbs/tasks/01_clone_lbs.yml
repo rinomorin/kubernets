@@ -73,92 +73,92 @@
     EOF
   loop: "{{ groups['hahost'] }}"
 
-- name: Final Cleanup - Remove Bootstrap NIC
-  delegate_to: "{{ VM_HOST_IP }}"
-  block:
+# - name: Final Cleanup - Remove Bootstrap NIC
+#   delegate_to: "{{ VM_HOST_IP }}"
+#   block:
 
-    - name: Verify Pre-Removal Configuration via SSH
-      delegate_to: localhost
-      vars:
-        target_ip: "{{ hostvars[item].ansible_host }}"
-        key_path: "/home/cloud_helper/.ssh/id_rsa"
-      shell: |
-        echo "--- Checking Network State for {{ item }} ({{ target_ip }}) ---"
-        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ target_ip }} "ip -brief addr show && echo '---' && nmcli con show --active"
-      loop: "{{ groups['hahost'] }}"
-      register: preremote_config
-      # Wait a few seconds for the OS to process the hardware removal before checking
-      delay: 3
-      retries: 3
-      until: preremote_config.rc == 0
+#     - name: Verify Pre-Removal Configuration via SSH
+#       delegate_to: localhost
+#       vars:
+#         target_ip: "{{ hostvars[item].ansible_host }}"
+#         key_path: "/home/cloud_helper/.ssh/id_rsa"
+#       shell: |
+#         echo "--- Checking Network State for {{ item }} ({{ target_ip }}) ---"
+#         ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ target_ip }} "ip -brief addr show && echo '---' && nmcli con show --active"
+#       loop: "{{ groups['hahost'] }}"
+#       register: preremote_config
+#       # Wait a few seconds for the OS to process the hardware removal before checking
+#       delay: 3
+#       retries: 3
+#       until: preremote_config.rc == 0
 
-    - name: Display Final IP Address Status
-      debug:
-        msg: "{{ item.stdout_lines }}"
-      loop: "{{ preremote_config.results }}"
+#     - name: Display Final IP Address Status
+#       debug:
+#         msg: "{{ item.stdout_lines }}"
+#       loop: "{{ preremote_config.results }}"
 
 
 
-    - name: Live Remove Unwanted NICs
-      delegate_to: "{{ VM_HOST_IP }}"
-      vars:
-        short_name: "{{ item.split('.')[0] }}"
-        # Extract facts into local task variables to simplify the shell block
-        c_mac: "{{ discovery_data[item].cloud_mac }}"
-        p_mac: "{{ discovery_data[item].prov_mac }}"
-      shell: |
-        CURRENT_MACS=$(sudo virsh domiflist {{ short_name }} | awk 'NR>2 {print $5}' | grep -vE '^$|-')
-        for m in $CURRENT_MACS; do
-          if [ "$m" != "{{ c_mac }}" ] && [ "$m" != "{{ p_mac }}" ]; then
-            echo "<interface><mac address='$m'/></interface>" > /tmp/{{ short_name }}-$m.xml
-            sudo virsh detach-device {{ short_name }} /tmp/{{ short_name }}-$m.xml --live --config
-            rm -f /tmp/{{ short_name }}-$m.xml
-          fi
-        done
-      loop: "{{ groups['hahost'] }}"
-      register: cleanup_result
-      changed_when: "'successfully' in cleanup_result.stdout"
+#     - name: Live Remove Unwanted NICs
+#       delegate_to: "{{ VM_HOST_IP }}"
+#       vars:
+#         short_name: "{{ item.split('.')[0] }}"
+#         # Extract facts into local task variables to simplify the shell block
+#         c_mac: "{{ discovery_data[item].cloud_mac }}"
+#         p_mac: "{{ discovery_data[item].prov_mac }}"
+#       shell: |
+#         CURRENT_MACS=$(sudo virsh domiflist {{ short_name }} | awk 'NR>2 {print $5}' | grep -vE '^$|-')
+#         for m in $CURRENT_MACS; do
+#           if [ "$m" != "{{ c_mac }}" ] && [ "$m" != "{{ p_mac }}" ]; then
+#             echo "<interface><mac address='$m'/></interface>" > /tmp/{{ short_name }}-$m.xml
+#             sudo virsh detach-device {{ short_name }} /tmp/{{ short_name }}-$m.xml --live --config
+#             rm -f /tmp/{{ short_name }}-$m.xml
+#           fi
+#         done
+#       loop: "{{ groups['hahost'] }}"
+#       register: cleanup_result
+#       changed_when: "'successfully' in cleanup_result.stdout"
 
-    - name: Verify Post-Removal Configuration via SSH
-      delegate_to: localhost
-      vars:
-        target_ip: "{{ hostvars[item].ansible_host }}"
-        key_path: "/home/cloud_helper/.ssh/id_rsa"
-      shell: |
-        echo "--- Checking Network State for {{ item }} ({{ target_ip }}) ---"
-        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ target_ip }} "ip -brief addr show && echo '---' && nmcli con show --active"
-      loop: "{{ groups['hahost'] }}"
-      register: remote_config
-      # Wait a few seconds for the OS to process the hardware removal before checking
-      delay: 3
-      retries: 3
-      until: remote_config.rc == 0
+#     - name: Verify Post-Removal Configuration via SSH
+#       delegate_to: localhost
+#       vars:
+#         target_ip: "{{ hostvars[item].ansible_host }}"
+#         key_path: "/home/cloud_helper/.ssh/id_rsa"
+#       shell: |
+#         echo "--- Checking Network State for {{ item }} ({{ target_ip }}) ---"
+#         ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ target_ip }} "ip -brief addr show && echo '---' && nmcli con show --active"
+#       loop: "{{ groups['hahost'] }}"
+#       register: remote_config
+#       # Wait a few seconds for the OS to process the hardware removal before checking
+#       delay: 3
+#       retries: 3
+#       until: remote_config.rc == 0
 
-    - name: Display Final IP Address Status
-      debug:
-        msg: "{{ item.stdout_lines }}"
-      loop: "{{ remote_config.results }}"
+#     - name: Display Final IP Address Status
+#       debug:
+#         msg: "{{ item.stdout_lines }}"
+#       loop: "{{ remote_config.results }}"
 
-    - name: Power off VMs
-      community.libvirt.virt:
-        name: "{{ item.split('.')[0] }}"
-        state: shutdown
-      loop: "{{ groups['hahost'] }}"
+#     - name: Power off VMs
+#       community.libvirt.virt:
+#         name: "{{ item.split('.')[0] }}"
+#         state: shutdown
+#       loop: "{{ groups['hahost'] }}"
 
-    - name: Wait for shutdown
-      shell: "virsh list --name | grep -qx '{{ item.split('.')[0] }}'"
-      register: vm_status
-      until: vm_status.rc != 0
-      retries: 20
-      delay: 5
-      loop: "{{ groups['hahost'] }}"
-      failed_when: false
+#     - name: Wait for shutdown
+#       shell: "virsh list --name | grep -qx '{{ item.split('.')[0] }}'"
+#       register: vm_status
+#       until: vm_status.rc != 0
+#       retries: 20
+#       delay: 5
+#       loop: "{{ groups['hahost'] }}"
+#       failed_when: false
 
-    - name: Power on Production LBs
-      community.libvirt.virt:
-        name: "{{ item.split('.')[0] }}"
-        state: running
-      loop: "{{ groups['hahost'] }}"
+#     - name: Power on Production LBs
+#       community.libvirt.virt:
+#         name: "{{ item.split('.')[0] }}"
+#         state: running
+#       loop: "{{ groups['hahost'] }}"
 
 - name: Verify SSH reachability on Static IPs
   wait_for:
