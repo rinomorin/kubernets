@@ -63,20 +63,22 @@
     m_ip: "{{ maintenance_map[item] }}"
     p_mac: "{{ provider_mac_raw.results | selectattr('item', 'equalto', item) | map(attribute='stdout') | first }}"
     key_path: "/home/cloud_helper/.ssh/id_rsa"
+    dns_servers: "{{ groups['dns'] | map('extract', hostvars, 'ansible_host') | join(',') }}"
   shell: |
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ m_ip }} << EOF
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ m_ip }} "
       # Identify the OS device name (ethX) using the Provider MAC
       DEV=\$(nmcli -t -f DEVICE,MAC-ADDRESS device show | grep -i "{{ p_mac }}" | cut -d: -f1 | head -n1)
       
       # Set Static IP and Gateway on the provider interface
-      sudo nmcli con add type ethernet con-name provider-static ifname \$DEV \
+      sudo nmcli con add type ethernet con-name provider ifname \$DEV \
         ipv4.addresses {{ provider_ip }}/24 \
         ipv4.gateway {{ provider_gw }} \
+        ipv4.dns {{ dns_servers }} \
         ipv4.method manual \
         connection.autoconnect yes
       
       sudo nmcli con up provider-static
-      EOF
+      "
   loop: "{{ groups['hahost'] }}"
 
 # - name: Final Cleanup - Remove Bootstrap NIC
