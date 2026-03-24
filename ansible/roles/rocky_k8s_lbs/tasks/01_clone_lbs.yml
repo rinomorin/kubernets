@@ -18,77 +18,60 @@
     state: running
   loop: "{{ groups['hahost'] }}"
 
-- name: NIC Discovery and Bootstrap IP Mapping
+- name: 1.1 - Discover Maintenance IP from br-nat
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
-    # 1. Get the Bootstrap MAC and IP from br-nat
-    B_MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'br-nat' | awk '{print $5}')
-    while ! sudo virsh net-dhcp-leases br-nat | grep -q "$B_MAC"; do sleep 2; done
-    B_IP=$(sudo virsh net-dhcp-leases br-nat | grep "$B_MAC" | awk '{print $5}' | cut -d/ -f1)
-
-    # 2. Capture MACs for target production networks
-    CLOUD_MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'default' | awk '{print $5}' || echo "NONE")
-    PROV_MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'br-cluster' | awk '{print $5}' || echo "NONE")
-
-    # Output string for Ansible to parse (4 values)
-    echo "$B_IP|$B_MAC|$CLOUD_MAC|$PROV_MAC"
-  register: nic_discovery
+    M_MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'br-nat' | awk '{print $5}')
+    while ! sudo virsh net-dhcp-leases br-nat | grep -q "$M_MAC"; do sleep 2; done
+    sudo virsh net-dhcp-leases br-nat | grep "$M_MAC" | awk '{print $5}' | cut -d/ -f1
+  register: maintenance_ip_raw
   loop: "{{ groups['hahost'] }}"
 
-- name: Set Network Discovery Facts
-  set_fact:
-    discovery_data: "{{ discovery_data | default({}) | combine({ item.item: {
-      'bootstrap_ip': item.stdout.split('|')[0],
-      'bootstrap_mac': item.stdout.split('|')[1],
-      'cloud_mac': item.stdout.split('|')[2],
-      'prov_mac': item.stdout.split('|')[3]
-    } }) }}"
-  loop: "{{ nic_discovery.results }}"
-
-- name: Configure Production NICs (Forceful & Persistent)
+- name: 1.2 - Verify Maintenance SSH (sshok)
   delegate_to: localhost
   vars:
-    node: "{{ discovery_data[item] }}"
-    provider_ip: "{{ hostvars[item].ansible_host | default('') }}"
-    prov_ip: "{{ hostvars[item].provision_ip | default('') }}"
-    # Updated logic
-    gateway_ip: "{{ hostvars['kvmdc01'].libvirt_networks | selectattr('name', 'equalto', 'default') | map(attribute='cidr') | first | ansible.utils.ipaddr('net') | ansible.utils.ipaddr('1') | split('/') | first }}"
+    m_ip: "{{ item.stdout }}"
     key_path: "/home/cloud_helper/.ssh/id_rsa"
   shell: |
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ node.bootstrap_ip }} << 'EOF'
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ m_ip }} "echo sshok"
+  register: ssh_test
+  until: "'sshok' in ssh_test.stdout"
+  retries: 5
+  delay: 3
+  loop: "{{ maintenance_ip_raw.results }}"
+
+- name: 2.1 - Discover Provider MAC from default network
+  delegate_to: "{{ VM_HOST_IP }}"
+  shell: |
+    sudo virsh domiflist {{ item.split('.')[0] }} | grep 'default' | awk '{print $5}'
+  register: provider_mac_raw
+  loop: "{{ groups['hahost'] }}"
+
+- name: 2.2 - Configure Provider IP via Maintenance Tunnel
+  delegate_to: localhost
+  vars:
+    # Inventory values
+    provider_ip: "{{ hostvars[item].ansible_host }}"
+    # Calculated .1 Gateway
+    provider_gw: "{{ hostvars['kvmdc01'].libvirt_networks | selectattr('name', 'equalto', 'default') | map(attribute='cidr') | first | ansible.utils.ipaddr('net') | ansible.utils.ipaddr('1') | split('/') | first }}"
+    # Connections
+    m_ip: "{{ maintenance_map[item] }}"
+    p_mac: "{{ provider_mac_raw.results | selectattr('item', 'equalto', item) | map(attribute='stdout') | first }}"
+    key_path: "/home/cloud_helper/.ssh/id_rsa"
+  shell: |
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ m_ip }} << EOF
+      # Identify the OS device name (ethX) using the Provider MAC
+      DEV=\$(nmcli -t -f DEVICE,MAC-ADDRESS device show | grep -i "{{ p_mac }}" | cut -d: -f1 | head -n1)
       
-      # 1. Configure Provider/Cloud Interface (Primary)
-      if [ -n "{{ provider_ip }}" ] && [ "{{ node.cloud_mac }}" != "NONE" ]; then
-        # Identify the device by MAC
-        PROV_DEV=$(nmcli -t -f DEVICE,MAC-ADDRESS device show | grep -i "{{ node.cloud_mac }}" | cut -d: -f1 | head -n1)
-        
-        # Force-delete any existing active connections on this specific hardware
-        for uuid in $(nmcli -t -f UUID,DEVICE connection show --active | grep "$PROV_DEV" | cut -d: -f1); do
-          sudo nmcli con down "$uuid" || true
-          sudo nmcli con delete "$uuid" || true
-        done
-
-        # Add the Static IP and the Dynamic Gateway
-        sudo nmcli con add type ethernet con-name provider-net ifname $PROV_DEV \
-          ipv4.addresses {{ provider_ip }}/24 \
-          ipv4.gateway {{ gateway_ip }} \
-          ipv4.method manual \
-          connection.autoconnect yes
-        
-        sudo nmcli con up provider-net
-      fi
-
-      # 2. Configure Internal Provisioning Interface (Optional)
-      if [ -n "{{ prov_ip }}" ] && [ "{{ node.prov_mac }}" != "NONE" ]; then
-        INT_DEV=$(nmcli -t -f DEVICE,MAC-ADDRESS device show | grep -i "{{ node.prov_mac }}" | cut -d: -f1 | head -n1)
-        for uuid in $(nmcli -t -f UUID,DEVICE connection show --active | grep "$INT_DEV" | cut -d: -f1); do
-          sudo nmcli con delete "$uuid" || true
-        done
-        sudo nmcli con add type ethernet con-name internal-net ifname $INT_DEV \
-          ipv4.addresses {{ prov_ip }}/24 ipv4.method manual connection.autoconnect yes
-        sudo nmcli con up internal-net
-      fi
-    EOF
+      # Set Static IP and Gateway on the provider interface
+      sudo nmcli con add type ethernet con-name provider-static ifname \$DEV \
+        ipv4.addresses {{ provider_ip }}/24 \
+        ipv4.gateway {{ provider_gw }} \
+        ipv4.method manual \
+        connection.autoconnect yes
+      
+      sudo nmcli con up provider-static
+      EOF
   loop: "{{ groups['hahost'] }}"
 
 # - name: Final Cleanup - Remove Bootstrap NIC
