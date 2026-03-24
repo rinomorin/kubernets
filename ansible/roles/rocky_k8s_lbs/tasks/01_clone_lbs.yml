@@ -18,18 +18,23 @@
     state: running
   loop: "{{ groups['hahost'] }}"
 
-- name: Wait for DHCP on Management Bridge
+- name: Wait for DHCP on br-nat
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
+    # Find the MAC specifically attached to the br-nat bridge
     MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'br-nat' | awk '{print $5}')
-    while ! sudo virsh net-dhcp-leases default | grep -q "$MAC"; do sleep 2; done
+    # Loop until the lease appears in the br-nat table
+    while ! sudo virsh net-dhcp-leases br-nat | grep -q "$MAC"; do 
+      sleep 2
+    done
   loop: "{{ groups['hahost'] }}"
+  register: wait_for_dhcp
 
-- name: Map DHCP IPs and MACs
+- name: Map DHCP IPs and MACs from br-nat
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
     MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'br-nat' | awk '{print $5}')
-    IP=$(sudo virsh net-dhcp-leases default | grep "$MAC" | awk '{print $5}' | cut -d/ -f1)
+    IP=$(sudo virsh net-dhcp-leases br-nat | grep "$MAC" | awk '{print $5}' | cut -d/ -f1)
     echo "$MAC|$IP"
   register: lb_net_raw
   loop: "{{ groups['hahost'] }}"
@@ -46,10 +51,9 @@
     temp_ip: "{{ lb_dhcp_map[item] }}"
     target_ip: "{{ hostvars[item].ansible_host }}"
   shell: |
-    ssh -o StrictHostKeyChecking=no core@{{ temp_ip }} \
-    "sudo nmcli con add type ethernet con-name provider ifname enp1s0 \
-     ipv4.addresses {{ target_ip }}/24 ipv4.method manual connection.autoconnect yes && \
-     sudo nmcli con up provider"
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ temp_ip }} \
+    "sudo nmcli con mod 'Wired connection 1' ipv4.addresses {{ target_ip }}/24 ipv4.method manual connection.autoconnect yes && \
+     sudo nmcli con up 'Wired connection 1'"
   async: 45
   poll: 0
   loop: "{{ groups['hahost'] }}"
@@ -58,5 +62,6 @@
   wait_for:
     host: "{{ hostvars[item].ansible_host }}"
     port: 22
-    timeout: 60
+    state: started
+    timeout: 90
   loop: "{{ groups['hahost'] }}"
