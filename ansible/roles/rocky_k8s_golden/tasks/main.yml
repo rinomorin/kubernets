@@ -9,7 +9,6 @@
 - name: Initialize golden-base facts
   set_fact: 
     existing_vms: false
-    vm_host: "golden-base"
     golden_ip: "unknown"
     # Create a timestamp for version tracking
     build_timestamp: "{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}"

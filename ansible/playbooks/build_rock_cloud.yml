@@ -28,9 +28,14 @@
   pre_tasks:
     - name: Check if Golden Base already exists
       delegate_to: "{{ VM_HOST_IP }}"
-      shell: "sudo virsh dominfo {{ golden_image_name }}"
+      # This shell command always returns 0 (success) but changes the output
+      shell: |
+        if sudo virsh list --all | grep -q "{{ golden_image_name }}"; then
+          echo "found"
+        else
+          echo "not_found"
+        fi
       register: base_check
-      ignore_errors: true # Important: don't crash if it's missing
       changed_when: false
       run_once: true
 
@@ -38,7 +43,8 @@
     - name: Run Golden Image Build Role
       include_role:
         name: rocky_k8s_golden
-      when: base_check.rc != 0 # Only runs if the check failed (image missing)
+      # We only run this if the output was "not_found"
+      when: "'not_found' in base_check.stdout"
 
 # 4. Deploy Infrastructure (LBs and Base Config)
 - name: Deploy Cluster Infrastructure
