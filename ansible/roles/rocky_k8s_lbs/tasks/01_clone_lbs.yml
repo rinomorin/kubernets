@@ -45,7 +45,7 @@
 
 - name: who am I
   delegate_to: localhost
-  shell: who am i
+  shell: whoami
   register: whoami_out
 - debug:
     msg: "Current user is {{ whoami_out.stdout }}"
@@ -99,11 +99,21 @@
       failed_when: false
 
     - name: Remove br-nat Interface from Config
+      delegate_to: "{{ VM_HOST_IP }}"
       shell: |
-        B_MAC=$(sudo virsh dumpxml {{ item.split('.')[0] }} | xpath -e "//interface[source/@bridge='br-nat']/mac/@address" -q | cut -d'"' -f2)
-        sudo virsh detach-interface {{ item.split('.')[0] }} bridge --mac $B_MAC --config
+        # Find the MAC address associated with the br-nat bridge from the VM definition
+        B_MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'br-nat' | awk '{print $5}')
+        
+        # If a MAC was found, detach it from the persistent config
+        if [ -n "$B_MAC" ]; then
+          sudo virsh detach-interface {{ item.split('.')[0] }} bridge --mac $B_MAC --config
+        else
+          echo "No interface found on br-nat for {{ item.split('.')[0] }}"
+          exit 0
+        fi
       loop: "{{ groups['hahost'] }}"
-      ignore_errors: true
+      register: detach_result
+      changed_when: "'detached' in detach_result.stdout"
 
     - name: Power on Production LBs
       community.libvirt.virt:
