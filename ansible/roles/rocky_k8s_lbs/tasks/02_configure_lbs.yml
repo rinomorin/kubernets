@@ -21,9 +21,8 @@
       delegate_to: localhost
       vars:
         target_ip: "{{ hostvars[item].ansible_host }}"
-        key_path: "/home/cloud_helper/.ssh/id_rsa"
-        ssh_cmd: "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }}"
-        scp_cmd: "scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }}"
+        ssh_cmd: "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
+        scp_cmd: "scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
       shell: |
         {{ scp_cmd }} /tmp/{{ item }}_haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
         {{ scp_cmd }} /tmp/{{ item }}_keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
@@ -45,4 +44,9 @@
       sudo virsh detach-interface {{ item.split('.')[0] }} bridge --mac $MAC --config --live
     fi
   loop: "{{ groups['hahost'] }}"
-
+- name: Final Cleanup - Remove Bootstrap NIC
+  delegate_to: "{{ VM_HOST_IP }}"
+  shell: |
+    MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'default' | awk '{print $5}')
+    sudo virsh detach-interface {{ item.split('.')[0] }} bridge --mac $MAC --config --live
+  loop: "{{ groups['hahost'] }}"
