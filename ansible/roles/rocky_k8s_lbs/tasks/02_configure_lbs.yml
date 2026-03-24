@@ -5,8 +5,6 @@
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }} core@{{ hostvars[item].ansible_host }} "sudo dnf install -y haproxy keepalived"
   loop: "{{ groups['hahost'] }}"
 
-
-
 - name: Push HAProxy and Keepalived Configs
   block:
 
@@ -61,7 +59,7 @@
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
     
     # 4. Remote Execution (Avoid nested double quotes)
-    ssh {{ ssh_opts }} core@{{ target_ip }} << 'EOF'
+    ssh {{ ssh_opts }} core@{{ ta!rget_ip }} << 'EOF'
       sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
       sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf
       sudo chown root:root /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
@@ -81,9 +79,39 @@
       sudo systemctl enable --now haproxy
     EOF
 
-- name: Final Cleanup - Remove Bootstrap NIC
+- name: Create Isolated Dummy Network
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
-    MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'default' | awk '{print $5}')
-    sudo virsh detach-interface {{ item.split('.')[0] }} bridge --mac $MAC --config --live
+    if ! sudo virsh net-info black-hole >/dev/null 2>&1; then
+      cat <<EOF > /tmp/black-hole.xml
+      <network>
+        <name>black-hole</name>
+      </network>
+    EOF
+      sudo virsh net-define /tmp/black-hole.xml
+      sudo virsh net-autostart black-hole
+      sudo virsh net-start black-hole
+    fi
+
+- name: Final Cleanup - Isolate Cluster and NAT Networks
+  delegate_to: "{{ VM_HOST_IP }}"
+  shell: |
+    # 1. Get MACs for everything EXCEPT the 'default' network
+    # This grabs the MACs for br-cluster and br-nat
+    TARGET_MACS=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep -E 'br-nat|br-cluster' | awk '{print $5}')
+    
+    for MAC in $TARGET_MACS; do
+      # 2. Create the "Dead" XML for this specific interface
+      cat <<EOF > /tmp/{{ item }}_${MAC}_dead.xml
+      <interface type='network'>
+        <mac address='$MAC'/>
+        <source network='black-hole'/>
+        <link state='down'/>
+        <model type='virtio'/>
+      </interface>
+    EOF
+
+      # 3. Apply to the VM (Live and Config)
+      sudo virsh update-device {{ item.split('.')[0] }} /tmp/{{ item }}_${MAC}_dead.xml --live --config
+    done
   loop: "{{ groups['hahost'] }}"
