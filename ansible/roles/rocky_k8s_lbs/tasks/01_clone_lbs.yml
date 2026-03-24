@@ -81,20 +81,22 @@
       delegate_to: "{{ VM_HOST_IP }}"
       vars:
         short_name: "{{ item.split('.')[0] }}"
-        # FIX: Use the cloud_mac we saved in discovery_data
-        keep_mac: "{{ discovery_data[item].cloud_mac }}"
+        # Extracting the target MACs from our discovery fact
+        cloud_mac: "{{ discovery_data[item].cloud_mac }}"
+        prov_mac: "{{ discovery_data[item].prov_mac }}"
       shell: |
         # 1. Get all MACs (skipping the header)
         CURRENT_MACS=$(sudo virsh domiflist {{ short_name }} | awk 'NR>2 {print $5}' | grep -vE '^$|-')
 
         for m in $CURRENT_MACS; do
           # Only remove if it's NOT the cloud_mac AND NOT the prov_mac
-          if [ "$m" != "{{ discovery_data[item].cloud_mac }}" ] && [ "$m" != "{{ discovery_data[item].prov_mac }}" ]; then
+          if [ "$m" != "{{ cloud_mac }}" ] && [ "$m" != "{{ prov_mac }}" ]; then
             echo "Removing unwanted NIC: $m from {{ short_name }}"
             
+            # Create a temp XML snippet to identify the device precisely
             echo "<interface><mac address='$m'/></interface>" > /tmp/{{ short_name }}-$m.xml
             
-            # Use detach-device for maximum compatibility with immutable host NIC types
+            # Use detach-device with --live (runtime) and --config (next boot)
             sudo virsh detach-device {{ short_name }} /tmp/{{ short_name }}-$m.xml --live --config
             
             rm -f /tmp/{{ short_name }}-$m.xml
@@ -104,6 +106,7 @@
         done
       loop: "{{ groups['hahost'] }}"
       register: cleanup_result
+      changed_when: "'successfully' in cleanup_result.stdout"
 
     - name: Power off VMs
       community.libvirt.virt:
