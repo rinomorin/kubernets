@@ -6,7 +6,7 @@
   block:
     - name: Authenticate with FreeIPA
       shell: "echo '{{ ipa_admin_password }}' | kinit admin"
-      no_log: true
+      # no_log: true
 
     - name: Ensure DNS Forward and Reverse Zones exist
       command: "ipa dnszone-add {{ item }} --name-server={{ ipa_master_fqdn }}."
