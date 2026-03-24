@@ -38,30 +38,13 @@
         {{ ssh_cmd }} core@{{ target_ip }} sudo dnf install -y haproxy keepalived
       loop: "{{ groups['hahost'] }}"
           
-    # - name: Deploy and Enable Services
-    #   delegate_to: localhost
-    #   vars:
-    #     target_ip: "{{ hostvars[item].ansible_host }}"
-    #     ssh_cmd: "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
-    #     scp_cmd: "scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
-    #   shell: |
-    #     {{ scp_cmd }} /tmp/{{ item }}_haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
-    #     {{ scp_cmd }} /tmp/{{ item }}_keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
-    #     {{ ssh_cmd }} core@{{ target_ip }} << 'EOF'
-    #       sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
-    #       sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf
-    #       sudo sysctl -w net.ipv4.ip_nonlocal_bind=1
-    #       sudo setsebool -P haproxy_connect_any 1
-    #       sudo systemctl enable --now keepalived haproxy
-    #     EOF
-    #   loop: "{{ groups['hahost'] }}"
 
 - name: Push and Enable LB Services (Fixed LF and SELinux)
   delegate_to: localhost
   run_once: true
   loop: "{{ groups['hahost'] }}"
   vars:
-    ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+    ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
     target_ip: "{{ hostvars[item].ansible_host }}"
   shell: |
     # 1. Detect Interface
