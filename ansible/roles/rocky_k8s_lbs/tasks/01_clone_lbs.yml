@@ -100,15 +100,14 @@
 
     - name: Remove br-nat Interface from Config
       delegate_to: "{{ VM_HOST_IP }}"
+      vars:
+        # Use the bootstrap MAC we discovered and stored earlier
+        target_mac: "{{ discovery_data[item].bootstrap_mac }}"
       shell: |
-        # Find the MAC address associated with the br-nat bridge from the VM definition
-        B_MAC=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep 'br-nat' | awk '{print $5}')
-        
-        # If a MAC was found, detach it from the persistent config
-        if [ -n "$B_MAC" ]; then
-          sudo virsh detach-interface {{ item.split('.')[0] }} bridge --mac $B_MAC --config
+        if sudo virsh domiflist {{ item.split('.')[0] }} | grep -q "{{ target_mac }}"; then
+          sudo virsh detach-interface {{ item.split('.')[0] }} bridge --mac {{ target_mac }} --config
         else
-          echo "No interface found on br-nat for {{ item.split('.')[0] }}"
+          echo "Interface {{ target_mac }} already removed from {{ item.split('.')[0] }}"
           exit 0
         fi
       loop: "{{ groups['hahost'] }}"
