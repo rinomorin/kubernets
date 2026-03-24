@@ -1,138 +1,48 @@
 ---
-# site.yml
-
-- name: load environment
+# 1. Prepare Environment
+- name: Load environment and install requirements
   hosts: all
   gather_facts: false
   tasks:
-    - name: Ensure latest stable collections are installed on controller
+    - name: Ensure latest stable collections are installed
       delegate_to: localhost
-      become: false
       run_once: true
       command: "ansible-galaxy collection install {{ item }} --upgrade"
       loop:
         - community.general
         - ansible.posix
-        - kubernetes.core  # Highly recommended for your FCOS/K8s work
-      changed_when: false # These commands check for updates every time
-    
+        - kubernetes.core
+      changed_when: false
+
+# 2. Run your environment check playbook
 - import_playbook: ../check_env.yml
-- name: Build Golden Base
+
+# 3. Build Golden Base (Conditional)
+- name: Build Golden Base Image
   hosts: kvm
   gather_facts: false
   vars:
-    # Set this at the top level so it's available everywhere
     golden_image_name: "{{ lookup('env', 'golden_image_name') | default('golden-base', true) }}"
+  
+  pre_tasks:
+    - name: Check if Golden Base already exists
+      delegate_to: "{{ VM_HOST_IP }}"
+      shell: "sudo virsh dominfo {{ golden_image_name }}"
+      register: base_check
+      ignore_errors: true # Important: don't crash if it's missing
+      changed_when: false
+      run_once: true
 
-  # Now we wrap the role in a block or use a dynamic include
   tasks:
     - name: Run Golden Image Build Role
       include_role:
         name: rocky_k8s_golden
-      # ONLY run this if the virsh command failed (rc != 0)
-      when: base_check.rc != 0
+      when: base_check.rc != 0 # Only runs if the check failed (image missing)
 
-    - name: Confirm Image is now ready
-      debug:
-        msg: "Golden image {{ golden_image_name }} is present or has been built."
-
-- name: Build Golden Base
-  gather_facts: false
+# 4. Deploy Infrastructure (LBs and Base Config)
+- name: Deploy Cluster Infrastructure
   hosts: kvm
-  roles:
-    - rocky_k8s_golden
-  
-  pre_tasks:
-    - name: Load environment
-      set_fact:
-        # Use a default value if the ENV var is missing
-        golden_image_name: "{{ lookup('env', 'golden_image_name') | default('golden-base', true) }}"
-    
-    - name: Verify Golden Base exists on KVM Host
-      delegate_to: "{{ VM_HOST_IP }}"
-      # Using 'virsh dominfo' is more reliable than grepping a list
-      shell: "sudo virsh dominfo {{ golden_image_name }}"
-      register: base_check
-      # This will now fail with a clear message if the VM doesn't exist
-      failed_when: base_check.rc != 0
-      changed_when: false
-      run_once: true
-
+  gather_facts: false
   roles:
     - role: rocky_k8s_lbs
-
-    # - name: Configure local SSH to auto-accept lab keys
-    #   delegate_to: localhost
-    #   become: false
-    #   blockinfile:
-    #     path: "~/.ssh/config"
-    #     create: yes
-    #     mode: '0600'
-    #     block: |
-    #       # Lab Environment Auto-Accept
-    #       Host 172.16.0.* 10.0.0.* 192.168.100.*
-    #           StrictHostKeyChecking accept-new
-    #           UserKnownHostsFile ~/.ssh/known_hosts
-    #           LogLevel ERROR
-
-    # - name: load environment
-    #   set_fact:
-    #     VM_HOST: "{{ lookup('env','VM_HOST')}}"
-    #     ipa_admin_password: "{{ lookup('env','ipa_admin_password')}}"
-    #     VM_HOST_IP: "{{ lookup('env','VM_HOST_IP')}}"
-    #     secops_id: "{{ lookup('env', 'secops_id') }}"
-    #     cloud_id: "{{ lookup('env', 'cloud_id') }}"
-    #     secops_pwd: "{{ lookup('env', 'secops_pwd') }}"
-    #     cluster_ip_addr: "{{ lookup('env', 'cluster_ip_addr') }}"
-    #     cluster_netmask: "{{ lookup('env', 'cluster_netmask') }}"
-    #     cloud_zone: "{{ lookup('env', 'cloud_zone') }}"
-    #     cloud_provision: "{{ lookup('env', 'cloud_provision') }}"
-    #     cluster_gateway: "{{ lookup('env', 'cluster_gateway') }}"
-    #     default_netmask: "{{ lookup('env', 'default_netmask') }}"
-    #     default_net_device: "{{ lookup('env', 'default_net_device') }}"
-    #     cluster_net_device: "{{ lookup('env', 'cluster_net_device') }}"
-    #     nat_net_device: "{{ lookup('env', 'nat_net_device') }}"
-    #     default_ansible_pwd: "{{ lookup('env', 'secops_pwd') }}"
-    #     secops_key: "{{ lookup('env','secops_key') }}"
-    #     secops_edkey: "{{ lookup('env','secops_edkey') }}"
-    #     ssh_key_path: "{{ lookup('env', 'ssh_key_path')| to_json }}"
-    #     account_name: "{{ lookup('env', 'account_name') }}"
-    #     masters: "{{ groups['control_nodes'] | default([]) }}"
-    #     workers: "{{ groups['worker_nodes'] | default([]) }}"
-    #     helper_node: "{{ groups['helpers'][0] | default([]) }}"
-    #     helper_node_ip: "{{ hostvars[groups['helpers'][0]].ansible_host }}"
-    #     node_list: "{{ groups['control_nodes'] + groups['worker_nodes'] }}"
-    #     cloud_helper_workdir: "{{ lookup('env','cloud_helper_workdir') | default('/opt/cloud_helper', true) }}"
-    #     cloud_helper_user: "{{ lookup('env', 'CLOUD_HELPER_USER') | default('cloud_helper') }}"
-
-
-    #     # Network layout
-    #     cloud_networks:
-    #       house: "192.168.100.0/24"
-    #       private: "10.0.0.0/24"
-    #       nat: "172.16.0.0/24"
-
-    #     # Interface mapping
-    #     cloud_interfaces:
-    #       house: "enp1s0"
-    #       private: "enp2s0"
-    #       nat: "enp3s0"
-
-    # - name: global variables ror rocky cloud
-    #   set_fact:
-    #     build_root: "{{ cloud_helper_workdir }}/rocky_build"
-    #     output_dir: "{{ cloud_helper_workdir }}/ignition"
-    #     disk_size: "10G"
-    #     kubetnet_version: "{{ lookup('env', 'kubetnet_version') }}"
-    #     crio_version: "{{ lookup('env', 'kubetnet_version') }}"
-    #     crio_stream: "stable"
-    #     cloud_helper_shell: "/bin/bash"
-
-
-# - hosts: kvm,control_nodes,worker_nodes,hahost
-#   become: false
-#   gather_facts: false
-#   # vars: 
-#   #   ansible_user: "{{ cloud_helper_user }}"
-#   roles:
-#     - rocky_k8s_base
+    # You can uncomment and add rocky_k8s_base here if needed
