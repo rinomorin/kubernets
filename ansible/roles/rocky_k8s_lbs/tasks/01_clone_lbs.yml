@@ -43,25 +43,26 @@
     } }) }}"
   loop: "{{ nic_discovery.results }}"
 
+- name: who am I
+  delegate_to: localhost
+  shell: whoami
+  register: whoami_out
+- debug:
+    msg: "Current user is {{ whoami_out.stdout }}"
+
 - name: Configure Production NICs (Conditional Assignment)
   delegate_to: localhost
   vars:
     node: "{{ discovery_data[item] }}"
     cloud_ip: "{{ hostvars[item].ansible_host | default('') }}"
     prov_ip: "{{ hostvars[item].provision_ip | default('') }}"
-    # Use the path from your env_build.sh or fallback to default
-    ssh_key: "~/.ssh/id_rsa" 
+    # Pulling the key path directly from your env_build.sh
+    key_path: "{{ lookup('env', 'ssh_key_path') | default('~/.ssh/id_rsa', true) }}"
   shell: |
-    ssh -o StrictHostKeyChecking=no \
-        -o UserKnownHostsFile=/dev/null \
-        -o BatchMode=yes \
-        -i {{ ssh_key }} \
-        core@{{ node.bootstrap_ip }} << 'EOF'
-      
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ node.bootstrap_ip }} << 'EOF'
       # 1. Configure Cloud Interface (default bridge)
       if [ -n "{{ cloud_ip }}" ] && [ "{{ node.cloud_mac }}" != "NONE" ]; then
-        CLOUD_DEV=$(nmcli -t -f DEVICE,MAC-ADDRESS device show | grep -i "{{ node.cloud_mac }}" | cut -d: -f1)
-        # Use 'modify' if the connection already exists, or 'add' if it's raw
+        CLOUD_DEV=$(nmcli -t -f DEVICE,MAC-ADDRESS device show | grep -i "{{ node.cloud_mac }}" | cut -d: -f1 | head -n1)
         sudo nmcli con add type ethernet con-name cloud-net ifname $CLOUD_DEV \
           ipv4.addresses {{ cloud_ip }}/24 ipv4.method manual connection.autoconnect yes
         sudo nmcli con up cloud-net
@@ -69,7 +70,7 @@
 
       # 2. Configure Provisioning Interface (br-cluster)
       if [ -n "{{ prov_ip }}" ] && [ "{{ node.prov_mac }}" != "NONE" ]; then
-        PROV_DEV=$(nmcli -t -f DEVICE,MAC-ADDRESS device show | grep -i "{{ node.prov_mac }}" | cut -d: -f1)
+        PROV_DEV=$(nmcli -t -f DEVICE,MAC-ADDRESS device show | grep -i "{{ node.prov_mac }}" | cut -d: -f1 | head -n1)
         sudo nmcli con add type ethernet con-name prov-net ifname $PROV_DEV \
           ipv4.addresses {{ prov_ip }}/24 ipv4.method manual connection.autoconnect yes
         sudo nmcli con up prov-net
