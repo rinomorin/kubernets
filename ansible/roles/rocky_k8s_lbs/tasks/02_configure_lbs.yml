@@ -2,8 +2,7 @@
 - name: Install HA Software Stack
   delegate_to: localhost
   shell: |
-    ssh -o StrictHostKeyChecking=no core@{{ hostvars[item].ansible_host }} \
-    "sudo dnf install -y haproxy keepalived"
+    ssh core@{{ hostvars[item].ansible_host }} "sudo dnf install -y haproxy keepalived"
   loop: "{{ groups['hahost'] }}"
 
 - name: Push HAProxy and Keepalived Configs
