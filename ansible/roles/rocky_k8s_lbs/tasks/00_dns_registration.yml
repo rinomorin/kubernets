@@ -38,6 +38,10 @@
   delegate_to: localhost
   run_once: true
   block:
+    - name: Authenticate with FreeIPA
+      shell: "echo '{{ ipa_admin_password }}' | kinit admin"
+      # no_log: true
+    
     - name: Add Forward A Record for VIP
       command: >
         ipa dnsrecord-add {{ c_zone }} k8s-api 
