@@ -1,8 +1,8 @@
 ---
 # ============================================================
-# PHASE 1: Prepare Silver Image
+# 3.1 - Prepare and "Wash" the Lead Master (Silver Image)
 # ============================================================
-- name: "3.1.1 - Power off msrlv9mast01 for cloning"
+- name: "3.1.1 - Power off msrlv9mast01 for cleaning"
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
     if sudo virsh list --all | grep -q "msrlv9mast01"; then
@@ -15,15 +15,23 @@
     fi
   changed_when: true
 
+- name: "3.1.2 - Sysprep Lead Master (The Silver Image)"
+  delegate_to: "{{ VM_HOST_IP }}"
+  command: >
+    sudo virt-sysprep -d msrlv9mast01
+    --operations machine-id,net-hostname,net-hwaddr,ssh-hostkeys,customize
+    --hostname msrlv9mast01.{{ c_zone }}
+
 # ============================================================
-# PHASE 2: Clone and Power On
+# 3.2 - Clone the Remaining Nodes
 # ============================================================
-- name: "3.2.1 - Clone Remaining Nodes from Silver Image"
+- name: "3.2.1 - Clone Nodes with Unique MACs"
   delegate_to: "{{ VM_HOST_IP }}"
   command: >
     sudo virt-clone --original msrlv9mast01 
     --name {{ item.split('.')[0] }} 
     --file /var/lib/libvirt/images/{{ item.split('.')[0] }}.qcow2
+    --mac RANDOM --mac RANDOM --mac RANDOM
   loop: "{{ groups['cluster_nodes'] }}"
   when: 
     - item != 'helper'
@@ -31,24 +39,30 @@
   args:
     creates: "/var/lib/libvirt/images/{{ item.split('.')[0] }}.qcow2"
 
-- name: "3.2.2 - Power On All Nodes (Idempotent)"
+- name: "3.2.2 - Sysprep the Clones"
+  delegate_to: "{{ VM_HOST_IP }}"
+  command: >
+    sudo virt-sysprep -d {{ item.split('.')[0] }}
+    --operations machine-id,net-hostname,net-hwaddr,ssh-hostkeys,customize
+    --hostname {{ item.split('.')[0] }}.{{ c_zone }}
+  loop: "{{ groups['cluster_nodes'] }}"
+  when: 
+    - item != 'helper'
+    - item != 'msrlv9mast01'
+
+- name: "3.2.3 - Power On All Nodes"
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
     if [ "$(sudo virsh domstate {{ item.split('.')[0] }})" == "shut off" ]; then
       sudo virsh start {{ item.split('.')[0] }}
-      echo "starting"
-    else
-      echo "already_active"
     fi
   loop: "{{ groups['cluster_nodes'] }}"
   when: item != 'helper'
-  register: start_output
-  changed_when: "'starting' in start_output.stdout"
 
 # ============================================================
-# PHASE 3: Discovery
+# 3.3 - Discovery (Using unique MACs/IDs now)
 # ============================================================
-- name: "3.3.1 - Discovery: Map MACs and Maintenance IPs"
+- name: "3.3.1 - Discovery: Map KVM MACs and Maintenance IPs"
   delegate_to: "{{ VM_HOST_IP }}"
   become: true
   shell: |
@@ -56,98 +70,49 @@
     P_MAC=$(virsh domiflist $VM | grep 'default' | awk '{print $5}')
     C_MAC=$(virsh domiflist $VM | grep 'br-cluster' | awk '{print $5}')
     N_MAC=$(virsh domiflist $VM | grep 'br-nat' | awk '{print $5}')
-    M_IP=$(virsh net-dhcp-leases br-nat | grep "$N_MAC" | awk '{print $5}' | cut -d/ -f1)
-    echo "P_MAC=$P_MAC|C_MAC=$C_MAC|M_IP=$M_IP"
+    M_IP=$(virsh net-dhcp-leases br-nat | grep -i "$N_MAC" | awk '{print $5}' | cut -d/ -f1)
+    echo "P_MAC=$P_MAC|C_MAC=$C_MAC|N_MAC=$N_MAC|M_IP=$M_IP"
   register: temp_net_map
   until: temp_net_map.stdout is search('M_IP=[0-9]')
-  retries: 30
+  retries: 40
   delay: 5
   loop: "{{ groups['cluster_nodes'] }}"
   when: item != 'helper'
 
-- name: "3.3.1.b - Set Facts for Networking"
+- name: "3.3.1.b - Set Facts"
   set_fact:
     discovery_data: "{{ item.stdout }}"
   loop: "{{ temp_net_map.results }}"
-  when: 
-    - item.skipped is not defined
-    - item.stdout is defined
+  when: item.stdout is defined
   delegate_to: localhost
 
 # ============================================================
-# PHASE 4: Identity and Network Customization
+# 3.4 - Network Customization
 # ============================================================
-
-- name: "3.3.2.1 - Set FQDN Hostname"
-  delegate_to: localhost
-  become: false
-  vars:
-    # Extracting these in vars is safer than inside the shell string
-    m_ip: "{{ hostvars[item].discovery_data | regex_search('M_IP=([0-9.]+)', '\\1') | first }}"
-    fqdn: "{{ item.split('.')[0] }}.{{ c_zone }}"
-  shell: >
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
-    core@{{ m_ip }} "sudo hostnamectl set-hostname {{ fqdn }}"
-  loop: "{{ groups['cluster_nodes'] }}"
-  when: 
-    - item != 'helper'
-    - hostvars[item].discovery_data is defined
-
-- name: "3.3.2.2 - Configure Cluster IP"
+- name: "3.4.1 - Final Network Injection"
   delegate_to: localhost
   become: false
   vars:
     node_info: "{{ hostvars[item].discovery_data }}"
     m_ip: "{{ node_info | regex_search('M_IP=([0-9.]+)', '\\1') | first }}"
     c_mac: "{{ node_info | regex_search('C_MAC=([0-9a-f:]+)', '\\1') | first }}"
-    node_ip: "{{ hostvars[item].node_ip }}"
-  shell: |
-    # Discover the device name (enpXs0) using the MAC address
-    C_DEV=$(ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "ip -o link show | grep -i '{{ c_mac }}' | awk '{print \$2}' | sed 's/://'")
-    
-    # Apply static configuration
-    ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "sudo nmcli con add type ethernet con-name cluster-net ifname $C_DEV ipv4.method manual ipv4.addresses {{ node_ip }}/24 connection.autoconnect yes && sudo nmcli con up cluster-net"
-  loop: "{{ groups['cluster_nodes'] }}"
-  when: 
-    - item != 'helper'
-    - hostvars[item].discovery_data is defined
-
-- name: "3.3.2.3 - Configure Provider IP (Masters Only)"
-  delegate_to: localhost
-  become: false
-  vars:
-    node_info: "{{ hostvars[item].discovery_data }}"
-    m_ip: "{{ node_info | regex_search('M_IP=([0-9.]+)', '\\1') | first }}"
     p_mac: "{{ node_info | regex_search('P_MAC=([0-9a-f:]+)', '\\1') | first }}"
+    node_ip: "{{ hostvars[item].node_ip }}"
     prov_ip: "{{ hostvars[item].provider_ip | default('') }}"
   shell: |
-    P_DEV=$(ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "ip -o link show | grep -i '{{ p_mac }}' | awk '{print \$2}' | sed 's/://'")
-    
-    ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "sudo nmcli con add type ethernet con-name provider-net ifname $P_DEV ipv4.method manual ipv4.addresses {{ prov_ip }}/24 connection.autoconnect yes && sudo nmcli con up provider-net"
-  loop: "{{ groups['cluster_nodes'] }}"
-  when: 
-    - item != 'helper'
-    - hostvars[item].discovery_data is defined
-    - hostvars[item].provider_ip is defined
+    # Wait for SSH
+    until nc -z -w 2 {{ m_ip }} 22; do sleep 2; done
 
-- name: "3.3.2.4 - Black Hole Worker Provider NIC"
-  delegate_to: "{{ VM_HOST_IP }}"
-  become: true
-  vars:
-    node_info: "{{ hostvars[item].discovery_data }}"
-    p_mac: "{{ node_info | regex_search('P_MAC=([0-9a-f:]+)', '\\1') | first }}"
-  shell: |
-    VM="{{ item.split('.')[0] }}"
-    cat <<EOF > /tmp/${VM}_p_dead.xml
-    <interface type='network'>
-      <mac address='{{ p_mac }}'/>
-      <source network='black-hole'/>
-      <link state='down'/>
-    </interface>
-    EOF
-    virsh update-device $VM /tmp/${VM}_p_dead.xml --live --config
+    # Match Cluster NIC by MAC
+    C_DEV=$(ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "ip -o link show | grep -i '{{ c_mac }}' | awk '{print \$2}' | sed 's/://'")
+    ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "sudo nmcli con add type ethernet con-name cluster-net ifname \$C_DEV ipv4.method manual ipv4.addresses {{ node_ip }}/24 connection.autoconnect yes && sudo nmcli con up cluster-net"
+
+    # Match Provider NIC by MAC (Masters Only)
+    if [ -n "{{ prov_ip }}" ]; then
+      P_DEV=$(ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "ip -o link show | grep -i '{{ p_mac }}' | awk '{print \$2}' | sed 's/://'")
+      ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "sudo nmcli con add type ethernet con-name provider-net ifname \$P_DEV ipv4.method manual ipv4.addresses {{ prov_ip }}/24 connection.autoconnect yes && sudo nmcli con up provider-net"
+    fi
   loop: "{{ groups['cluster_nodes'] }}"
   when: 
     - item != 'helper'
     - hostvars[item].discovery_data is defined
-    - "'wrk' in item"
