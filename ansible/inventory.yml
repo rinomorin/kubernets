@@ -60,14 +60,14 @@ all:
       ansible_host: 10.0.0.41 
       hostname: msrlv9wrk01.cloud.home.morinsoft.ca 
       provision_ip: 10.0.0.41
-      node_ip: 10.0.41
+      node_ip: 10.0.0.41
 
     msrlv9wrk02: 
       ansible_user: core
       ansible_host: 10.0.0.42 
       hostname: msrlv9wrk02.cloud.home.morinsoft.ca 
       provision_ip: 10.0.0.42
-      node_ip: 10.0.42
+      node_ip: 10.0.0.42
 
     kvmdc01:
       ansible_host: 192.168.100.3
