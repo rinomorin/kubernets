@@ -40,7 +40,7 @@
   block:
     - name: Authenticate with FreeIPA
       shell: "echo '{{ ipa_admin_password }}' | kinit admin"
-      # no_log: true
+      no_log: true
     
     - name: Add Forward A Record for VIP
       command: >

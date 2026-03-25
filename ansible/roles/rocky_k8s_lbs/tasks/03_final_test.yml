@@ -1,0 +1,35 @@
+- name: Power Cycle and Connectivity Verification
+  block:
+    - name: Hard Power Off VMs
+      delegate_to: "{{ VM_HOST_IP }}"
+      shell: "sudo virsh destroy {{ item.split('.')[0] }} || true"
+      loop: "{{ groups['hahost'] }}"
+
+    - name: Wait for state settlement
+      pause:
+        seconds: 5
+
+    - name: Power On VMs
+      delegate_to: "{{ VM_HOST_IP }}"
+      shell: "sudo virsh start {{ item.split('.')[0] }}"
+      loop: "{{ groups['hahost'] }}"
+
+    - name: Wait for SSH on Production IP
+      delegate_to: localhost
+      wait_for:
+        host: "{{ hostvars[item].ansible_host }}"
+        port: 22
+        state: started
+        delay: 10
+        timeout: 120
+      loop: "{{ groups['hahost'] }}"
+
+    - name: Final Verification - Internal Services
+      delegate_to: localhost
+      vars:
+        ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
+      shell: |
+        ssh {{ ssh_opts }} core@{{ hostvars[item].ansible_host }} "systemctl is-active haproxy keepalived"
+      loop: "{{ groups['hahost'] }}"
+      register: service_status
+      failed_when: service_status.rc != 0
