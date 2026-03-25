@@ -46,7 +46,7 @@
   changed_when: "'starting' in start_output.stdout"
 
 # ============================================================
-# PHASE 3: Discovery (Now pinning data to hostvars)
+# PHASE 3: Discovery
 # ============================================================
 - name: "3.3.1 - Discovery: Map MACs and Maintenance IPs"
   delegate_to: "{{ VM_HOST_IP }}"
@@ -69,7 +69,9 @@
   set_fact:
     discovery_data: "{{ item.stdout }}"
   loop: "{{ temp_net_map.results }}"
-  when: item.skipped is not defined
+  when: 
+    - item.skipped is not defined
+    - item.stdout is defined
   delegate_to: localhost
 
 # ============================================================
@@ -79,12 +81,13 @@
 - name: "3.3.2.1 - Set FQDN Hostname"
   delegate_to: localhost
   become: false
-  shell: |
-    # Extract M_IP directly from the host's own fact
-    M_IP=$(echo "{{ hostvars[item].discovery_data }}" | grep -oP 'M_IP=\K[0-9.]+')
-    FQDN="{{ item.split('.')[0] }}.{{ c_zone }}"
-    
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@$M_IP "sudo hostnamectl set-hostname $FQDN"
+  vars:
+    # Extracting these in vars is safer than inside the shell string
+    m_ip: "{{ hostvars[item].discovery_data | regex_search('M_IP=([0-9.]+)', '\\1') | first }}"
+    fqdn: "{{ item.split('.')[0] }}.{{ c_zone }}"
+  shell: >
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+    core@{{ m_ip }} "sudo hostnamectl set-hostname {{ fqdn }}"
   loop: "{{ groups['cluster_nodes'] }}"
   when: 
     - item != 'helper'
@@ -93,16 +96,17 @@
 - name: "3.3.2.2 - Configure Cluster IP"
   delegate_to: localhost
   become: false
+  vars:
+    node_info: "{{ hostvars[item].discovery_data }}"
+    m_ip: "{{ node_info | regex_search('M_IP=([0-9.]+)', '\\1') | first }}"
+    c_mac: "{{ node_info | regex_search('C_MAC=([0-9a-f:]+)', '\\1') | first }}"
+    node_ip: "{{ hostvars[item].node_ip }}"
   shell: |
-    M_IP=$(echo "{{ hostvars[item].discovery_data }}" | grep -oP 'M_IP=\K[0-9.]+')
-    C_MAC=$(echo "{{ hostvars[item].discovery_data }}" | grep -oP 'C_MAC=\K[0-9a-f:]+')
-    NODE_IP="{{ hostvars[item].node_ip }}"
+    # Discover the device name (enpXs0) using the MAC address
+    C_DEV=$(ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "ip -o link show | grep -i '{{ c_mac }}' | awk '{print \$2}' | sed 's/://'")
     
-    # 1. Find Dev Name
-    C_DEV=$(ssh -o StrictHostKeyChecking=no core@$M_IP "ip -o link show | grep -i '$C_MAC' | awk '{print \$2}' | sed 's/://'")
-    
-    # 2. Configure
-    ssh -o StrictHostKeyChecking=no core@$M_IP "sudo nmcli con add type ethernet con-name cluster-net ifname $C_DEV ipv4.method manual ipv4.addresses $NODE_IP/24 connection.autoconnect yes && sudo nmcli con up cluster-net"
+    # Apply static configuration
+    ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "sudo nmcli con add type ethernet con-name cluster-net ifname $C_DEV ipv4.method manual ipv4.addresses {{ node_ip }}/24 connection.autoconnect yes && sudo nmcli con up cluster-net"
   loop: "{{ groups['cluster_nodes'] }}"
   when: 
     - item != 'helper'
@@ -111,16 +115,39 @@
 - name: "3.3.2.3 - Configure Provider IP (Masters Only)"
   delegate_to: localhost
   become: false
+  vars:
+    node_info: "{{ hostvars[item].discovery_data }}"
+    m_ip: "{{ node_info | regex_search('M_IP=([0-9.]+)', '\\1') | first }}"
+    p_mac: "{{ node_info | regex_search('P_MAC=([0-9a-f:]+)', '\\1') | first }}"
+    prov_ip: "{{ hostvars[item].provider_ip | default('') }}"
   shell: |
-    M_IP=$(echo "{{ hostvars[item].discovery_data }}" | grep -oP 'M_IP=\K[0-9.]+')
-    P_MAC=$(echo "{{ hostvars[item].discovery_data }}" | grep -oP 'P_MAC=\K[0-9a-f:]+')
-    PROV_IP="{{ hostvars[item].provider_ip }}"
+    P_DEV=$(ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "ip -o link show | grep -i '{{ p_mac }}' | awk '{print \$2}' | sed 's/://'")
     
-    P_DEV=$(ssh -o StrictHostKeyChecking=no core@$M_IP "ip -o link show | grep -i '$P_MAC' | awk '{print \$2}' | sed 's/://'")
-    
-    ssh -o StrictHostKeyChecking=no core@$M_IP "sudo nmcli con add type ethernet con-name provider-net ifname $P_DEV ipv4.method manual ipv4.addresses $PROV_IP/24 connection.autoconnect yes && sudo nmcli con up provider-net"
+    ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "sudo nmcli con add type ethernet con-name provider-net ifname $P_DEV ipv4.method manual ipv4.addresses {{ prov_ip }}/24 connection.autoconnect yes && sudo nmcli con up provider-net"
   loop: "{{ groups['cluster_nodes'] }}"
   when: 
     - item != 'helper'
     - hostvars[item].discovery_data is defined
     - hostvars[item].provider_ip is defined
+
+- name: "3.3.2.4 - Black Hole Worker Provider NIC"
+  delegate_to: "{{ VM_HOST_IP }}"
+  become: true
+  vars:
+    node_info: "{{ hostvars[item].discovery_data }}"
+    p_mac: "{{ node_info | regex_search('P_MAC=([0-9a-f:]+)', '\\1') | first }}"
+  shell: |
+    VM="{{ item.split('.')[0] }}"
+    cat <<EOF > /tmp/${VM}_p_dead.xml
+    <interface type='network'>
+      <mac address='{{ p_mac }}'/>
+      <source network='black-hole'/>
+      <link state='down'/>
+    </interface>
+    EOF
+    virsh update-device $VM /tmp/${VM}_p_dead.xml --live --config
+  loop: "{{ groups['cluster_nodes'] }}"
+  when: 
+    - item != 'helper'
+    - hostvars[item].discovery_data is defined
+    - "'wrk' in item"
