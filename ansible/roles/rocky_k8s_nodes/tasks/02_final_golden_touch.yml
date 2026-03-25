@@ -115,6 +115,7 @@
 
 - name: Download ectd
   become: false
+  delegate_to: localhost
   get_url:
     url: "https://github.com/etcd-io/etcd/releases/download/v3.5.12/etcd-{{ etcd_ver }}-linux-amd64.tar.gz"
     dest: "/tmp/etcd-{{ etcd_ver }}-linux-amd64.tar.gz"
