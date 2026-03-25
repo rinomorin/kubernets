@@ -54,3 +54,10 @@
   roles:
     - role: rocky_k8s_lbs
     # You can uncomment and add rocky_k8s_base here if needed
+
+# 4. Deploy Infrastructure (LBs and Base Config)
+- name: Deploy Cluster nodes
+  hosts: kvm
+  gather_facts: false
+  roles:
+    - role: rocky_k8s_nodes

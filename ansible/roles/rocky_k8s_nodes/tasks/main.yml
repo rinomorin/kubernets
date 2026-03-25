@@ -1,0 +1,17 @@
+---
+- name: 0.1 - Run Pre-checks and Build Decision
+  import_tasks: 00_pre_check.yml
+
+- name: 0.2 - Debug Build Status
+  debug:
+    msg: "Rebuild requested: {{ rebuild_nodes | default(false) }} | Skipping Build: {{ skip_build }}"
+
+- name: Kubernetes Node Provisioning Block
+  block:
+    - name: 1.0 - Clone Virtual Machines
+      include_tasks: 01_clone_nodes.yml
+
+    - name: 2.0 - OS Personalization and K8s Prep
+      include_tasks: 02_prep_os.yml
+  # Use 'cluster_nodes' group and skip if already exists
+  when: not skip_build | bool
