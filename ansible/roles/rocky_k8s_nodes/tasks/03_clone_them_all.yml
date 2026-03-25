@@ -1,51 +1,6 @@
 ---
 # ============================================================
-# 3.1 - Seal the Silver Image (Lead Master)
-# ============================================================
-- name: 3.1.1 - Power off msrlv9mast01 for cloning
-  delegate_to: "{{ VM_HOST_IP }}"
-  shell: |
-    if sudo virsh list --all | grep -q "msrlv9mast01"; then
-      sudo virsh destroy msrlv9mast01 || true
-      # Wait for state to settle
-      for i in {1..15}; do
-        STATE=$(sudo virsh domstate msrlv9mast01)
-        if [ "$STATE" == "shut off" ]; then
-          exit 0
-        fi
-        sleep 2
-      done
-    fi
-  changed_when: true
-
-# ============================================================
-# 3.2 - Clone to the remaining cluster nodes
-# ============================================================
-- name: 3.2.1 - Clone Remaining Nodes from Silver Image
-  delegate_to: "{{ VM_HOST_IP }}"
-  command: >
-    sudo virt-clone --original msrlv9mast01 
-    --name {{ item.split('.')[0] }} 
-    --file /var/lib/libvirt/images/{{ item.split('.')[0] }}.qcow2
-  loop: "{{ groups['cluster_nodes'] }}"
-  when: 
-    - item != 'helper'
-    - item != 'msrlv9mast01'
-  args:
-    creates: "/var/lib/libvirt/images/{{ item.split('.')[0] }}.qcow2"
-
-- name: 3.2.2 - Power On All Nodes
-  delegate_to: "{{ VM_HOST_IP }}"
-  shell: "sudo virsh start {{ item.split('.')[0] }}"
-  loop: "{{ groups['cluster_nodes'] }}"
-  when: item != 'helper'
-  ignore_errors: true
-
-# ============================================================
-# 3.3 - Discovery & FQDN Identity
-# ============================================================
-# ============================================================
-# 3.1 - Seal the Silver Image (Lead Master)
+# PHASE 1: Prepare Silver Image
 # ============================================================
 - name: "3.1.1 - Power off msrlv9mast01 for cloning"
   delegate_to: "{{ VM_HOST_IP }}"
@@ -61,7 +16,7 @@
   changed_when: true
 
 # ============================================================
-# 3.2 - Clone to the remaining cluster nodes
+# PHASE 2: Clone and Power On
 # ============================================================
 - name: "3.2.1 - Clone Remaining Nodes from Silver Image"
   delegate_to: "{{ VM_HOST_IP }}"
@@ -76,16 +31,14 @@
   args:
     creates: "/var/lib/libvirt/images/{{ item.split('.')[0] }}.qcow2"
 
-# ============================================================
-# 3.2.2 - Power On All Nodes (Idempotent Version)
-# ============================================================
-- name: "3.2.2 - Power On All Nodes"
+- name: "3.2.2 - Power On All Nodes (Idempotent)"
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
     if [ "$(sudo virsh domstate {{ item.split('.')[0] }})" == "shut off" ]; then
       sudo virsh start {{ item.split('.')[0] }}
+      echo "starting"
     else
-      echo "Already running"
+      echo "already_active"
     fi
   loop: "{{ groups['cluster_nodes'] }}"
   when: item != 'helper'
@@ -93,37 +46,35 @@
   changed_when: "'starting' in start_output.stdout"
 
 # ============================================================
-# 3.3.2.2 - Step 2: Configure Cluster IP (Fixed Octets)
+# PHASE 3: Discovery (Populate net_map)
 # ============================================================
-- name: "3.3.2.2 - Configure Cluster IP"
-  delegate_to: localhost
-  become: false
-  vars:
-    raw_data: "{{ (net_map.results | selectattr('item', 'equalto', item) | first).stdout }}"
-    m_ip: "{{ raw_data | regex_search('M_IP=([0-9.]+)', '\\1') | first }}"
-    c_mac: "{{ raw_data | regex_search('C_MAC=([0-9a-fA-F:]+)', '\\1') | first }}"
-    # Check if the IP has 4 octets; if not, you might need to fix your inventory.
-    # For now, I'll use your inventory variable directly.
-    node_ip: "{{ hostvars[item].node_ip }}" 
+- name: "3.3.1 - Discovery: Map MACs and Maintenance IPs"
+  delegate_to: "{{ VM_HOST_IP }}"
+  become: true
   shell: |
-    # 1. Discover device
-    C_DEV=$(ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "ip -o link show | grep -i '{{ c_mac }}' | awk '{print \$2}' | sed 's/://'")
-    
-    # 2. Add connection
-    # Ensure your inventory has the full IP like 10.0.0.41
-    ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "sudo nmcli con add type ethernet con-name cluster-net ifname $C_DEV ipv4.method manual ipv4.addresses {{ node_ip }}/24 connection.autoconnect yes && sudo nmcli con up cluster-net"
+    VM="{{ item.split('.')[0] }}"
+    P_MAC=$(virsh domiflist $VM | grep 'default' | awk '{print $5}')
+    C_MAC=$(virsh domiflist $VM | grep 'br-cluster' | awk '{print $5}')
+    N_MAC=$(virsh domiflist $VM | grep 'br-nat' | awk '{print $5}')
+    M_IP=$(virsh net-dhcp-leases br-nat | grep "$N_MAC" | awk '{print $5}' | cut -d/ -f1)
+    echo "P_MAC=$P_MAC|C_MAC=$C_MAC|M_IP=$M_IP"
+  register: net_map
+  until: net_map.stdout is search('M_IP=[0-9]')
+  retries: 30
+  delay: 5
   loop: "{{ groups['cluster_nodes'] }}"
   when: item != 'helper'
 
 # ============================================================
-# 3.3.2 - Step 1: Set FQDN Hostname
+# PHASE 4: Identity and Network Customization
 # ============================================================
-- name: "3.3.2.1 - Set FQDN Hostname"
+
+- name: "3.3.2.1 - Step 1: Set FQDN Hostname"
   delegate_to: localhost
   become: false
   vars:
-    raw_data: "{{ (net_map.results | selectattr('item', 'equalto', item) | first).stdout }}"
-    m_ip: "{{ raw_data | regex_search('M_IP=([0-9.]+)', '\\1') | first }}"
+    node_data: "{{ (net_map.results | selectattr('item', 'equalto', item) | first).stdout }}"
+    m_ip: "{{ node_data | regex_search('M_IP=([0-9.]+)', '\\1') | first }}"
     fqdn: "{{ item.split('.')[0] }}.{{ c_zone }}"
   shell: |
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
@@ -131,51 +82,46 @@
   loop: "{{ groups['cluster_nodes'] }}"
   when: item != 'helper'
 
-# ============================================================
-# 3.3.2.2 - Step 2: Configure Cluster IP (10.0.0.x)
-# ============================================================
-- name: "3.3.2.2 - Configure Cluster IP"
+- name: "3.3.2.2 - Step 2: Configure Cluster IP (10.0.0.x)"
   delegate_to: localhost
   become: false
   vars:
-    raw_data: "{{ (net_map.results | selectattr('item', 'equalto', item) | first).stdout }}"
-    m_ip: "{{ raw_data | regex_search('M_IP=([0-9.]+)', '\\1') | first }}"
-    c_mac: "{{ raw_data | regex_search('C_MAC=([0-9a-fA-F:]+)', '\\1') | first }}"
+    node_data: "{{ (net_map.results | selectattr('item', 'equalto', item) | first).stdout }}"
+    m_ip: "{{ node_data | regex_search('M_IP=([0-9.]+)', '\\1') | first }}"
+    c_mac: "{{ node_data | regex_search('C_MAC=([0-9a-fA-F:]+)', '\\1') | first }}"
     node_ip: "{{ hostvars[item].node_ip }}"
   shell: |
+    # Find dev name by MAC inside the VM
     C_DEV=$(ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "ip -o link show | grep -i '{{ c_mac }}' | awk '{print \$2}' | sed 's/://'")
+    
+    # Apply static IP
     ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "sudo nmcli con add type ethernet con-name cluster-net ifname $C_DEV ipv4.method manual ipv4.addresses {{ node_ip }}/24 connection.autoconnect yes && sudo nmcli con up cluster-net"
   loop: "{{ groups['cluster_nodes'] }}"
   when: item != 'helper'
 
-# ============================================================
-# 3.3.2.3 - Step 3: Configure Provider IP (Masters Only)
-# ============================================================
-- name: "3.3.2.3 - Configure Provider IP"
+- name: "3.3.2.3 - Step 3: Configure Provider IP (Masters Only)"
   delegate_to: localhost
   become: false
   vars:
-    raw_data: "{{ (net_map.results | selectattr('item', 'equalto', item) | first).stdout }}"
-    m_ip: "{{ raw_data | regex_search('M_IP=([0-9.]+)', '\\1') | first }}"
-    p_mac: "{{ raw_data | regex_search('P_MAC=([0-9a-fA-F:]+)', '\\1') | first }}"
+    node_data: "{{ (net_map.results | selectattr('item', 'equalto', item) | first).stdout }}"
+    m_ip: "{{ node_data | regex_search('M_IP=([0-9.]+)', '\\1') | first }}"
+    p_mac: "{{ node_data | regex_search('P_MAC=([0-9a-fA-F:]+)', '\\1') | first }}"
     prov_ip: "{{ hostvars[item].provider_ip | default('') }}"
   shell: |
     P_DEV=$(ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "ip -o link show | grep -i '{{ p_mac }}' | awk '{print \$2}' | sed 's/://'")
+    
     ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "sudo nmcli con add type ethernet con-name provider-net ifname $P_DEV ipv4.method manual ipv4.addresses {{ prov_ip }}/24 connection.autoconnect yes && sudo nmcli con up provider-net"
   loop: "{{ groups['cluster_nodes'] }}"
   when: 
     - item != 'helper'
     - hostvars[item].provider_ip is defined
 
-# ============================================================
-# 3.3.2.4 - Step 4: Black Hole Provider (Workers Only)
-# ============================================================
-- name: "3.3.2.4 - Black Hole Worker Provider NIC"
+- name: "3.3.2.4 - Step 4: Black Hole Worker Provider NIC"
   delegate_to: "{{ VM_HOST_IP }}"
   become: true
   vars:
-    raw_data: "{{ (net_map.results | selectattr('item', 'equalto', item) | first).stdout }}"
-    p_mac: "{{ raw_data | regex_search('P_MAC=([0-9a-fA-F:]+)', '\\1') | first }}"
+    node_data: "{{ (net_map.results | selectattr('item', 'equalto', item) | first).stdout }}"
+    p_mac: "{{ node_data | regex_search('P_MAC=([0-9a-fA-F:]+)', '\\1') | first }}"
   shell: |
     VM="{{ item.split('.')[0] }}"
     cat <<EOF > /tmp/${VM}_p_dead.xml
