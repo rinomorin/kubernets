@@ -1,0 +1,104 @@
+---
+# ============================================================
+# 3.1 - Seal the Silver Image (Lead Master)
+# ============================================================
+- name: 3.1.1 - Power off msrlv9mast01 for cloning
+  delegate_to: "{{ VM_HOST_IP }}"
+  shell: |
+    # Force shutdown if it's still hanging on cloud-init cleanup
+    sudo virsh destroy msrlv9mast01 || true
+    while [ "$(sudo virsh domstate msrlv9mast01)" != "shut off" ]; do sleep 2; done
+  changed_when: true
+
+# ============================================================
+# 3.2 - Parallel Clone to Remaining Nodes
+# ============================================================
+- name: 3.2.1 - Clone Remaining Nodes from Silver Image
+  delegate_to: "{{ VM_HOST_IP }}"
+  command: >
+    sudo virt-clone --original msrlv9mast01 
+    --name {{ item.split('.')[0] }} 
+    --file /var/lib/libvirt/images/{{ item.split('.')[0] }}.qcow2
+  loop: "{{ groups['cluster_nodes'] }}"
+  when: 
+    - item != 'helper'
+    - item != 'msrlv9mast01'
+  args:
+    creates: "/var/lib/libvirt/images/{{ item.split('.')[0] }}.qcow2"
+
+- name: 3.2.2 - Power On All Nodes
+  delegate_to: "{{ VM_HOST_IP }}"
+  shell: "sudo virsh start {{ item.split('.')[0] }}"
+  loop: "{{ groups['cluster_nodes'] }}"
+  when: item != 'helper'
+  ignore_errors: true
+
+# ============================================================
+# 3.3 - Discovery & FQDN Identity
+# ============================================================
+- name: 3.3.1 - Discover Maintenance Tunnel IPs
+  delegate_to: "{{ VM_HOST_IP }}"
+  shell: |
+    VM="{{ item.split('.')[0] }}"
+    N_MAC=$(sudo virsh domiflist $VM | grep 'br-nat' | awk '{print $5}')
+    sudo virsh net-dhcp-leases br-nat | grep "$N_MAC" | awk '{print $5}' | cut -d/ -f1
+  register: m_tunnel_ips
+  until: m_tunnel_ips.stdout != ""
+  retries: 20
+  delay: 10
+  loop: "{{ groups['cluster_nodes'] }}"
+  when: item != 'helper'
+
+- name: 3.3.2 - Set FQDN and Configure Networking
+  delegate_to: localhost
+  vars:
+    # Get M_IP from discovery
+    m_ip: "{{ (m_tunnel_ips.results | selectattr('item', 'equalto', item) | first).stdout | trim }}"
+    # FQDN construction
+    fqdn: "{{ item.split('.')[0] }}.{{ c_zone }}"
+    ssh_opts: "-o StrictHostKeyChecking=no -o BatchMode=yes -o UserKnownHostsFile=/dev/null"
+    node_ip: "{{ hostvars[item].node_ip }}"
+    prov_ip: "{{ hostvars[item].provider_ip | default('') }}"
+  shell: |
+    # 1. Update Hostname to FQDN
+    ssh {{ ssh_opts }} core@{{ m_ip }} "sudo hostnamectl set-hostname {{ fqdn }}"
+
+    # 2. Get MACs from Host to find correct eth names in VM
+    C_MAC=$(ssh {{ ssh_opts }} core@{{ m_ip }} "ip -o link show | grep '52:54:00' | grep -v 'eth0' | head -n1 | awk '{print \$2}' | sed 's/://'")
+    
+    # 3. Configure Cluster Network (10.0.0.x)
+    ssh {{ ssh_opts }} core@{{ m_ip }} << 'EOF'
+      sudo nmcli con add type ethernet con-name cluster-net ifname $C_MAC ipv4.method manual ipv4.addresses {{ node_ip }}/24 connection.autoconnect yes
+      sudo nmcli con up cluster-net
+    EOF
+
+    # 4. Configure Provider Network (192.168.100.x) - Masters Only
+    if [ -n "{{ prov_ip }}" ]; then
+      ssh {{ ssh_opts }} core@{{ m_ip }} << 'EOF'
+        sudo nmcli con add type ethernet con-name provider-net ifname eth0 ipv4.method manual ipv4.addresses {{ prov_ip }}/24 connection.autoconnect yes
+        sudo nmcli con up provider-net
+      EOF
+    fi
+  loop: "{{ groups['cluster_nodes'] }}"
+  when: item != 'helper'
+
+# ============================================================
+# 3.4 - Black Hole Provider (Workers Only)
+# ============================================================
+- name: 3.4.1 - Isolate Worker Provider Interface
+  delegate_to: "{{ VM_HOST_IP }}"
+  shell: |
+    VM="{{ item.split('.')[0] }}"
+    P_MAC=$(sudo virsh domiflist $VM | grep 'default' | awk '{print $5}')
+    cat <<EOF > /tmp/${VM}_p_dead.xml
+    <interface type='network'>
+      <mac address='$P_MAC'/>
+      <source network='black-hole'/>
+      <link state='down'/>
+    </interface>
+    EOF
+    sudo virsh update-device $VM /tmp/${VM}_p_dead.xml --live --config
+  loop: "{{ groups['cluster_nodes'] }}"
+  when: 
+    - item != 'helper'
+    - "'wrk' in item"
