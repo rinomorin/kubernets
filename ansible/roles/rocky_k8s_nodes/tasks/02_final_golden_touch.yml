@@ -131,6 +131,7 @@
     ssh core@"{{ golden_ip }}" sudo ln -s /usr/local/bin/etcdctl /usr/bin/etcdctl
     ssh core@"{{ golden_ip }}" sudo rm -f /tmp/etcd-{{ etcd_ver }}-linux-amd64.tar.gz
 
+
 # --------------------------------------------------------
 # Clean dynamic state before freezing image
 # --------------------------------------------------------
@@ -140,12 +141,15 @@
   shell: |
     # This ensures clones get a new machine-id and run cloud-init on first boot
     ssh core@"{{ golden_ip }}" "sudo cloud-init clean --logs --seed"
+    ssh core@"{{ golden_ip }}"  sudo dnf install -y libguestfs-tools
 
 - name: Clear logs
   become: false
   delegate_to: localhost
   shell: |
     ssh core@"{{ golden_ip }}" sudo rm -rf /var/log/*
+    sudo virt-sysprep -d msrlv9mast01
+    --operations machine-id,net-hostname,net-hwaddr,ssh-hostkeys,customize
 
 - name: Clear dnf cache
   become: false 
