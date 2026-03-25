@@ -135,21 +135,21 @@
 # --------------------------------------------------------
 # Clean dynamic state before freezing image
 # --------------------------------------------------------
-- name: Clean image for use as a template
-  become: false
+- name: Clean image for use as a template (Inside VM)
   delegate_to: localhost
+  become: false
   shell: |
-    # This ensures clones get a new machine-id and run cloud-init on first boot
-    ssh core@"{{ golden_ip }}" "sudo cloud-init clean --logs --seed"
-    ssh core@"{{ golden_ip }}"  sudo dnf install -y libguestfs-tools
+    # This cleans the OS state from inside before we shut it down
+    ssh -o StrictHostKeyChecking=no core@"{{ golden_ip }}" "sudo cloud-init clean --logs --seed && sudo rm -rf /var/log/*"
 
-- name: Clear logs
-  become: false
-  delegate_to: localhost
+- name: Sysprep the Master (On Hypervisor)
+  delegate_to: "{{ VM_HOST_IP }}"
+  become: true
   shell: |
-    ssh core@"{{ golden_ip }}" sudo rm -rf /var/log/*
-    sudo virt-sysprep -d msrlv9mast01
-    --operations machine-id,net-hostname,net-hwaddr,ssh-hostkeys,customize
+    # We run this on the KVM host while the VM is OFF
+    virt-sysprep -d msrlv9mast01 \
+      --operations machine-id,net-hostname,net-hwaddr,ssh-hostkeys,customize \
+      --hostname msrlv9mast01.{{ c_zone }}
 
 - name: Clear dnf cache
   become: false 

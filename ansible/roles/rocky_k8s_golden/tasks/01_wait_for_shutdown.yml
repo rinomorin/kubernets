@@ -22,3 +22,4 @@
   debug:
     msg: "Golden Base Version {{ build_timestamp }} is now offline and ready."
 
+
