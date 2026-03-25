@@ -1,4 +1,7 @@
 ---
+## 00 precheck
+- import_tasks: 00_pre_check.yml
+
 # 00: Prep DNS so the network identity exists
 - import_tasks: 00_dns_registration.yml
 
