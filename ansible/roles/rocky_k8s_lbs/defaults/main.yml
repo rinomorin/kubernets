@@ -2,8 +2,8 @@
 # ------------------------------------------------------------
 # Infrastructure Identity
 # ------------------------------------------------------------
-c_zone: "{{ lookup('env', 'cloud_zone') | default('morinsoft.ca', true) }}"
-p_zone: "{{ lookup('env', 'provision_zone') | default('prov.morinsoft.ca', true) }}"
+c_zone: "{{ lookup('env', 'cloud_zone') | default('cloud.home.morinsoft.ca', true) }}"
+p_zone: "{{ lookup('env', 'provision_zone') | default('home.morinsoft.ca', true) }}"
 ssh_key_path: "{{ lookup('env', 'ssh_key_path') | default('~/.ssh/id_rsa', true) | regex_replace('\\.pub$', '') }}"
 # ------------------------------------------------------------
 # Dynamic CIDR Extraction (from install.yml / inventory)

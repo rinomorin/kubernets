@@ -57,8 +57,9 @@
     # 3. Transfer files
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
+    ssh {{ ssh_opts }} core@{{ target_ip }} "sudo hostnamectl set-hostname {{ item.split('.')[0] }}.{{ c_zone }}"
     
-    # 4. Remote Execution (Fixed the 'ta!rget_ip' typo)
+    # 4. Remote Execution (Fixed the 'target_ip' typo)
     ssh {{ ssh_opts }} core@{{ target_ip }} << 'EOF'
       sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
       sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf
