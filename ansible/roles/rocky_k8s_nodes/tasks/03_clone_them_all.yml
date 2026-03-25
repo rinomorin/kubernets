@@ -44,24 +44,37 @@
 # ============================================================
 # 3.3 - Discovery & FQDN Identity
 # ============================================================
-- name: 3.3.1 - Discover Maintenance Tunnel IPs
+---
+# ============================================================
+# 3.3.1 - Discovery (Crucial: This populates net_map)
+# ============================================================
+- name: 3.3.1 - Map MACs and Maintenance IPs
   delegate_to: "{{ VM_HOST_IP }}"
+  become: true
   shell: |
     VM="{{ item.split('.')[0] }}"
-    N_MAC=$(sudo virsh domiflist $VM | grep 'br-nat' | awk '{print $5}')
-    sudo virsh net-dhcp-leases br-nat | grep "$N_MAC" | awk '{print $5}' | cut -d/ -f1
-  register: m_tunnel_ips
-  until: m_tunnel_ips.stdout != ""
+    P_MAC=$(virsh domiflist $VM | grep 'default' | awk '{print $5}')
+    C_MAC=$(virsh domiflist $VM | grep 'br-cluster' | awk '{print $5}')
+    N_MAC=$(virsh domiflist $VM | grep 'br-nat' | awk '{print $5}')
+    M_IP=$(virsh net-dhcp-leases br-nat | grep "$N_MAC" | awk '{print $5}' | cut -d/ -f1)
+    echo "P_MAC=$P_MAC|C_MAC=$C_MAC|M_IP=$M_IP"
+  register: net_map
+  until: net_map.stdout is search('M_IP=[0-9]')
   retries: 20
   delay: 10
   loop: "{{ groups['cluster_nodes'] }}"
   when: item != 'helper'
 
-- name: 3.3.2.1 - Set FQDN Hostname
+# ============================================================
+# 3.3.2 - Identity and Networking (The 4 Steps)
+# ============================================================
+
+- name: 3.3.2.1 - Step 1: Set FQDN Hostname
   delegate_to: localhost
-  become: false  # Ensure we use the 'cloud_helper' user's SSH keys
+  become: false
   vars:
-    m_ip: "{{ (m_tunnel_ips.results | selectattr('item', 'equalto', item) | first).stdout | trim }}"
+    raw_data: "{{ (net_map.results | selectattr('item', 'equalto', item) | first).stdout }}"
+    m_ip: "{{ raw_data | regex_search('M_IP=([0-9.]+)', '\\1') | first }}"
     fqdn: "{{ item.split('.')[0] }}.{{ c_zone }}"
   shell: |
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
@@ -69,15 +82,16 @@
   loop: "{{ groups['cluster_nodes'] }}"
   when: item != 'helper'
 
-- name: 3.3.2.2 - Configure Cluster IP (br-cluster)
+- name: 3.3.2.2 - Step 2: Configure Cluster IP (10.0.0.x)
   delegate_to: localhost
   become: false
   vars:
-    m_ip: "{{ (m_tunnel_ips.results | selectattr('item', 'equalto', item) | first).stdout | trim }}"
-    c_mac: "{{ (net_map.results | selectattr('item', 'equalto', item) | first).stdout | regex_search('C_MAC=([0-9a-fA-F:]+)', '\\1') | first }}"
+    raw_data: "{{ (net_map.results | selectattr('item', 'equalto', item) | first).stdout }}"
+    m_ip: "{{ raw_data | regex_search('M_IP=([0-9.]+)', '\\1') | first }}"
+    c_mac: "{{ raw_data | regex_search('C_MAC=([0-9a-fA-F:]+)', '\\1') | first }}"
     node_ip: "{{ hostvars[item].node_ip }}"
   shell: |
-    # Find the device name (e.g., enp2s0) inside the VM using the MAC
+    # Find the device name (enpXs0) inside the VM using the MAC
     C_DEV=$(ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "ip -o link show | grep -i '{{ c_mac }}' | awk '{print \$2}' | sed 's/://'")
     
     # Apply static IP via nmcli
@@ -85,12 +99,13 @@
   loop: "{{ groups['cluster_nodes'] }}"
   when: item != 'helper'
 
-- name: 3.3.2.3 - Configure Provider IP (Masters Only)
+- name: 3.3.2.3 - Step 3: Configure Provider IP (Masters Only)
   delegate_to: localhost
   become: false
   vars:
-    m_ip: "{{ (m_tunnel_ips.results | selectattr('item', 'equalto', item) | first).stdout | trim }}"
-    p_mac: "{{ (net_map.results | selectattr('item', 'equalto', item) | first).stdout | regex_search('P_MAC=([0-9a-fA-F:]+)', '\\1') | first }}"
+    raw_data: "{{ (net_map.results | selectattr('item', 'equalto', item) | first).stdout }}"
+    m_ip: "{{ raw_data | regex_search('M_IP=([0-9.]+)', '\\1') | first }}"
+    p_mac: "{{ raw_data | regex_search('P_MAC=([0-9a-fA-F:]+)', '\\1') | first }}"
     prov_ip: "{{ hostvars[item].provider_ip | default('') }}"
   shell: |
     P_DEV=$(ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "ip -o link show | grep -i '{{ p_mac }}' | awk '{print \$2}' | sed 's/://'")
@@ -101,11 +116,12 @@
     - item != 'helper'
     - hostvars[item].provider_ip is defined
 
-- name: 3.3.2.4 - Black Hole Worker Provider NIC
+- name: 3.3.2.4 - Step 4: Black Hole Worker Provider NIC
   delegate_to: "{{ VM_HOST_IP }}"
   become: true
   vars:
-    p_mac: "{{ (net_map.results | selectattr('item', 'equalto', item) | first).stdout | regex_search('P_MAC=([0-9a-fA-F:]+)', '\\1') | first }}"
+    raw_data: "{{ (net_map.results | selectattr('item', 'equalto', item) | first).stdout }}"
+    p_mac: "{{ raw_data | regex_search('P_MAC=([0-9a-fA-F:]+)', '\\1') | first }}"
   shell: |
     VM="{{ item.split('.')[0] }}"
     cat <<EOF > /tmp/${VM}_p_dead.xml
