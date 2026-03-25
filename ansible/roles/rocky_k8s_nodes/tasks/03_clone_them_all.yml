@@ -57,38 +57,69 @@
   loop: "{{ groups['cluster_nodes'] }}"
   when: item != 'helper'
 
-- name: 3.3.2 - Set FQDN and Configure Networking
+- name: 3.3.2.1 - Set FQDN Hostname
   delegate_to: localhost
+  become: false  # Ensure we use the 'cloud_helper' user's SSH keys
   vars:
-    # Get M_IP from discovery
     m_ip: "{{ (m_tunnel_ips.results | selectattr('item', 'equalto', item) | first).stdout | trim }}"
-    # FQDN construction
     fqdn: "{{ item.split('.')[0] }}.{{ c_zone }}"
-    ssh_opts: "-o StrictHostKeyChecking=no -o BatchMode=yes -o UserKnownHostsFile=/dev/null"
-    node_ip: "{{ hostvars[item].node_ip }}"
-    prov_ip: "{{ hostvars[item].provider_ip | default('') }}"
   shell: |
-    # 1. Update Hostname to FQDN
-    ssh {{ ssh_opts }} core@{{ m_ip }} "sudo hostnamectl set-hostname {{ fqdn }}"
-
-    # 2. Get MACs from Host to find correct eth names in VM
-    C_MAC=$(ssh {{ ssh_opts }} core@{{ m_ip }} "ip -o link show | grep '52:54:00' | grep -v 'eth0' | head -n1 | awk '{print \$2}' | sed 's/://'")
-    
-    # 3. Configure Cluster Network (10.0.0.x)
-    ssh {{ ssh_opts }} core@{{ m_ip }} << 'EOF'
-      sudo nmcli con add type ethernet con-name cluster-net ifname $C_MAC ipv4.method manual ipv4.addresses {{ node_ip }}/24 connection.autoconnect yes
-      sudo nmcli con up cluster-net
-    EOF
-
-    # 4. Configure Provider Network (192.168.100.x) - Masters Only
-    if [ -n "{{ prov_ip }}" ]; then
-      ssh {{ ssh_opts }} core@{{ m_ip }} << 'EOF'
-        sudo nmcli con add type ethernet con-name provider-net ifname eth0 ipv4.method manual ipv4.addresses {{ prov_ip }}/24 connection.autoconnect yes
-        sudo nmcli con up provider-net
-      EOF
-    fi
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    core@{{ m_ip }} "sudo hostnamectl set-hostname {{ fqdn }}"
   loop: "{{ groups['cluster_nodes'] }}"
   when: item != 'helper'
+
+- name: 3.3.2.2 - Configure Cluster IP (br-cluster)
+  delegate_to: localhost
+  become: false
+  vars:
+    m_ip: "{{ (m_tunnel_ips.results | selectattr('item', 'equalto', item) | first).stdout | trim }}"
+    c_mac: "{{ (net_map.results | selectattr('item', 'equalto', item) | first).stdout | regex_search('C_MAC=([0-9a-fA-F:]+)', '\\1') | first }}"
+    node_ip: "{{ hostvars[item].node_ip }}"
+  shell: |
+    # Find the device name (e.g., enp2s0) inside the VM using the MAC
+    C_DEV=$(ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "ip -o link show | grep -i '{{ c_mac }}' | awk '{print \$2}' | sed 's/://'")
+    
+    # Apply static IP via nmcli
+    ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "sudo nmcli con add type ethernet con-name cluster-net ifname $C_DEV ipv4.method manual ipv4.addresses {{ node_ip }}/24 connection.autoconnect yes && sudo nmcli con up cluster-net"
+  loop: "{{ groups['cluster_nodes'] }}"
+  when: item != 'helper'
+
+- name: 3.3.2.3 - Configure Provider IP (Masters Only)
+  delegate_to: localhost
+  become: false
+  vars:
+    m_ip: "{{ (m_tunnel_ips.results | selectattr('item', 'equalto', item) | first).stdout | trim }}"
+    p_mac: "{{ (net_map.results | selectattr('item', 'equalto', item) | first).stdout | regex_search('P_MAC=([0-9a-fA-F:]+)', '\\1') | first }}"
+    prov_ip: "{{ hostvars[item].provider_ip | default('') }}"
+  shell: |
+    P_DEV=$(ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "ip -o link show | grep -i '{{ p_mac }}' | awk '{print \$2}' | sed 's/://'")
+    
+    ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "sudo nmcli con add type ethernet con-name provider-net ifname $P_DEV ipv4.method manual ipv4.addresses {{ prov_ip }}/24 connection.autoconnect yes && sudo nmcli con up provider-net"
+  loop: "{{ groups['cluster_nodes'] }}"
+  when: 
+    - item != 'helper'
+    - hostvars[item].provider_ip is defined
+
+- name: 3.3.2.4 - Black Hole Worker Provider NIC
+  delegate_to: "{{ VM_HOST_IP }}"
+  become: true
+  vars:
+    p_mac: "{{ (net_map.results | selectattr('item', 'equalto', item) | first).stdout | regex_search('P_MAC=([0-9a-fA-F:]+)', '\\1') | first }}"
+  shell: |
+    VM="{{ item.split('.')[0] }}"
+    cat <<EOF > /tmp/${VM}_p_dead.xml
+    <interface type='network'>
+      <mac address='{{ p_mac }}'/>
+      <source network='black-hole'/>
+      <link state='down'/>
+    </interface>
+    EOF
+    virsh update-device $VM /tmp/${VM}_p_dead.xml --live --config
+  loop: "{{ groups['cluster_nodes'] }}"
+  when: 
+    - item != 'helper'
+    - "'wrk' in item"
 
 # ============================================================
 # 3.4 - Black Hole Provider (Workers Only)
