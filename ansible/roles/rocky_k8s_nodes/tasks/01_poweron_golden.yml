@@ -18,6 +18,7 @@
   retries: "{{ build_loops | int }}"
   delay: 10
 
+
 - name: Get golden-base VM IP
   shell: |
     sudo virsh net-dhcp-leases br-nat | \
@@ -28,7 +29,6 @@
 
 - name: wait 20 seconds
   shell: sleep 20
-  delegate_to: localhost
 
 - set_fact:
     golden_ip: "{{ gold_ip.stdout }}"
