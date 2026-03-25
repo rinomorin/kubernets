@@ -5,15 +5,21 @@
 - name: 3.1.1 - Power off msrlv9mast01 for cloning
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
-    # Force shutdown if it's still hanging on cloud-init cleanup
-    sudo virsh destroy msrlv9mast01 || true
-    while [ "$(sudo virsh domstate msrlv9mast01)" != "shut off" ]; do 
-      sleep 2
-    done
+    if sudo virsh list --all | grep -q "msrlv9mast01"; then
+      sudo virsh destroy msrlv9mast01 || true
+      # Wait for state to settle
+      for i in {1..15}; do
+        STATE=$(sudo virsh domstate msrlv9mast01)
+        if [ "$STATE" == "shut off" ]; then
+          exit 0
+        fi
+        sleep 2
+      done
+    fi
   changed_when: true
 
 # ============================================================
-# 3.2 - Parallel Clone to Remaining Nodes
+# 3.2 - Clone to the remaining cluster nodes
 # ============================================================
 - name: 3.2.1 - Clone Remaining Nodes from Silver Image
   delegate_to: "{{ VM_HOST_IP }}"
