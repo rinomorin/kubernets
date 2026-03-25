@@ -17,10 +17,11 @@
 
 - name: Cleanup for Rebuild
   delegate_to: "{{ VM_HOST_IP }}"
-  when: rebuild_nodes | default(false) | bool
+  when: 
+    - rebuild_nodes | default(false) | bool
+    - item != 'helper'
   shell: |
     VM="{{ item.split('.')[0] }}"
     sudo virsh destroy $VM || true
     sudo virsh undefine $VM --remove-all-storage --nvram || true
   loop: "{{ groups['cluster_nodes'] }}"
-  when: item != 'helper'
