@@ -1,24 +1,52 @@
-- name: Cleanup Existing LB Nodes (Rebuild Requested)
+- name: 0.1 - Check if LB Nodes already exist
+  delegate_to: "{{ VM_HOST_IP }}"
+  shell: |
+    if sudo virsh list --all | grep -q "{{ item.split('.')[0] }}"; then
+      echo "exists"
+    else
+      echo "missing"
+    fi
+  register: vm_check
+  loop: "{{ groups['hahost'] }}"
+
+- name: 0.2 - Determine if Build is Required
+  set_fact:
+    # Build only if:
+    # 1. User forced it via extra-vars
+    # 2. OR any of the VMs are 'missing'
+    skip_build: "{{ not (rebuild_lbs | default(false) | bool) and ('missing' not in vm_check.results | map(attribute='stdout') | list) }}"
+
+- name: 0.3 - Cleanup for Rebuild (Only if forced)
   delegate_to: "{{ VM_HOST_IP }}"
   when: rebuild_lbs | default(false) | bool
   shell: |
-    # Loop through the specific VM name for this iteration
-    VM_NAME="{{ item.split('.')[0] }}"
-    
-    if sudo virsh list --all | grep -q "$VM_NAME"; then
-      echo "Removing existing VM: $VM_NAME"
-      
-      # 1. Force stop if running
-      sudo virsh destroy "$VM_NAME" || true
-      
-      # 2. Undefine with all associated storage (wipes the qcow2 files)
-      sudo virsh undefine "$VM_NAME" --remove-all-storage --nvram || true
-      
-      # 3. Clean up any leftover XML in tmp from previous failed runs
-      sudo rm -f /tmp/${VM_NAME}*
-    else
-      echo "VM $VM_NAME does not exist. Skipping cleanup."
-    fi
+    VM="{{ item.split('.')[0] }}"
+    sudo virsh destroy $VM || true
+    sudo virsh undefine $VM --remove-all-storage --nvram || true
+    sudo rm -f /var/lib/libvirt/images/${VM}.qcow2
   loop: "{{ groups['hahost'] }}"
-  register: cleanup_output
-  changed_when: "'Removing existing VM' in cleanup_output.stdout"
+
+# - name: Cleanup Existing LB Nodes (Rebuild Requested)
+#   delegate_to: "{{ VM_HOST_IP }}"
+#   when: rebuild_lbs | default(false) | bool
+#   shell: |
+#     # Loop through the specific VM name for this iteration
+#     VM_NAME="{{ item.split('.')[0] }}"
+    
+#     if sudo virsh list --all | grep -q "$VM_NAME"; then
+#       echo "Removing existing VM: $VM_NAME"
+      
+#       # 1. Force stop if running
+#       sudo virsh destroy "$VM_NAME" || true
+      
+#       # 2. Undefine with all associated storage (wipes the qcow2 files)
+#       sudo virsh undefine "$VM_NAME" --remove-all-storage --nvram || true
+      
+#       # 3. Clean up any leftover XML in tmp from previous failed runs
+#       sudo rm -f /tmp/${VM_NAME}*
+#     else
+#       echo "VM $VM_NAME does not exist. Skipping cleanup."
+#     fi
+#   loop: "{{ groups['hahost'] }}"
+#   register: cleanup_output
+#   changed_when: "'Removing existing VM' in cleanup_output.stdout"

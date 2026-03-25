@@ -1,7 +1,8 @@
 ---
 ## 00 precheck
 - import_tasks: 00_pre_check.yml
-
+- debug:
+    msg: "skip_build {{ skip_build }}"
 # 00: Prep DNS so the network identity exists
 - import_tasks: 00_dns_registration.yml
 
