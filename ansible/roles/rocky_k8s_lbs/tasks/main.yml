@@ -12,4 +12,4 @@
 
   # 02: Install services and push HA configurations
   - import_tasks: 02_configure_lbs.yml
-  when: "{{ not skip_build }}"
+  when: not skip_build | bool
