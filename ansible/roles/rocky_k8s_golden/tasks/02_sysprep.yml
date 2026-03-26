@@ -29,20 +29,20 @@
   delegate_to: localhost
   become: false
   vars:
-    # We use .stdout.split() to ensure we only get the IP string without whitespace
     m_ip: "{{ maintenance_ip_raw.stdout | trim }}"
   shell: |
-    # 1. Delete all NetworkManager connection profiles
+    # 1. Delete all NetworkManager connection profiles (Wipes old MACs/IPs)
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ m_ip }} "sudo find /etc/NetworkManager/system-connections/ -type f -delete"
     
-    # 2. Clear out the persistent net rules
+    # 2. Clear out persistent net rules to prevent interface naming conflicts
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ m_ip }} "sudo rm -f /etc/udev/rules.d/70-persistent-net.rules"
     
-    # 3. Clear machine-id for regeneration
+    # 3. Clear machine-id so clones generate unique D-Bus/DHCP IDs on boot
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ m_ip }} "sudo truncate -s 0 /etc/machine-id"
     
-    # 4. Clean cloud-init
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ m_ip }} "sudo cloud-init clean --logs --seed"
+    # 4. Manual Log and Temp Clean (Alternative to cloud-init clean)
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ m_ip }} "sudo rm -rf /var/log/* /tmp/* /var/tmp/*"
+  register: scrub_output
 
 # 3. Shut down for cloning
 - name: "3.1.4 - Final Shutdown for Cloning"
@@ -52,3 +52,12 @@
     virsh destroy {{ vm_host }} || true
     while [ "$(virsh domstate {{ vm_host }})" != "shut off" ]; do sleep 2; done
   changed_when: true
+
+- name: Sysprep the golden (On Hypervisor)
+  delegate_to: "{{ VM_HOST_IP }}"
+  become: true
+  shell: |
+    # We run this on the KVM host while the VM is OFF
+    virt-sysprep -d {{ vm_host }} \
+      --operations machine-id,net-hostname,net-hwaddr,ssh-hostkeys,customize \
+      --hostname msrlv9mast01.{{ c_zone }}
