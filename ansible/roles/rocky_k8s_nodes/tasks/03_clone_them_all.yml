@@ -30,7 +30,7 @@
     rm -f ~/.ssh/known_hosts*
     
 # ============================================================
-# 3.2 - Clone the Remaining Nodes
+# 3.2 - Clone and Prepare the Remaining Nodes
 # ============================================================
 - name: "3.2.1 - Clone Nodes with Unique MACs"
   delegate_to: "{{ VM_HOST_IP }}"
@@ -67,59 +67,89 @@
   when: item != 'helper'
 
 # ============================================================
-# 3.3 - Discovery (Using unique MACs/IDs now)
+# 3.3 - Discovery (Mapping KVM MACs to Maintenance IPs)
 # ============================================================
 - name: "3.3.1 - Discovery: Map KVM MACs and Maintenance IPs"
   delegate_to: "{{ VM_HOST_IP }}"
   become: true
   shell: |
     VM="{{ item.split('.')[0] }}"
+    # Extract MACs from virsh config
     P_MAC=$(virsh domiflist $VM | grep 'default' | awk '{print $5}')
     C_MAC=$(virsh domiflist $VM | grep 'br-cluster' | awk '{print $5}')
     N_MAC=$(virsh domiflist $VM | grep 'br-nat' | awk '{print $5}')
+    
+    # Wait for the DHCP lease on the NAT network
     M_IP=$(virsh net-dhcp-leases br-nat | grep -i "$N_MAC" | awk '{print $5}' | cut -d/ -f1)
+    
+    if [ -z "$M_IP" ]; then exit 1; fi
     echo "P_MAC=$P_MAC|C_MAC=$C_MAC|N_MAC=$N_MAC|M_IP=$M_IP"
   register: temp_net_map
-  until: temp_net_map.stdout is search('M_IP=[0-9]')
-  retries: 40
-  delay: 5
+  until: temp_net_map.rc == 0
+  retries: 50
+  delay: 10
   loop: "{{ groups['cluster_nodes'] }}"
   when: item != 'helper'
 
-- name: "3.3.1.b - Set Facts"
+- name: "3.3.1.b - Set Discovery Facts on Nodes"
   set_fact:
     discovery_data: "{{ item.stdout }}"
   loop: "{{ temp_net_map.results }}"
-  when: item.stdout is defined
+  when: 
+    - item.skipped is not defined
+    - item.stdout is defined
+    - item.item != 'helper'
   delegate_to: localhost
 
 # ============================================================
-# 3.4 - Network Customization
+# 3.4 - Network Customization (MAC-to-Device Matching)
 # ============================================================
-- name: "3.4.1 - Final Network Injection"
+- name: "3.4.1 - Final Network Injection via SSH Jump"
   delegate_to: localhost
   become: false
-  vars:
-    node_info: "{{ hostvars[item].discovery_data }}"
-    m_ip: "{{ node_info | regex_search('M_IP=([0-9.]+)', '\\1') | first }}"
-    c_mac: "{{ node_info | regex_search('C_MAC=([0-9a-f:]+)', '\\1') | first }}"
-    p_mac: "{{ node_info | regex_search('P_MAC=([0-9a-f:]+)', '\\1') | first }}"
-    node_ip: "{{ hostvars[item].node_ip }}"
-    prov_ip: "{{ hostvars[item].provider_ip | default('') }}"
   shell: |
-    # Wait for SSH
-    until nc -z -w 2 {{ m_ip }} 22; do sleep 2; done
+    # Variables from discovery_data
+    DATA="{{ hostvars[item].discovery_data }}"
+    M_IP=$(echo "$DATA" | grep -oP 'M_IP=\K[0-9.]+')
+    C_MAC=$(echo "$DATA" | grep -oP 'C_MAC=\K[0-9a-f:]+')
+    P_MAC=$(echo "$DATA" | grep -oP 'P_MAC=\K[0-9a-f:]+')
+    
+    # Node Configuration from Inventory
+    TARGET_NODE_IP="{{ hostvars[item].node_ip }}"
+    TARGET_PROV_IP="{{ hostvars[item].provider_ip | default('') }}"
 
-    # Match Cluster NIC by MAC
-    C_DEV=$(ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "ip -o link show | grep -i '{{ c_mac }}' | awk '{print \$2}' | sed 's/://'")
-    ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "sudo nmcli con add type ethernet con-name cluster-net ifname \$C_DEV ipv4.method manual ipv4.addresses {{ node_ip }}/24 connection.autoconnect yes && sudo nmcli con up cluster-net"
+    # 1. Wait for SSH availability on Maintenance IP
+    until nc -z -w 2 $M_IP 22; do sleep 3; done
 
-    # Match Provider NIC by MAC (Masters Only)
-    if [ -n "{{ prov_ip }}" ]; then
-      P_DEV=$(ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "ip -o link show | grep -i '{{ p_mac }}' | awk '{print \$2}' | sed 's/://'")
-      ssh -o StrictHostKeyChecking=no core@{{ m_ip }} "sudo nmcli con add type ethernet con-name provider-net ifname \$P_DEV ipv4.method manual ipv4.addresses {{ prov_ip }}/24 connection.autoconnect yes && sudo nmcli con up provider-net"
+    SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
+    # 2. Match Cluster NIC (enpX) by MAC and Assign IP
+    C_DEV=$(ssh $SSH_OPTS core@$M_IP "ip -o link show | grep -i '$C_MAC' | awk '{print \$2}' | sed 's/://'")
+    if [ -n "$C_DEV" ]; then
+      ssh $SSH_OPTS core@$M_IP "sudo nmcli con add type ethernet con-name cluster-net ifname $C_DEV ipv4.method manual ipv4.addresses $TARGET_NODE_IP/24 connection.autoconnect yes && sudo nmcli con up cluster-net"
+    fi
+
+    # 3. Match Provider NIC (enpY) by MAC (Masters Only)
+    if [ -n "$TARGET_PROV_IP" ] && [ -n "$P_MAC" ]; then
+      P_DEV=$(ssh $SSH_OPTS core@$M_IP "ip -o link show | grep -i '$P_MAC' | awk '{print \$2}' | sed 's/://'")
+      if [ -n "$P_DEV" ]; then
+        ssh $SSH_OPTS core@$M_IP "sudo nmcli con add type ethernet con-name provider-net ifname $P_DEV ipv4.method manual ipv4.addresses $TARGET_PROV_IP/24 connection.autoconnect yes && sudo nmcli con up provider-net"
+      fi
     fi
   loop: "{{ groups['cluster_nodes'] }}"
   when: 
     - item != 'helper'
     - hostvars[item].discovery_data is defined
+  async: 300
+  poll: 0
+  register: network_config_jobs
+
+- name: "3.4.2 - Wait for Network Configuration to Finish"
+  async_status:
+    jid: "{{ item.ansible_job_id }}"
+  register: job_result
+  until: job_result.finished
+  retries: 30
+  delay: 5
+  loop: "{{ network_config_jobs.results }}"
+  when: item.ansible_job_id is defined
