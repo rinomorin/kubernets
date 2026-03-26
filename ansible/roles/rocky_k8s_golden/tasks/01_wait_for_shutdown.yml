@@ -18,6 +18,16 @@
   retries: "{{ build_loops|int }}"
   delay: 10
 
+- name: Sysprep the Master (On Hypervisor)
+  delegate_to: "{{ VM_HOST_IP }}"
+  become: true
+  shell: |
+    # We run this on the KVM host while the VM is OFF
+    virt-sysprep -d {{ vm_host }} \
+      --operations machine-id,net-hostname,net-hwaddr,ssh-hostkeys,customize \
+      --hostname {{ vm_host }}
+
+
 - name: Record Build Completion
   debug:
     msg: "Golden Base Version {{ build_timestamp }} is now offline and ready."
