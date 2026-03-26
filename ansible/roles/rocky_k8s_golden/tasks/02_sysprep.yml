@@ -1,4 +1,10 @@
 ---
+- name: Start cloned VMs
+  delegate_to: "{{ VM_HOST_IP }}"
+  community.libvirt.virt:
+    name: "{{ vm_host }}"
+    state: running
+  
 # 1. Discover the IP directly from the Hypervisor for the Golden VM
 - name: "3.1.2 - Discover Maintenance IP from br-nat"
   delegate_to: "{{ VM_HOST_IP }}"
