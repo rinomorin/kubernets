@@ -46,5 +46,5 @@
   delegate_to: "{{ VM_HOST_IP }}"
   become: true
   shell: |
-    virsh destroy msrlv9mast01 || true
+    virsh destroy {{ vm_host }}
     while [ "$(virsh domstate {{ vm_host}})" != "shut off" ]; do sleep 2; done
