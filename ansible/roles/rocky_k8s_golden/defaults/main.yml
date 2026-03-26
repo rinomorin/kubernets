@@ -29,14 +29,12 @@ tdisk_size: "{{ lookup('env', 'VM_DISK') | default(50, true) }}"
 
 # OS & Repo Versions
 tos_name: "rocky"
-tos_variant: "{{ lookup('env', 'OS_VERSION') | default('9.4', true) }}"
+# tos_variant: "{{ lookup('env', 'OS_VERSION') | default('9.4', true) }}"
 crio_version: "{{ lookup('env', 'crio_version') | default('1.34', true) }}"
 kubernetes_version: "{{ lookup('env', 'K8S_VERSION') | default('1.34', true) }}"
 # iso_path: "{{ lookup('env', 'ISO_PATH') | default('https://download.rockylinux.org/pub/rocky/9/BaseOS/x86_64/os/', true) }}"
 iso_path: "{{ lookup('env', 'ISO_PATH') | default('/var/lib/libvirt/images/Rocky-9-latest-x86_64-dvd.iso', true) }}"
 
 # Other defaults remain the same...
-vm_host: "golden-base"
-tos_name: "rocky"
 tos_variant: "9"
 build_loops: "{{ bl|default(120)}}"
