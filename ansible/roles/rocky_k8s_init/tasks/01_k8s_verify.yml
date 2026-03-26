@@ -1,3 +1,4 @@
+---
 - name: 1.1 - Verify Unique Identity
   assert:
     that:
@@ -5,12 +6,18 @@
     fail_msg: "CRITICAL: Nodes share the same machine-id! Sysprep failed."
   when: inventory_hostname == groups['control_nodes'][0]
 
-- name: 1.2 - Check Container Runtime
+- name: 1.2 - Ensure CRI-O is started and enabled
+  systemd:
+    name: crio
+    state: started
+    enabled: yes
+
+- name: 1.3 - Check Container Runtime Health
   command: crictl info
   register: crio_check
   changed_when: false
 
-- name: 1.3 - Ensure Kubelet is enabled but stopped
+- name: 1.4 - Ensure Kubelet is enabled but stopped
   systemd:
     name: kubelet
     enabled: yes
