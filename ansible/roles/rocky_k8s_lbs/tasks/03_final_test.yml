@@ -35,6 +35,7 @@
       failed_when: service_status.rc != 0
 
     - name: 1.1 - Open Ports and Start Services on HA Hosts
+      delegate_to: localhost
       vars:
         ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
       shell: |
