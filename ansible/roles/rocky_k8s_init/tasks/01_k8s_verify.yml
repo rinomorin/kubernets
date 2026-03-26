@@ -49,3 +49,12 @@
     - { key: 'net.bridge.bridge-nf-call-iptables', value: '1' }
     - { key: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
     - { key: 'net.ipv4.ip_forward', value: '1' }
+
+- name: 1.8 - Ensure full cluster hostname resolution in /etc/hosts
+  lineinfile:
+    path: /etc/hosts
+    line: "{{ hostvars[item]['node_ip'] }} {{ item }} {{ hostvars[item]['hostname'] | default('') }}"
+    state: present
+    create: yes
+  loop: "{{ groups['cluster_nodes'] }}"
+  when: hostvars[item]['node_ip'] is defined

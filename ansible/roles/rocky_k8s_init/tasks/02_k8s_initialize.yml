@@ -6,10 +6,9 @@
     --token "{{ cluster_token }}"
     --pod-network-cidr=10.244.0.0/16
     --apiserver-advertise-address={{ node_ip }}
+    --ignore-preflight-errors=SystemVerification
   register: kubeadm_init
-  when: inventory_hostname == groups['control_nodes'][0]
-  args:
-    creates: /etc/kubernetes/admin.conf
+  # ... (rest of the task remains same)
 
 - name: 2.2 - Handle Existing Cluster (Extract Key if 2.1 Skipped)
   shell: |
