@@ -153,30 +153,38 @@
     - item != 'helper'
     - hostvars[item].discovery_data is defined
 
-- name: "3.4.3 - Ensure Blackhole Bridge exists on KVM Host"
+- name: "3.4.0 - Isolate the Blackhole Bridge via Firewall"
   become: true
-  delegate_to: kvmdc01
+  delegate_to: "{{ VM_HOST_IP }}"
   shell: |
-    if ! nmcli con show br-blackhole > /dev/null 2>&1; then
-      nmcli con add type bridge con-name br-blackhole ifname br-blackhole ipv4.method disabled ipv6.method disabled
-      nmcli con up br-blackhole
+    # 1. Get the actual bridge interface name for the 'black-hole' network
+    BR_DEV=$(virsh net-info black-hole | grep "Bridge:" | awk '{print $2}')
+    
+    if [ -n "$BR_DEV" ]; then
+      # 2. Apply surgical isolation using the actual device name
+      if ! firewall-cmd --direct --get-rules eb filter FORWARD | grep -q "$BR_DEV"; then
+        firewall-cmd --permanent --direct --add-rule eb filter FORWARD 0 --logical-in $BR_DEV -j DROP
+        firewall-cmd --reload
+      fi
+    else
+      echo "Error: Libvirt network 'black-hole' not found."
+      exit 1
     fi
 
 - name: "3.4.4 - Move Worker Provider NICs to Blackhole"
-  become: true
+  delegate_to: "{{ VM_HOST_IP }}"
   vars:
     p_mac: "{{ (hostvars[item].discovery_data | regex_search('P_MAC=([^|]+)', '\\1')) | first }}"
     # Change 'br-blackhole' to the name of your isolated bridge
     blackhole_bridge: "br-blackhole" 
   shell: |
-    virsh detach-interface {{ item }} --type bridge --mac {{ p_mac }} --config --live
-    virsh attach-interface {{ item }} --type bridge --source {{ blackhole_bridge }} --mac {{ p_mac }} --model virtio --config --live
+    sudo virsh detach-interface {{ item }} --type bridge --mac {{ p_mac }} --config --live
+    sudo virsh attach-interface {{ item }} --type bridge --source {{ blackhole_bridge }} --mac {{ p_mac }} --model virtio --config --live
   loop: "{{ groups['cluster_nodes'] }}"
   when: 
     - "'wrk' in item"
     - hostvars[item].discovery_data is defined
-
-
+ 
 - name: "3.4.5 - Wait for Network Configuration to Finish"
   async_status:
     jid: "{{ item.ansible_job_id }}"
