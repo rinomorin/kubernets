@@ -74,16 +74,18 @@
   become: true
   shell: |
     VM="{{ item.split('.')[0] }}"
-    # Extract MACs from virsh config
+    # Get MACs from the XML/Domiflist
     P_MAC=$(virsh domiflist $VM | grep 'default' | awk '{print $5}')
     C_MAC=$(virsh domiflist $VM | grep 'br-cluster' | awk '{print $5}')
     N_MAC=$(virsh domiflist $VM | grep 'br-nat' | awk '{print $5}')
     
-    # Wait for the DHCP lease on the NAT network
+    # Get the Maintenance IP from the NAT bridge leases
     M_IP=$(virsh net-dhcp-leases br-nat | grep -i "$N_MAC" | awk '{print $5}' | cut -d/ -f1)
     
     if [ -z "$M_IP" ]; then exit 1; fi
-    echo "P_MAC=$P_MAC|C_MAC=$C_MAC|N_MAC=$N_MAC|M_IP=$M_IP"
+
+    # Output a structured string for easy parsing
+    echo "NODE: $VM | NAT_IP: $M_IP | NAT_MAC: $N_MAC | CLUSTER_MAC: $C_MAC | PROVIDER_MAC: $P_MAC"
   register: temp_net_map
   until: temp_net_map.rc == 0
   retries: 50
@@ -91,11 +93,49 @@
   loop: "{{ groups['cluster_nodes'] }}"
   when: item != 'helper'
 
-- name: "3.3.2 - Print Network Mapping Summary"
+- name: "3.3.2 - Visual Network Map"
   debug:
-    msg: "VM: {{ item.item }} -> {{ item.stdout }}"
+    msg: "{{ item.stdout }}"
   loop: "{{ temp_net_map.results }}"
-  when: item.stdout is defined 
+  when: item.stdout is defined
+
+- name: "3.3.1 - Discovery: Map KVM MACs to Intended IPs"
+  delegate_to: "{{ VM_HOST_IP }}"
+  become: true
+  shell: |
+    VM="{{ item.split('.')[0] }}"
+    # Get MACs from virsh
+    P_MAC=$(virsh domiflist $VM | grep 'default' | awk '{print $5}')
+    C_MAC=$(virsh domiflist $VM | grep 'br-cluster' | awk '{print $5}')
+    N_MAC=$(virsh domiflist $VM | grep 'br-nat' | awk '{print $5}')
+    
+    # Get the Maintenance (NAT) IP
+    M_IP=$(virsh net-dhcp-leases br-nat | grep -i "$N_MAC" | awk '{print $5}' | cut -d/ -f1)
+    
+    if [ -z "$M_IP" ]; then exit 1; fi
+
+    # Create the formatted row (VM | Provider | Cluster | NAT/Maint)
+    # Using printf for alignment
+    printf "%-12s | P: %s (%-12s) | C: %s (%-12s) | N: %s (%-12s)" \
+      "$VM" \
+      "$P_MAC" "{{ hostvars[item].provider_ip | default('N/A') }}" \
+      "$C_MAC" "{{ hostvars[item].node_ip }}" \
+      "$N_MAC" "$M_IP"
+  register: temp_net_map
+  until: temp_net_map.rc == 0
+  retries: 50
+  delay: 10
+  loop: "{{ groups['cluster_nodes'] }}"
+  when: item != 'helper'
+
+- name: "3.3.2 - DISPLAY NETWORK MAP TABLE"
+  debug:
+    msg: 
+      - "----------------------------------------------------------------------------------------------------------------------"
+      - "VM NAME      | PROVIDER (MAC/STATIC)            | CLUSTER (MAC/STATIC)             | NAT/MAINT (MAC/DHCP)"
+      - "----------------------------------------------------------------------------------------------------------------------"
+      - "{{ temp_net_map.results | selectattr('stdout', 'defined') | map(attribute='stdout') | list | join('\n') }}"
+      - "----------------------------------------------------------------------------------------------------------------------"
 
 - name: "3.3.1.b - Set Discovery Facts on Nodes"
   set_fact:
