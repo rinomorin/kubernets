@@ -114,7 +114,7 @@
 # ============================================================
 # 3.4 - Network Customization (MAC-to-Device Matching)
 # ============================================================
-- name: "3.4.1 - Final Network Injection via SSH Jump"
+- name: "3.4.1 - Final Network Injection (Force Static)"
   delegate_to: localhost
   become: false
   shell: |
@@ -123,34 +123,36 @@
     C_MAC=$(echo "$DATA" | awk -F'|' '{print $2}' | cut -d= -f2)
     P_MAC=$(echo "$DATA" | awk -F'|' '{print $1}' | cut -d= -f2)
     
-    # Intended IPs from Inventory
     TARGET_PROV_IP="{{ hostvars[item].provider_ip | default('') }}"
     TARGET_CLUS_IP="{{ hostvars[item].provision_ip }}"
 
-    # Wait for SSH heart-beat
-    until nc -z -w 2 $M_IP 22; do sleep 3; done
     SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
-    # Match and Set Cluster NIC (10.0.0.x) by MAC
-    C_DEV=$(ssh $SSH_OPTS core@$M_IP "ip -o link show | grep -i '$C_MAC' | awk '{print \$2}' | sed 's/://'")
-    if [ -n "$C_DEV" ]; then
-      ssh $SSH_OPTS core@$M_IP "sudo nmcli con add type ethernet con-name cluster-net ifname $C_DEV ipv4.method manual ipv4.addresses $TARGET_CLUS_IP/24 connection.autoconnect yes && sudo nmcli con up cluster-net"
-    fi
+    # 1. CLUSTER NETWORK (10.0.0.x)
+    # Find the device name for the Cluster MAC
+    C_DEV=$(ssh $SSH_OPTS core@$M_IP "ip link show | grep -B1 '$C_MAC' | head -n1 | awk '{print \$2}' | tr -d ':'")
+    
+    ssh $SSH_OPTS core@$M_IP "
+      sudo nmcli con delete 'Wired connection 2' || true;
+      sudo nmcli con delete 'cluster-net' || true;
+      sudo nmcli con add type ethernet con-name cluster-net ifname $C_DEV ipv4.method manual ipv4.addresses $TARGET_CLUS_IP/24;
+      sudo nmcli con up cluster-net
+    "
 
-    # Match and Set Provider NIC (192.168.100.x) by MAC
+    # 2. PROVIDER NETWORK (192.168.100.x)
     if [ -n "$TARGET_PROV_IP" ] && [ "$TARGET_PROV_IP" != "N/A" ]; then
-      P_DEV=$(ssh $SSH_OPTS core@$M_IP "ip -o link show | grep -i '$P_MAC' | awk '{print \$2}' | sed 's/://'")
-      if [ -n "$P_DEV" ]; then
-        ssh $SSH_OPTS core@$M_IP "sudo nmcli con add type ethernet con-name provider-net ifname $P_DEV ipv4.method manual ipv4.addresses $TARGET_PROV_IP/24 connection.autoconnect yes && sudo nmcli con up provider-net"
-      fi
+      P_DEV=$(ssh $SSH_OPTS core@$M_IP "ip link show | grep -B1 '$P_MAC' | head -n1 | awk '{print \$2}' | tr -d ':'")
+      ssh $SSH_OPTS core@$M_IP "
+        sudo nmcli con delete 'Wired connection 3' || true;
+        sudo nmcli con delete 'provider-net' || true;
+        sudo nmcli con add type ethernet con-name provider-net ifname $P_DEV ipv4.method manual ipv4.addresses $TARGET_PROV_IP/24;
+        sudo nmcli con up provider-net
+      "
     fi
   loop: "{{ groups['cluster_nodes'] }}"
   when: 
     - item != 'helper'
     - hostvars[item].discovery_data is defined
-  async: 300
-  poll: 0
-  register: network_config_jobs
 
 - name: "3.4.2 - Wait for Network Configuration to Finish"
   async_status:
