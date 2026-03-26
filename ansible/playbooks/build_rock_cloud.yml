@@ -45,7 +45,7 @@
       include_role:
         name: rocky_k8s_golden
       # We only run this if the output was "not_found"
-      when: "'not_found' in base_check.stdout"
+      when: "'not_found' in base_check.stdout  or force_new_image == true or new_image == true"
 
 # 4. Deploy Infrastructure (LBs and Base Config)
 - name: Deploy Cluster Infrastructure
