@@ -58,3 +58,45 @@
     create: yes
   loop: "{{ groups['cluster_nodes'] }}"
   when: hostvars[item]['node_ip'] is defined
+
+- name: 1.9 - Configure Firewalld for Kubernetes
+  firewalld:
+    port: "{{ item }}"
+    permanent: yes
+    state: enabled
+    immediate: yes
+  loop:
+    # Common ports for all nodes
+    - 10250/tcp  # Kubelet API
+    - 30000-32767/tcp # NodePort Services
+  
+- name: 1.10 - Open Control Plane Specific Ports
+  firewalld:
+    port: "{{ item }}"
+    permanent: yes
+    state: enabled
+    immediate: yes
+  loop:
+    - 6443/tcp   # Kubernetes API Server
+    - 2379-2380/tcp # etcd server client API
+    - 10257/tcp  # kube-controller-manager
+    - 10259/tcp  # kube-scheduler
+  when: inventory_hostname in groups['control_nodes']
+
+- name: 1.11 - Allow VRRP/Keepalived traffic (If LBs are on these nodes)
+  firewalld:
+    rich_rule: 'rule protocol value="vrrp" accept'
+    permanent: yes
+    state: enabled
+    immediate: yes
+  when: inventory_hostname in groups['kvm'] # Adjust group name if needed
+
+- name: 1.12 - Open CNI Overlay Ports
+  firewalld:
+    port: "{{ item }}"
+    permanent: yes
+    state: enabled
+    immediate: yes
+  loop:
+    - 8472/udp   # Flannel/VXLAN
+    - 4789/udp   # Cilium/VXLAN
