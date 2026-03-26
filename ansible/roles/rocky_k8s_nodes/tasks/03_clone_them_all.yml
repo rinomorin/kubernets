@@ -91,8 +91,11 @@
   loop: "{{ groups['cluster_nodes'] }}"
   when: item != 'helper'
 
-- debug: msg="temp_net_map {{ temp_net_map.results }}"
-  
+- name: "3.3.2 - Print Network Mapping Summary"
+  debug:
+    msg: "VM: {{ item.item }} -> {{ item.stdout }}"
+  loop: "{{ temp_net_map.results }}"
+  when: item.stdout is defined 
 
 - name: "3.3.1.b - Set Discovery Facts on Nodes"
   set_fact:
@@ -104,7 +107,11 @@
     - item.item != 'helper'
   delegate_to: localhost
 
-- debug: msg="discovery_data {{ discovery_data }}"
+- name: "3.3.2 - Print Network Mapping Summary"
+  debug:
+    msg: "VM: {{ item.item }} -> {{ item.stdout }}"
+  loop: "{{ discovery_data }}"
+  when: item.stdout is defined
 
 # ============================================================
 # 3.4 - Network Customization (MAC-to-Device Matching)
