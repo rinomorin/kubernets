@@ -170,13 +170,18 @@
       echo "Error: Libvirt network 'black-hole' not found."
       exit 1
     fi
-
+- name: Get the Blackhole
+  delegate_to: "{{ VM_HOST_IP }}"
+  shell: |
+    virsh net-info black-hole | grep "Bridge:" | awk '{print $2}'
+  register: blackhole
+  
 - name: "3.4.4 - Move Worker Provider NICs to Blackhole"
   delegate_to: "{{ VM_HOST_IP }}"
   vars:
     p_mac: "{{ (hostvars[item].discovery_data | regex_search('P_MAC=([^|]+)', '\\1')) | first }}"
     # Change 'br-blackhole' to the name of your isolated bridge
-    blackhole_bridge: "br-blackhole" 
+    blackhole_bridge: "{{ blackhole.stdout }}" 
   shell: |
     sudo virsh detach-interface {{ item }} --type bridge --mac {{ p_mac }} --config --live
     sudo virsh attach-interface {{ item }} --type bridge --source {{ blackhole_bridge }} --mac {{ p_mac }} --model virtio --config --live
