@@ -48,6 +48,7 @@
       failed_when: lb_bootstrap.rc != 0
 
     - name: 1.2 - Verify VIP is now active (Ping Test)
+      delegate_to: localhost
       shell: "ping -c 3 {{ k8s_api_vip }}"
       register: vip_ping
       until: vip_ping.rc == 0
