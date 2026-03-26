@@ -153,7 +153,31 @@
     - item != 'helper'
     - hostvars[item].discovery_data is defined
 
-- name: "3.4.2 - Wait for Network Configuration to Finish"
+- name: "3.4.3 - Ensure Blackhole Bridge exists on KVM Host"
+  become: true
+  delegate_to: kvmdc01
+  shell: |
+    if ! nmcli con show br-blackhole > /dev/null 2>&1; then
+      nmcli con add type bridge con-name br-blackhole ifname br-blackhole ipv4.method disabled ipv6.method disabled
+      nmcli con up br-blackhole
+    fi
+
+- name: "3.4.4 - Move Worker Provider NICs to Blackhole"
+  become: true
+  vars:
+    p_mac: "{{ (hostvars[item].discovery_data | regex_search('P_MAC=([^|]+)', '\\1')) | first }}"
+    # Change 'br-blackhole' to the name of your isolated bridge
+    blackhole_bridge: "br-blackhole" 
+  shell: |
+    virsh detach-interface {{ item }} --type bridge --mac {{ p_mac }} --config --live
+    virsh attach-interface {{ item }} --type bridge --source {{ blackhole_bridge }} --mac {{ p_mac }} --model virtio --config --live
+  loop: "{{ groups['cluster_nodes'] }}"
+  when: 
+    - "'wrk' in item"
+    - hostvars[item].discovery_data is defined
+
+
+- name: "3.4.5 - Wait for Network Configuration to Finish"
   async_status:
     jid: "{{ item.ansible_job_id }}"
   register: job_result
