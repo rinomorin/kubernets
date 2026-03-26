@@ -5,87 +5,60 @@
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }} core@{{ hostvars[item].ansible_host }} "sudo dnf install -y haproxy keepalived"
   loop: "{{ groups['hahost'] }}"
 
-- name: Push HAProxy and Keepalived Configs
-  block:
-
-    - name: Create local temp directories for each LB
-      file:
-        path: "/tmp/k8s_lb_configs/{{ item }}"
-        state: directory
-        mode: '0755'
-      loop: "{{ groups['hahost'] }}"
-
-    - name: Template HAProxy Config
-      template:
-        src: haproxy.cfg.j2
-        dest: "/tmp/k8s_lb_configs/{{ item }}/haproxy.cfg"
-        force: yes
-      loop: "{{ groups['hahost'] }}"
-
-    - name: Template Keepalived Config
-      template:
-        src: keepalived.conf.j2
-        dest: "/tmp/k8s_lb_configs/{{ item }}/keepalived.conf"
-        force: yes
-      loop: "{{ groups['hahost'] }}"
-
-    - name: install haproxy and keepalived on target
-      delegate_to: localhost
-      vars:
-        target_ip: "{{ hostvars[item].ansible_host }}"
-        ssh_cmd: "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
-      shell: |
-        {{ ssh_cmd }} core@{{ target_ip }} sudo dnf install -y haproxy keepalived
-      loop: "{{ groups['hahost'] }}"
-          
-- name: Push and Enable LB Services (Fixed LF and SELinux)
+- name: Push and Enable LB Services
   delegate_to: localhost
-  # REMOVED run_once: true
   loop: "{{ groups['hahost'] }}"
   vars:
-    # Ensure this is the PRIVATE key path as we discussed
     ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
     target_ip: "{{ hostvars[item].ansible_host }}"
   shell: |
-    # 1. Detect Interface on the VM
+    # 1. Detect the actual Interface name on the remote node
     REAL_IFACE=$(ssh {{ ssh_opts }} core@{{ target_ip }} "ip -o addr show | grep '192.168.' | awk '{print \$2}' | head -n1")
     
-    # 2. Update local config with the real interface name
-    # Using 'item' here refers to the current host in the loop (e.g., msrlv9l01)
+    # 2. Fix the local files on the CONTROLLER before sending
+    # Force the correct interface name
     sed -i "s|interface .*|interface $REAL_IFACE|" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
-    sed -i 's|killall -0 haproxy|pgrep -x haproxy|' /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
-    printf '\n' >> /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg
+    
+    # Force the correct VIP (.30) into the config (Removes the .29 ghost)
+    sed -i "s|[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}/24|{{ k8s_api_vip }}/24|" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
+    
+    # Ensure HAProxy is binding to the correct VIP
+    sed -i "s|bind .*:6443|bind {{ k8s_api_vip }}:6443|" /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg
 
-    # 3. Transfer files
+    # 3. TRANSFER: Move files from Controller -> Remote Node /tmp
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
-    ssh {{ ssh_opts }} core@{{ target_ip }} "sudo hostnamectl set-hostname {{ item.split('.')[0] }}.{{ c_zone }}"
     
-    # 4. Remote Execution (Fixed the 'target_ip' typo)
+    # 4. REMOTE INSTALL: Move to /etc and restart
     ssh {{ ssh_opts }} core@{{ target_ip }} << 'EOF'
+      # Clean up the 'ghost' .29 IP if it's currently active on the interface
+      sudo ip addr del 192.168.100.29/24 dev $(ip -o addr show | grep '192.168.' | awk '{print $2}' | head -n1) 2>/dev/null || true
+
+      # Move configs to production paths
       sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
       sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf
+      
+      # Set Permissions & SELinux labels
       sudo chown root:root /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
       sudo chmod 644 /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
       sudo restorecon -Rv /etc/haproxy /etc/keepalived
       
-      # Persistence for non-local bind (vital for Keepalived VIPs)
+      # Networking Optimizations
       sudo sysctl -w net.ipv4.ip_nonlocal_bind=1
       echo "net.ipv4.ip_nonlocal_bind=1" | sudo tee /etc/sysctl.d/99-haproxy.conf
-      
       sudo setsebool -P haproxy_connect_any 1
-      sudo systemctl stop haproxy keepalived
       
-      if ! sudo haproxy -c -f /etc/haproxy/haproxy.cfg; then
-          echo "HAProxy config invalid"
-          exit 1
-      fi
+      # Firewalld: Ensure ports are open before starting services
+      sudo firewall-cmd --permanent --add-port=6443/tcp
+      sudo firewall-cmd --permanent --add-rich-rule='rule protocol value="vrrp" accept'
+      sudo firewall-cmd --reload
 
+      # Restart services to pick up new .30 config
+      sudo systemctl stop haproxy keepalived
       sudo systemctl enable --now keepalived
       sleep 2
       sudo systemctl enable --now haproxy
     EOF
-
 # - name: 2.1 - Correct IP in LB configurations and reload
 #   hosts: localhost
 #   gather_facts: no
