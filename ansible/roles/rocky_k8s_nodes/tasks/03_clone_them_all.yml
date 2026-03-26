@@ -118,24 +118,23 @@
   delegate_to: localhost
   become: false
   vars:
-    # Now that facts are delegated correctly, we pull from 'item'
     m_ip: "{{ (hostvars[item].discovery_data | regex_search('M_IP=([^|]+)', '\\1')) | first }}"
     c_mac: "{{ (hostvars[item].discovery_data | regex_search('C_MAC=([^|]+)', '\\1')) | first }}"
     p_mac: "{{ (hostvars[item].discovery_data | regex_search('P_MAC=([^|]+)', '\\1')) | first }}"
-    
     target_c_ip: "{{ hostvars[item].provision_ip }}"
     target_p_ip: "{{ hostvars[item].provider_ip | default('N/A') }}"
-    
     key_path: "/home/cloud_helper/.ssh/id_rsa"
     ssh_cmd: "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ m_ip }}"
   shell: |
     # 1. Configure CLUSTER Network (10.0.0.x)
-    # Using your working LBS logic: -f GENERAL.DEVICE,GENERAL.HWADDR
     C_DEV=$({{ ssh_cmd }} "nmcli -t -f GENERAL.DEVICE,GENERAL.HWADDR device show" | grep -i "{{ c_mac }}" | head -n 1 | cut -d: -f1)
     
     if [ -n "$C_DEV" ]; then
+      # Delete ANY existing connection using this device to clear the path
+      {{ ssh_cmd }} "sudo nmcli device disconnect $C_DEV || true"
       {{ ssh_cmd }} "sudo nmcli con delete cluster-net || true"
-      {{ ssh_cmd }} "sudo nmcli con add type ethernet con-name cluster-net ifname $C_DEV ipv4.method manual ipv4.addresses {{ target_c_ip }}/24 connection.autoconnect yes"
+      # Add with explicit MAC binding
+      {{ ssh_cmd }} "sudo nmcli con add type ethernet con-name cluster-net ifname $C_DEV 802-3-ethernet.mac-address {{ c_mac }} ipv4.method manual ipv4.addresses {{ target_c_ip }}/24 connection.autoconnect yes"
       {{ ssh_cmd }} "sudo nmcli con up cluster-net"
     fi
 
@@ -143,8 +142,10 @@
     if [ "{{ target_p_ip }}" != "N/A" ]; then
       P_DEV=$({{ ssh_cmd }} "nmcli -t -f GENERAL.DEVICE,GENERAL.HWADDR device show" | grep -i "{{ p_mac }}" | head -n 1 | cut -d: -f1)
       if [ -n "$P_DEV" ]; then
+        {{ ssh_cmd }} "sudo nmcli device disconnect $P_DEV || true"
         {{ ssh_cmd }} "sudo nmcli con delete provider-net || true"
-        {{ ssh_cmd }} "sudo nmcli con add type ethernet con-name provider-net ifname $P_DEV ipv4.method manual ipv4.addresses {{ target_p_ip }}/24 connection.autoconnect yes"
+        # Add with explicit MAC binding
+        {{ ssh_cmd }} "sudo nmcli con add type ethernet con-name provider-net ifname $P_DEV 802-3-ethernet.mac-address {{ p_mac }} ipv4.method manual ipv4.addresses {{ target_p_ip }}/24 connection.autoconnect yes"
         {{ ssh_cmd }} "sudo nmcli con up provider-net"
       fi
     fi
@@ -152,7 +153,6 @@
   when: 
     - item != 'helper'
     - hostvars[item].discovery_data is defined
-  # Removing async/poll for a second to ensure we see any SSH errors in the console
   register: network_config_jobs
 
 - name: "3.4.2 - Wait for Network Configuration to Finish"
