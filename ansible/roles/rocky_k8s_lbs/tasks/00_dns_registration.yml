@@ -71,6 +71,13 @@
         - "'already exists' not in ptr_vip.stderr"
         - "'no modifications' not in ptr_vip.stderr"
 
+- name: 1.1 - Purge all existing DNS records for k8s-api
+  delegate_to: localhost
+  shell: |
+    ipa dnsrecord-del {{ c_zone }} k8s-api --a-rec=192.168.100.29 || true
+  register: dns_cleanup
+  ignore_errors: yes
+
 # - name: 1.2 - Ensure clean A record for k8s-api (Force to .30)
 #   delegate_to: localhost
 #   shell: |
