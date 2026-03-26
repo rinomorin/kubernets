@@ -11,53 +11,50 @@
   vars:
     ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
     target_ip: "{{ hostvars[item].ansible_host }}"
+    # Reference the ghost IP here so it's not hardcoded in the script
+    ghost_ip: "192.168.100.29"
   shell: |
-    # 1. Detect the actual Interface name on the remote node
-    REAL_IFACE=$(ssh {{ ssh_opts }} core@{{ target_ip }} "ip -o addr show | grep '192.168.' | awk '{print \$2}' | head -n1")
-    
-    # 2. Fix the local files on the CONTROLLER before sending
-    # Force the correct interface name
-    sed -i "s|interface .*|interface $REAL_IFACE|" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
-    
-    # Force the correct VIP (.30) into the config (Removes the .29 ghost)
+    # 1. Get the remote interface name reliably
+    REMOTE_IFACE=$(ssh {{ ssh_opts }} core@{{ target_ip }} "ip -4 -o addr show | grep '192.168.' | awk '{print \$2}' | head -n1")
+
+    # 2. Update local configs (Using the specific item directory to avoid cross-contamination)
+    # Force the interface name and the VIP (.30) into the local staging files
+    sed -i "s|interface .*|interface ${REMOTE_IFACE}|" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
     sed -i "s|[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}/24|{{ k8s_api_vip }}/24|" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
-    
-    # Ensure HAProxy is binding to the correct VIP
     sed -i "s|bind .*:6443|bind {{ k8s_api_vip }}:6443|" /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg
 
-    # 3. TRANSFER: Move files from Controller -> Remote Node /tmp
+    # 3. Securely transfer the prepared files
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
     scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
-    
-    # 4. REMOTE INSTALL: Move to /etc and restart
-    ssh {{ ssh_opts }} core@{{ target_ip }} << 'EOF'
-      # Clean up the 'ghost' .29 IP if it's currently active on the interface
-      sudo ip addr del 192.168.100.29/24 dev $(ip -o addr show | grep '192.168.' | awk '{print $2}' | head -n1) 2>/dev/null || true
 
-      # Move configs to production paths
+    # 4. Remote Deployment
+    ssh {{ ssh_opts }} core@{{ target_ip }} << EOF
+      # Remove the ghost IP ONLY if it exists to avoid errors
+      if ip addr show | grep -q "{{ ghost_ip }}"; then
+        sudo ip addr del {{ ghost_ip }}/24 dev ${REMOTE_IFACE}
+      fi
+
+      # Deploy and set permissions
       sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
       sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf
-      
-      # Set Permissions & SELinux labels
       sudo chown root:root /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
       sudo chmod 644 /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
-      sudo restorecon -Rv /etc/haproxy /etc/keepalived
       
-      # Networking Optimizations
-      sudo sysctl -w net.ipv4.ip_nonlocal_bind=1
-      echo "net.ipv4.ip_nonlocal_bind=1" | sudo tee /etc/sysctl.d/99-haproxy.conf
+      # SELinux and System Tweaks
+      sudo restorecon -v /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
       sudo setsebool -P haproxy_connect_any 1
-      
-      # Firewalld: Ensure ports are open before starting services
+      sudo sysctl -w net.ipv4.ip_nonlocal_bind=1
+      echo "net.ipv4.ip_nonlocal_bind=1" | sudo tee /etc/sysctl.d/99-haproxy.conf > /dev/null
+
+      # Firewall setup
       sudo firewall-cmd --permanent --add-port=6443/tcp
       sudo firewall-cmd --permanent --add-rich-rule='rule protocol value="vrrp" accept'
       sudo firewall-cmd --reload
 
-      # Restart services to pick up new .30 config
-      sudo systemctl stop haproxy keepalived
-      sudo systemctl enable --now keepalived
+      # Cycle services
+      sudo systemctl restart keepalived
       sleep 2
-      sudo systemctl enable --now haproxy
+      sudo systemctl restart haproxy
     EOF
 # - name: 2.1 - Correct IP in LB configurations and reload
 #   hosts: localhost
