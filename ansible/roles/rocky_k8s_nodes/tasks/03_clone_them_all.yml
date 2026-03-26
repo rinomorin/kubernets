@@ -126,13 +126,10 @@
     key_path: "/home/cloud_helper/.ssh/id_rsa"
     ssh_cmd: "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ m_ip }}"
   shell: |
-    # Function to get device name from MAC
-    get_dev() {
-      {{ ssh_cmd }} "nmcli -t -f DEVICE,HWADDR device" | grep -i "$1" | cut -d: -f1 | head -n 1
-    }
-
-    # 1. Configure CLUSTER Network
-    C_DEV=$(get_dev "{{ c_mac }}")
+    # 1. Configure CLUSTER Network (10.0.0.x)
+    # Using a simpler nmcli call that is more universally compatible
+    C_DEV=$({{ ssh_cmd }} "nmcli -t device" | grep -i "{{ c_mac }}" | cut -d: -f1 | head -n 1)
+    
     if [ -n "$C_DEV" ]; then
       {{ ssh_cmd }} "sudo nmcli device disconnect $C_DEV || true"
       {{ ssh_cmd }} "sudo nmcli con delete cluster-net || true"
@@ -140,9 +137,9 @@
       {{ ssh_cmd }} "sudo nmcli con up cluster-net"
     fi
 
-    # 2. Configure PROVIDER Network
+    # 2. Configure PROVIDER Network (192.168.100.x)
     if [ "{{ target_p_ip }}" != "N/A" ]; then
-      P_DEV=$(get_dev "{{ p_mac }}")
+      P_DEV=$({{ ssh_cmd }} "nmcli -t device" | grep -i "{{ p_mac }}" | cut -d: -f1 | head -n 1)
       if [ -n "$P_DEV" ]; then
         {{ ssh_cmd }} "sudo nmcli device disconnect $P_DEV || true"
         {{ ssh_cmd }} "sudo nmcli con delete provider-net || true"
