@@ -126,25 +126,26 @@
     key_path: "/home/cloud_helper/.ssh/id_rsa"
     ssh_cmd: "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ m_ip }}"
   shell: |
-    # 1. Configure CLUSTER Network (10.0.0.x)
-    C_DEV=$({{ ssh_cmd }} "nmcli -t -f GENERAL.DEVICE,GENERAL.HWADDR device show" | grep -i "{{ c_mac }}" | head -n 1 | cut -d: -f1)
-    
+    # Function to get device name from MAC
+    get_dev() {
+      {{ ssh_cmd }} "nmcli -t -f DEVICE,HWADDR device" | grep -i "$1" | cut -d: -f1 | head -n 1
+    }
+
+    # 1. Configure CLUSTER Network
+    C_DEV=$(get_dev "{{ c_mac }}")
     if [ -n "$C_DEV" ]; then
-      # Delete ANY existing connection using this device to clear the path
       {{ ssh_cmd }} "sudo nmcli device disconnect $C_DEV || true"
       {{ ssh_cmd }} "sudo nmcli con delete cluster-net || true"
-      # Add with explicit MAC binding
       {{ ssh_cmd }} "sudo nmcli con add type ethernet con-name cluster-net ifname $C_DEV 802-3-ethernet.mac-address {{ c_mac }} ipv4.method manual ipv4.addresses {{ target_c_ip }}/24 connection.autoconnect yes"
       {{ ssh_cmd }} "sudo nmcli con up cluster-net"
     fi
 
-    # 2. Configure PROVIDER Network (192.168.100.x)
+    # 2. Configure PROVIDER Network
     if [ "{{ target_p_ip }}" != "N/A" ]; then
-      P_DEV=$({{ ssh_cmd }} "nmcli -t -f GENERAL.DEVICE,GENERAL.HWADDR device show" | grep -i "{{ p_mac }}" | head -n 1 | cut -d: -f1)
+      P_DEV=$(get_dev "{{ p_mac }}")
       if [ -n "$P_DEV" ]; then
         {{ ssh_cmd }} "sudo nmcli device disconnect $P_DEV || true"
         {{ ssh_cmd }} "sudo nmcli con delete provider-net || true"
-        # Add with explicit MAC binding
         {{ ssh_cmd }} "sudo nmcli con add type ethernet con-name provider-net ifname $P_DEV 802-3-ethernet.mac-address {{ p_mac }} ipv4.method manual ipv4.addresses {{ target_p_ip }}/24 connection.autoconnect yes"
         {{ ssh_cmd }} "sudo nmcli con up provider-net"
       fi
