@@ -142,15 +142,6 @@
     # This cleans the OS state from inside before we shut it down
     ssh -o StrictHostKeyChecking=no core@"{{ golden_ip }}" "sudo cloud-init clean --logs --seed && sudo rm -rf /var/log/*"
 
-- name: Sysprep the Master (On Hypervisor)
-  delegate_to: "{{ VM_HOST_IP }}"
-  become: true
-  shell: |
-    # We run this on the KVM host while the VM is OFF
-    virt-sysprep -d msrlv9mast01 \
-      --operations machine-id,net-hostname,net-hwaddr,ssh-hostkeys,customize \
-      --hostname msrlv9mast01.{{ c_zone }}
-
 - name: Clear dnf cache
   become: false 
   delegate_to: localhost
@@ -170,6 +161,7 @@
   shell: |
     ssh core@"{{ golden_ip }}" sudo shutdown -h now
 
+
 # --------------------------------------------------------
 # Power off the golden image (via KVM host, not SSH)
 # --------------------------------------------------------
@@ -188,6 +180,14 @@
   delay: 2
   delegate_to: "{{ VM_HOST_IP }}"
 
+- name: Sysprep the Master (On Hypervisor)
+  delegate_to: "{{ VM_HOST_IP }}"
+  become: true
+  shell: |
+    # We run this on the KVM host while the VM is OFF
+    virt-sysprep -d msrlv9mast01 \
+      --operations machine-id,net-hostname,net-hwaddr,ssh-hostkeys,customize \
+      --hostname msrlv9mast01.{{ c_zone }}
 
 - name: rm local downloaded crictl archive
   delegate_to: localhost
