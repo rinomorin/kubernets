@@ -60,4 +60,4 @@
     # We run this on the KVM host while the VM is OFF
     virt-sysprep -d {{ vm_host }} \
       --operations machine-id,net-hostname,net-hwaddr,ssh-hostkeys,customize \
-      --hostname msrlv9mast01.{{ c_zone }}
+      --hostname {{ vm_host }}
