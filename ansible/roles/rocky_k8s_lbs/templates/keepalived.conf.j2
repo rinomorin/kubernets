@@ -7,7 +7,7 @@ vrrp_script check_haproxy {
 vrrp_instance VI_1 {
     # Use 'item' because we are looping through the VM names
     state {{ 'MASTER' if item == groups['hahost'][0] else 'BACKUP' }}
-    interface eth0  
+    interface enp1s0 
     virtual_router_id 51
     # Use 'item' to find the index for priority
     priority {{ 100 - (groups['hahost'].index(item) * 10) }}
