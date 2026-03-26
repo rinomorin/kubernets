@@ -61,7 +61,7 @@
 
 # 5. Initialize Kubernetes Cluster
 - name: Initialize Kubernetes Cluster
-  hosts: cluster_nodes
+  hosts: cluster_nodes:!helpers
   remote_user: core
   become: true
   gather_facts: true
