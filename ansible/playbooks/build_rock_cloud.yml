@@ -58,3 +58,16 @@
   gather_facts: false
   roles:
     - role: rocky_k8s_nodes
+
+# 5. In your main playbook or the role's meta
+- name: Initialize Kubernetes Cluster
+  hosts: cluster_nodes
+  remote_user: core
+  become: true
+  gather_facts: true
+  vars:
+    # Pulling from environment script via lookup
+    cluster_token: "{{ lookup('env', 'K8S_CLUSTER_TOKEN') }}"
+    # Pulling from inventory.yml vars
+    api_vip: "{{ k8s_api_vip }}"
+  role: rocky_k8s_init

@@ -1,0 +1,62 @@
+---
+# 1. Pull the config from the Seed Master to the Ansible Controller (localhost)
+- name: 4.1 - Fetch admin.conf from Seed Master
+  fetch:
+    src: /etc/kubernetes/admin.conf
+    dest: "/tmp/admin.conf"
+    flat: yes
+  when: inventory_hostname == groups['control_nodes'][0]
+
+# 2. Push the config to the Helper node
+- name: 4.2 - Copy admin.conf to Helper Node
+  copy:
+    src: "/tmp/admin.conf"
+    dest: "/home/{{ lookup('env', 'USER') }}/.kube/config"
+    owner: "{{ lookup('env', 'USER') }}"
+    group: "{{ lookup('env', 'USER') }}"
+    mode: '0600'
+  delegate_to: helper
+  run_once: true
+
+# 3. Clean up the temporary file on the Ansible Controller
+- name: 4.3 - Remove local temporary admin.conf
+  file:
+    path: "/tmp/admin.conf"
+    state: absent
+  delegate_to: localhost
+  run_once: true
+
+# 4. Verify Cluster Health from Helper
+- name: 4.4 - Verify Cluster Nodes are Ready
+  shell: "kubectl get nodes"
+  delegate_to: helper
+  register: nodes_ready
+  run_once: true
+  retries: 10
+  delay: 10
+  until: nodes_ready.rc == 0
+
+- name: 4.5 - Show Cluster Status
+  debug:
+    var: nodes_ready.stdout_lines
+  run_once: true
+
+# 5. Apply Flannel CNI to allow Nodes to reach 'Ready' state
+- name: 4.6 - Apply Flannel Pod Network
+  command: "kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml"
+  delegate_to: helper
+  run_once: true
+  environment:
+    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
+
+# 6. Wait for Nodes to transition to 'Ready'
+- name: 4.7 - Wait for all nodes to be Ready
+  shell: "kubectl get nodes | grep -v STATUS | grep -v 'NotReady' | wc -l"
+  delegate_to: helper
+  register: ready_count
+  until: ready_count.stdout | trim | int == (groups['cluster_nodes'] | length - 1) 
+  retries: 24
+  delay: 10
+  run_once: true
+  # Note: we subtract 1 from the group length because 'helper' is in 'cluster_nodes' 
+  # but is not a K8s node.

@@ -1,0 +1,22 @@
+- name: 3.1 - Join Additional Masters
+  command: >
+    kubeadm join {{ k8s_api_vip }}:6443 
+    --token {{ cluster_token }}
+    --discovery-token-unsafe-skip-ca-verification
+    --control-plane 
+    --certificate-key {{ hostvars[groups['control_nodes'][0]]['cert_key'] }}
+    --apiserver-advertise-address {{ node_ip }}
+  when: 
+    - "'control_nodes' in group_names"
+    - inventory_hostname != groups['control_nodes'][0]
+  args:
+    creates: /etc/kubernetes/admin.conf
+
+- name: 4.1 - Join Worker Nodes
+  command: >
+    kubeadm join {{ k8s_api_vip }}:6443 
+    --token {{ cluster_token }}
+    --discovery-token-unsafe-skip-ca-verification
+  when: "'worker_nodes' in group_names"
+  args:
+    creates: /etc/kubernetes/kubelet.conf
