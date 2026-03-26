@@ -29,23 +29,20 @@
   pre_tasks:
     - name: Check if Golden Base already exists
       delegate_to: "{{ VM_HOST_IP }}"
-      # This shell command always returns 0 (success) but changes the output
-      shell: |
-        if sudo virsh list --all | grep -q "{{ golden_image_name }}"; then
-          echo "found"
-        else
-          echo "not_found"
-        fi
+      shell: "sudo virsh list --all | grep -qw '{{ golden_image_name }}' && echo 'YES' || echo 'NO'"
       register: base_check
       changed_when: false
       run_once: true
 
+    - name: Set Build Flag
+      set_fact:
+        should_build_base: "{{ (base_check.stdout | trim == 'NO') or (force_new_image | default(false) | bool) or (new_image | default(false) | bool) }}"
+      run_once: true
   tasks:
     - name: Run Golden Image Build Role
       include_role:
         name: rocky_k8s_golden
-      # We only run this if the output was "not_found"
-      when: "'not_found' in base_check.stdout  or force_new_image == true or new_image == true"
+      when: should_build_base | bool
 
 # 4. Deploy Infrastructure (LBs and Base Config)
 - name: Deploy Cluster Infrastructure
