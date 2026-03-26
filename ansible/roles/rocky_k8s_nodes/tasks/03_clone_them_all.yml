@@ -114,45 +114,47 @@
 # ============================================================
 # 3.4 - Network Customization (MAC-to-Device Matching)
 # ============================================================
-- name: "3.4.1 - Final Network Injection (Force Static)"
+- name: "3.4.1 - Final Network Injection via Maintenance Tunnel"
   delegate_to: localhost
   become: false
+  vars:
+    # Extract data from the discovery map
+    m_ip: "{{ (hostvars[item].discovery_data | regex_search('M_IP=([^|]+)', '\\1')) | first }}"
+    c_mac: "{{ (hostvars[item].discovery_data | regex_search('C_MAC=([^|]+)', '\\1')) | first }}"
+    p_mac: "{{ (hostvars[item].discovery_data | regex_search('P_MAC=([^|]+)', '\\1')) | first }}"
+    
+    # Target IPs from Inventory
+    target_c_ip: "{{ hostvars[item].provision_ip }}"
+    target_p_ip: "{{ hostvars[item].provider_ip | default('N/A') }}"
+    
+    # SSH settings
+    key_path: "/home/cloud_helper/.ssh/id_rsa"
+    ssh_cmd: "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ m_ip }}"
   shell: |
-    DATA="{{ hostvars[item].discovery_data }}"
-    M_IP=$(echo "$DATA" | awk -F'|' '{print $4}' | cut -d= -f2)
-    C_MAC=$(echo "$DATA" | awk -F'|' '{print $2}' | cut -d= -f2)
-    P_MAC=$(echo "$DATA" | awk -F'|' '{print $1}' | cut -d= -f2)
+    # 1. Configure CLUSTER Network (10.0.0.x)
+    C_DEV=$({{ ssh_cmd }} "nmcli -t -f GENERAL.DEVICE,GENERAL.HWADDR device show" | grep -B 1 -i "{{ c_mac }}" | head -n 1 | cut -d: -f1)
+    if [ -z "$C_DEV" ]; then echo "Could not find device for {{ c_mac }}"; exit 1; fi
     
-    TARGET_PROV_IP="{{ hostvars[item].provider_ip | default('') }}"
-    TARGET_CLUS_IP="{{ hostvars[item].provision_ip }}"
+    {{ ssh_cmd }} "sudo nmcli con delete cluster-net || true"
+    {{ ssh_cmd }} "sudo nmcli con add type ethernet con-name cluster-net ifname $C_DEV ipv4.method manual ipv4.addresses {{ target_c_ip }}/24 connection.autoconnect yes"
+    {{ ssh_cmd }} "sudo nmcli con up cluster-net"
 
-    SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-
-    # 1. CLUSTER NETWORK (10.0.0.x)
-    # Find the device name for the Cluster MAC
-    C_DEV=$(ssh $SSH_OPTS core@$M_IP "ip link show | grep -B1 '$C_MAC' | head -n1 | awk '{print \$2}' | tr -d ':'")
-    
-    ssh $SSH_OPTS core@$M_IP "
-      sudo nmcli con delete 'Wired connection 2' || true;
-      sudo nmcli con delete 'cluster-net' || true;
-      sudo nmcli con add type ethernet con-name cluster-net ifname $C_DEV ipv4.method manual ipv4.addresses $TARGET_CLUS_IP/24;
-      sudo nmcli con up cluster-net
-    "
-
-    # 2. PROVIDER NETWORK (192.168.100.x)
-    if [ -n "$TARGET_PROV_IP" ] && [ "$TARGET_PROV_IP" != "N/A" ]; then
-      P_DEV=$(ssh $SSH_OPTS core@$M_IP "ip link show | grep -B1 '$P_MAC' | head -n1 | awk '{print \$2}' | tr -d ':'")
-      ssh $SSH_OPTS core@$M_IP "
-        sudo nmcli con delete 'Wired connection 3' || true;
-        sudo nmcli con delete 'provider-net' || true;
-        sudo nmcli con add type ethernet con-name provider-net ifname $P_DEV ipv4.method manual ipv4.addresses $TARGET_PROV_IP/24;
-        sudo nmcli con up provider-net
-      "
+    # 2. Configure PROVIDER Network (192.168.100.x) - Only if IP is defined
+    if [ "{{ target_p_ip }}" != "N/A" ]; then
+      P_DEV=$({{ ssh_cmd }} "nmcli -t -f GENERAL.DEVICE,GENERAL.HWADDR device show" | grep -B 1 -i "{{ p_mac }}" | head -n 1 | cut -d: -f1)
+      if [ -n "$P_DEV" ]; then
+        {{ ssh_cmd }} "sudo nmcli con delete provider-net || true"
+        {{ ssh_cmd }} "sudo nmcli con add type ethernet con-name provider-net ifname $P_DEV ipv4.method manual ipv4.addresses {{ target_p_ip }}/24 connection.autoconnect yes"
+        {{ ssh_cmd }} "sudo nmcli con up provider-net"
+      fi
     fi
   loop: "{{ groups['cluster_nodes'] }}"
   when: 
     - item != 'helper'
     - hostvars[item].discovery_data is defined
+  async: 300
+  poll: 0
+  register: network_config_jobs
 
 - name: "3.4.2 - Wait for Network Configuration to Finish"
   async_status:
