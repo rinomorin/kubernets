@@ -91,6 +91,8 @@
   loop: "{{ groups['cluster_nodes'] }}"
   when: item != 'helper'
 
+- debug: "temp_net_map {{ temp_net_map.results }}"
+
 - name: "3.3.1.b - Set Discovery Facts on Nodes"
   set_fact:
     discovery_data: "{{ item.stdout }}"
@@ -100,6 +102,8 @@
     - item.stdout is defined
     - item.item != 'helper'
   delegate_to: localhost
+
+- debug: "discovery_data {{ discovery_data }}"
 
 # ============================================================
 # 3.4 - Network Customization (MAC-to-Device Matching)
