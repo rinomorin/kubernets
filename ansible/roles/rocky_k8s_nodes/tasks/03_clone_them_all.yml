@@ -22,11 +22,10 @@
     --operations machine-id,net-hostname,net-hwaddr,ssh-hostkeys,customize
     --hostname msrlv9mast01.{{ c_zone }}
 
-- name: "3.2.4 - Force Remove Cluster Nodes from known_hosts"
+- name: "3.1.3 - Force Remove Cluster Nodes from known_hosts"
   delegate_to: localhost
   become: false
   shell: |
-    # Remove any line containing the node name or the maintenance subnet
     rm -f ~/.ssh/known_hosts*
     
 # ============================================================
@@ -67,67 +66,21 @@
   when: item != 'helper'
 
 # ============================================================
-# 3.3 - Discovery (Mapping KVM MACs to Maintenance IPs)
+# 3.3 - Discovery (Mapping KVM MACs to Intended IPs)
 # ============================================================
 - name: "3.3.1 - Discovery: Map KVM MACs and Maintenance IPs"
   delegate_to: "{{ VM_HOST_IP }}"
   become: true
   shell: |
     VM="{{ item.split('.')[0] }}"
-    # Get MACs from the XML/Domiflist
     P_MAC=$(virsh domiflist $VM | grep 'default' | awk '{print $5}')
     C_MAC=$(virsh domiflist $VM | grep 'br-cluster' | awk '{print $5}')
     N_MAC=$(virsh domiflist $VM | grep 'br-nat' | awk '{print $5}')
     
-    # Get the Maintenance IP from the NAT bridge leases
     M_IP=$(virsh net-dhcp-leases br-nat | grep -i "$N_MAC" | awk '{print $5}' | cut -d/ -f1)
     
     if [ -z "$M_IP" ]; then exit 1; fi
-
-    # Output a structured string for easy parsing
-    echo "NODE: $VM | NAT_IP: $M_IP | NAT_MAC: $N_MAC | CLUSTER_MAC: $C_MAC | PROVIDER_MAC: $P_MAC"
-  register: temp_net_map
-  until: temp_net_map.rc == 0
-  retries: 50
-  delay: 10
-  loop: "{{ groups['cluster_nodes'] }}"
-  when: item != 'helper'
-
-- name: "3.3.2 - Visual Network Map"
-  debug:
-    msg: "{{ item.stdout }}"
-  loop: "{{ temp_net_map.results }}"
-  when: item.stdout is defined
-
-# ============================================================
-# 3.3 - Discovery (Mapping KVM MACs to Intended IPs)
-# ============================================================
-- name: "3.3.1 - Discovery: Map KVM MACs to Intended IPs"
-  delegate_to: "{{ VM_HOST_IP }}"
-  become: true
-  shell: |
-    VM="{{ item.split('.')[0] }}"
-    # Get MACs from virsh config for this VM
-    P_MAC=$(virsh domiflist $VM | grep 'default' | awk '{print $5}')
-    C_MAC=$(virsh domiflist $VM | grep 'br-cluster' | awk '{print $5}')
-    N_MAC=$(virsh domiflist $VM | grep 'br-nat' | awk '{print $5}')
-    
-    # Get the Maintenance (NAT) IP from DHCP leases
-    M_IP=$(virsh net-dhcp-leases br-nat | grep -i "$N_MAC" | awk '{print $5}' | cut -d/ -f1)
-    
-    # Exit with error if the VM hasn't pulled a DHCP IP yet (triggers the 'until' retry)
-    if [ -z "$M_IP" ]; then exit 1; fi
-
-    # Create the formatted row
-    # Column 1: VM Name
-    # Column 2: Provider (NIC 3) - MAC (Static IP)
-    # Column 3: Cluster (NIC 2)  - MAC (Static IP)
-    # Column 4: NAT/Maint (NIC 1)- MAC (DHCP IP)
-    printf "%-12s | P: %s (%-15s) | C: %s (%-15s) | N: %s (%-15s)" \
-      "$VM" \
-      "$P_MAC" "{{ hostvars[item].provider_ip | default('N/A') }}" \
-      "$C_MAC" "{{ hostvars[item].provision_ip }}" \
-      "$N_MAC" "$M_IP"
+    echo "P_MAC=$P_MAC|C_MAC=$C_MAC|N_MAC=$N_MAC|M_IP=$M_IP"
   register: temp_net_map
   until: temp_net_map.rc == 0
   retries: 50
@@ -141,23 +94,25 @@
       - "------------------------------------------------------------------------------------------------------------------------"
       - "VM NAME      | PROVIDER (MAC / STATIC)             | CLUSTER (MAC / PROVISION)           | NAT/MAINT (MAC / DHCP)"
       - "------------------------------------------------------------------------------------------------------------------------"
-      - "{{ temp_net_map.results | selectattr('stdout', 'defined') | map(attribute='stdout') | list | join('\n') }}"
+      - |
+        {% for result in temp_net_map.results if result.stdout is defined %}
+        {% set p_mac = (result.stdout|regex_search('P_MAC=([0-9a-f:]+)', '\1'))[0] %}
+        {% set c_mac = (result.stdout|regex_search('C_MAC=([0-9a-f:]+)', '\1'))[0] %}
+        {% set n_mac = (result.stdout|regex_search('N_MAC=([0-9a-f:]+)', '\1'))[0] %}
+        {% set m_ip  = (result.stdout|regex_search('M_IP=([0-9.]+)', '\1'))[0] %}
+        {{ result.item | ljust(12) }} | P: {{ p_mac }} ({{ hostvars[result.item].provider_ip | default('N/A') | ljust(15) }}) | C: {{ c_mac }} ({{ hostvars[result.item].provision_ip | ljust(15) }}) | N: {{ n_mac }} ({{ m_ip | ljust(15) }})
+        {% endfor %}
       - "------------------------------------------------------------------------------------------------------------------------"
-- name: "3.3.1.b - Set Discovery Facts on Nodes"
+
+- name: "3.3.3 - Set Discovery Facts on Nodes"
   set_fact:
     discovery_data: "{{ item.stdout }}"
   loop: "{{ temp_net_map.results }}"
   when: 
-    - item.skipped is not defined
     - item.stdout is defined
     - item.item != 'helper'
   delegate_to: localhost
-
-- name: "3.3.2 - Print Network Mapping Summary"
-  debug:
-    msg: "VM: {{ item.item }} -> {{ item.stdout }}"
-  loop: "{{ discovery_data }}"
-  when: item.stdout is defined
+  delegate_facts: true
 
 # ============================================================
 # 3.4 - Network Customization (MAC-to-Device Matching)
@@ -166,29 +121,27 @@
   delegate_to: localhost
   become: false
   shell: |
-    # Variables from discovery_data
     DATA="{{ hostvars[item].discovery_data }}"
-    M_IP=$(echo "$DATA" | grep -oP 'M_IP=\K[0-9.]+')
-    C_MAC=$(echo "$DATA" | grep -oP 'C_MAC=\K[0-9a-f:]+')
-    P_MAC=$(echo "$DATA" | grep -oP 'P_MAC=\K[0-9a-f:]+')
+    M_IP=$(echo "$DATA" | awk -F'|' '{print $4}' | cut -d= -f2)
+    C_MAC=$(echo "$DATA" | awk -F'|' '{print $2}' | cut -d= -f2)
+    P_MAC=$(echo "$DATA" | awk -F'|' '{print $1}' | cut -d= -f2)
     
-    # Node Configuration from Inventory
-    TARGET_NODE_IP="{{ hostvars[item].node_ip }}"
+    # Intended IPs from Inventory
     TARGET_PROV_IP="{{ hostvars[item].provider_ip | default('') }}"
+    TARGET_CLUS_IP="{{ hostvars[item].provision_ip }}"
 
-    # 1. Wait for SSH availability on Maintenance IP
+    # Wait for SSH heart-beat
     until nc -z -w 2 $M_IP 22; do sleep 3; done
-
     SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
-    # 2. Match Cluster NIC (enpX) by MAC and Assign IP
+    # Match and Set Cluster NIC (10.0.0.x) by MAC
     C_DEV=$(ssh $SSH_OPTS core@$M_IP "ip -o link show | grep -i '$C_MAC' | awk '{print \$2}' | sed 's/://'")
     if [ -n "$C_DEV" ]; then
-      ssh $SSH_OPTS core@$M_IP "sudo nmcli con add type ethernet con-name cluster-net ifname $C_DEV ipv4.method manual ipv4.addresses $TARGET_NODE_IP/24 connection.autoconnect yes && sudo nmcli con up cluster-net"
+      ssh $SSH_OPTS core@$M_IP "sudo nmcli con add type ethernet con-name cluster-net ifname $C_DEV ipv4.method manual ipv4.addresses $TARGET_CLUS_IP/24 connection.autoconnect yes && sudo nmcli con up cluster-net"
     fi
 
-    # 3. Match Provider NIC (enpY) by MAC (Masters Only)
-    if [ -n "$TARGET_PROV_IP" ] && [ -n "$P_MAC" ]; then
+    # Match and Set Provider NIC (192.168.100.x) by MAC
+    if [ -n "$TARGET_PROV_IP" ] && [ "$TARGET_PROV_IP" != "N/A" ]; then
       P_DEV=$(ssh $SSH_OPTS core@$M_IP "ip -o link show | grep -i '$P_MAC' | awk '{print \$2}' | sed 's/://'")
       if [ -n "$P_DEV" ]; then
         ssh $SSH_OPTS core@$M_IP "sudo nmcli con add type ethernet con-name provider-net ifname $P_DEV ipv4.method manual ipv4.addresses $TARGET_PROV_IP/24 connection.autoconnect yes && sudo nmcli con up provider-net"
