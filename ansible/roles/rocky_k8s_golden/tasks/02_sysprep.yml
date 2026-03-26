@@ -29,20 +29,23 @@
 - name: "3.1.3 - Wipe NIC Artifacts and Hardware Affinity"
   delegate_to: localhost
   become: false
+  vars:
+    # Safely pull the IP from the previous discovery task
+    m_ip: "{{ maintenance_ip_raw.stdout | trim }}"
   shell: |
     # 1. Delete all NetworkManager connection profiles
-    ssh -o StrictHostKeyChecking=no core@{{ M_IP }} "sudo find /etc/NetworkManager/system-connections/ -type f -delete"
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ m_ip }} "sudo find /etc/NetworkManager/system-connections/ -type f -delete"
     
-    # 2. Clear out the persistent net rules (if any)
-    ssh -o StrictHostKeyChecking=no core@{{ M_IP }} "sudo rm -f /etc/udev/rules.d/70-persistent-net.rules"
+    # 2. Clear out the persistent net rules
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ m_ip }} "sudo rm -f /etc/udev/rules.d/70-persistent-net.rules"
     
-    # 3. Clear machine-id so it's regenerated on next boot
-    ssh -o StrictHostKeyChecking=no core@{{ M_IP }} "sudo truncate -s 0 /etc/machine-id"
+    # 3. Clear machine-id for regeneration
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ m_ip }} "sudo truncate -s 0 /etc/machine-id"
     
-    # 4. Clean cloud-init so it treats the clone as a new instance
-    ssh -o StrictHostKeyChecking=no core@{{ M_IP }} "sudo cloud-init clean --logs --seed"
+    # 4. Clean cloud-init
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@{{ m_ip }} "sudo cloud-init clean --logs --seed"
   
-- name: "3.1.4 - Final Shutdown for Cloning"
+- name: "Final Shutdown for Cloning"
   delegate_to: "{{ VM_HOST_IP }}"
   become: true
   shell: |
