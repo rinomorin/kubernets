@@ -83,6 +83,21 @@
       sleep 2
       sudo systemctl enable --now haproxy
     EOF
+
+- name: 2.1 - Correct IP in LB configurations and reload
+  hosts: localhost
+  gather_facts: no
+  vars:
+    ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes"
+  tasks:
+    - name: Force Update IP in haproxy and keepalived
+      shell: |
+        ssh {{ ssh_opts }} core@{{ hostvars[item].ansible_host }} "
+          sudo sed -i 's/bind .*:6443/bind {{ k8s_api_vip }}:6443/g' /etc/haproxy/haproxy.cfg
+          sudo sed -i 's/[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\/24/{{ k8s_api_vip }}\/24/g' /etc/keepalived/keepalived.conf
+          sudo systemctl restart keepalived haproxy
+        "
+      loop: "{{ groups['hahost'] }}"
 - name: Create Isolated Dummy Network
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
