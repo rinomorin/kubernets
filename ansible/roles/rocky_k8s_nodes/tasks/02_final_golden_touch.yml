@@ -27,6 +27,7 @@
   shell: |
     ssh core@"{{ golden_ip }}" sudo dnf install -y kubeadm kubelet   kubectl
 
+
 - name: Prepare Golden Image with cloud-init
   become: false
   delegate_to: localhost
@@ -68,6 +69,15 @@
     - "chmod 750 /home/core/.kube"
     - "echo 'kubeconfig will be populated after cluster bootstrap' > /home/core/.kube/config"
     - "chmod 600 /home/core/.kube/config"    
+
+# Install cri-o
+# --------------------------------------------------------
+- name: Install cri-o
+  become: false
+  delegate_to: localhost
+  shell: |
+    ssh core@"{{ golden_ip }}" sudo dnf install -y cri-o
+
 
 # --------------------------------------------------------
 # Validate binaries
