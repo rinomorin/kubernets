@@ -68,6 +68,9 @@
 # ============================================================
 # 3.3 - Discovery (Mapping KVM MACs to Intended IPs)
 # ============================================================
+# ============================================================
+# 3.3 - Discovery (Mapping KVM MACs to Intended IPs)
+# ============================================================
 - name: "3.3.1 - Discovery: Map KVM MACs and Maintenance IPs"
   delegate_to: "{{ VM_HOST_IP }}"
   become: true
@@ -76,7 +79,6 @@
     P_MAC=$(virsh domiflist $VM | grep 'default' | awk '{print $5}')
     C_MAC=$(virsh domiflist $VM | grep 'br-cluster' | awk '{print $5}')
     N_MAC=$(virsh domiflist $VM | grep 'br-nat' | awk '{print $5}')
-    
     M_IP=$(virsh net-dhcp-leases br-nat | grep -i "$N_MAC" | awk '{print $5}' | cut -d/ -f1)
     
     if [ -z "$M_IP" ]; then exit 1; fi
@@ -90,19 +92,18 @@
 
 - name: "3.3.2 - DISPLAY NETWORK MAP TABLE"
   debug:
-    msg: 
-      - "------------------------------------------------------------------------------------------------------------------------"
-      - "VM NAME      | PROVIDER (MAC / STATIC)             | CLUSTER (MAC / PROVISION)           | NAT/MAINT (MAC / DHCP)"
-      - "------------------------------------------------------------------------------------------------------------------------"
-      - |
-        {% for result in temp_net_map.results if result.stdout is defined %}
-        {% set p_mac = (result.stdout | regex_search('P_MAC=([0-9a-f:]+)', '\1')) | first | default('00:00:00:00:00:00') %}
-        {% set c_mac = (result.stdout | regex_search('C_MAC=([0-9a-f:]+)', '\1')) | first | default('00:00:00:00:00:00') %}
-        {% set n_mac = (result.stdout | regex_search('N_MAC=([0-9a-f:]+)', '\1')) | first | default('00:00:00:00:00:00') %}
-        {% set m_ip  = (result.stdout | regex_search('M_IP=([0-9.]+)', '\1')) | first | default('0.0.0.0') %}
-        {{ "%-12s" | format(result.item) }} | P: {{ p_mac }} ({{ "%-15s" | format(hostvars[result.item].provider_ip | default('N/A')) }}) | C: {{ c_mac }} ({{ "%-15s" | format(hostvars[result.item].provision_ip) }}) | N: {{ n_mac }} ({{ "%-15s" | format(m_ip) }})
-        {% endfor %}
-      - "------------------------------------------------------------------------------------------------------------------------"
+    msg: |
+      ------------------------------------------------------------------------------------------------------------------------
+      VM NAME      | PROVIDER (MAC / STATIC)             | CLUSTER (MAC / PROVISION)           | NAT/MAINT (MAC / DHCP)
+      ------------------------------------------------------------------------------------------------------------------------
+      {% for result in temp_net_map.results if result.stdout is defined %}
+      {% set p_mac = (result.stdout | regex_search('P_MAC=([^|]+)', '\1')) | first | default('00:00:00:00:00:00') %}
+      {% set c_mac = (result.stdout | regex_search('C_MAC=([^|]+)', '\1')) | first | default('00:00:00:00:00:00') %}
+      {% set n_mac = (result.stdout | regex_search('N_MAC=([^|]+)', '\1')) | first | default('00:00:00:00:00:00') %}
+      {% set m_ip  = (result.stdout | regex_search('M_IP=([^|]+)', '\1')) | first | default('0.0.0.0') %}
+      {{ "%-12s" | format(result.item) }} | P: {{ p_mac }} ({{ "%-15s" | format(hostvars[result.item].provider_ip | default('N/A')) }}) | C: {{ c_mac }} ({{ "%-15s" | format(hostvars[result.item].provision_ip) }}) | N: {{ n_mac }} ({{ "%-15s" | format(m_ip) }})
+      {% endfor %}
+      ------------------------------------------------------------------------------------------------------------------------
 
 - name: "3.3.3 - Set Discovery Facts on Nodes"
   set_fact:
