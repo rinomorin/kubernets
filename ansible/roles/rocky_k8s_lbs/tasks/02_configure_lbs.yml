@@ -19,12 +19,14 @@
       template:
         src: haproxy.cfg.j2
         dest: "/tmp/k8s_lb_configs/{{ item }}/haproxy.cfg"
+        force: yes
       loop: "{{ groups['hahost'] }}"
 
     - name: Template Keepalived Config
       template:
         src: keepalived.conf.j2
         dest: "/tmp/k8s_lb_configs/{{ item }}/keepalived.conf"
+        force: yes
       loop: "{{ groups['hahost'] }}"
 
     - name: install haproxy and keepalived on target
