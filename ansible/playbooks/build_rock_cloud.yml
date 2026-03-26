@@ -59,7 +59,7 @@
   roles:
     - role: rocky_k8s_nodes
 
-# 5. In your main playbook or the role's meta
+# 5. Initialize Kubernetes Cluster
 - name: Initialize Kubernetes Cluster
   hosts: cluster_nodes
   remote_user: core
@@ -70,4 +70,5 @@
     cluster_token: "{{ lookup('env', 'K8S_CLUSTER_TOKEN') }}"
     # Pulling from inventory.yml vars
     api_vip: "{{ k8s_api_vip }}"
-  role: rocky_k8s_init
+  roles:
+    - role: rocky_k8s_init
