@@ -90,20 +90,16 @@
   loop: "{{ groups['cluster_nodes'] }}"
   when: item != 'helper'
 
-- name: "3.3.2 - DISPLAY NETWORK MAP TABLE"
+- name: "3.3.2 - DISPLAY NETWORK MAPPING"
   debug:
     msg: |
-      ------------------------------------------------------------------------------------------------------------------------
-      VM NAME      | PROVIDER (MAC / STATIC)             | CLUSTER (MAC / PROVISION)           | NAT/MAINT (MAC / DHCP)
-      ------------------------------------------------------------------------------------------------------------------------
       {% for result in temp_net_map.results if result.stdout is defined %}
-      {% set p_mac = (result.stdout | regex_search('P_MAC=([^|]+)', '\1')) | first | default('00:00:00:00:00:00') %}
-      {% set c_mac = (result.stdout | regex_search('C_MAC=([^|]+)', '\1')) | first | default('00:00:00:00:00:00') %}
-      {% set n_mac = (result.stdout | regex_search('N_MAC=([^|]+)', '\1')) | first | default('00:00:00:00:00:00') %}
-      {% set m_ip  = (result.stdout | regex_search('M_IP=([^|]+)', '\1')) | first | default('0.0.0.0') %}
-      {{ "%-12s" | format(result.item) }} | P: {{ p_mac }} ({{ "%-15s" | format(hostvars[result.item].provider_ip | default('N/A')) }}) | C: {{ c_mac }} ({{ "%-15s" | format(hostvars[result.item].provision_ip) }}) | N: {{ n_mac }} ({{ "%-15s" | format(m_ip) }})
+      ---------------------------------------------------------
+      NODE: {{ result.item }}
+      MAINT:   {{ (result.stdout | regex_search('N_MAC=([^|]+)', '\1')) | first }} -> {{ (result.stdout | regex_search('M_IP=([^|]+)', '\1')) | first }}
+      PROV:    {{ (result.stdout | regex_search('P_MAC=([^|]+)', '\1')) | first }} -> {{ hostvars[result.item].provider_ip | default('N/A') }}
+      CLUSTER: {{ (result.stdout | regex_search('C_MAC=([^|]+)', '\1')) | first }} -> {{ hostvars[result.item].provision_ip }}
       {% endfor %}
-      ------------------------------------------------------------------------------------------------------------------------
 
 - name: "3.3.3 - Set Discovery Facts on Nodes"
   set_fact:
