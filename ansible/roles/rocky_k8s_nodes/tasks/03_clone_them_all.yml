@@ -126,21 +126,22 @@
     key_path: "/home/cloud_helper/.ssh/id_rsa"
     ssh_cmd: "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ m_ip }}"
   shell: |
-    # 1. Configure CLUSTER Network (10.0.0.x)
-    # Using a simpler nmcli call that is more universally compatible
-    C_DEV=$({{ ssh_cmd }} "nmcli -t device" | grep -i "{{ c_mac }}" | cut -d: -f1 | head -n 1)
+    # 1. Find CLUSTER device name by MAC
+    C_DEV=$({{ ssh_cmd }} "grep -l '{{ c_mac | lower }}' /sys/class/net/*/address | cut -d/ -f5")
     
     if [ -n "$C_DEV" ]; then
+      echo "Configuring Cluster Net on $C_DEV"
       {{ ssh_cmd }} "sudo nmcli device disconnect $C_DEV || true"
       {{ ssh_cmd }} "sudo nmcli con delete cluster-net || true"
       {{ ssh_cmd }} "sudo nmcli con add type ethernet con-name cluster-net ifname $C_DEV 802-3-ethernet.mac-address {{ c_mac }} ipv4.method manual ipv4.addresses {{ target_c_ip }}/24 connection.autoconnect yes"
       {{ ssh_cmd }} "sudo nmcli con up cluster-net"
     fi
 
-    # 2. Configure PROVIDER Network (192.168.100.x)
+    # 2. Find PROVIDER device name by MAC
     if [ "{{ target_p_ip }}" != "N/A" ]; then
-      P_DEV=$({{ ssh_cmd }} "nmcli -t device" | grep -i "{{ p_mac }}" | cut -d: -f1 | head -n 1)
+      P_DEV=$({{ ssh_cmd }} "grep -l '{{ p_mac | lower }}' /sys/class/net/*/address | cut -d/ -f5")
       if [ -n "$P_DEV" ]; then
+        echo "Configuring Provider Net on $P_DEV"
         {{ ssh_cmd }} "sudo nmcli device disconnect $P_DEV || true"
         {{ ssh_cmd }} "sudo nmcli con delete provider-net || true"
         {{ ssh_cmd }} "sudo nmcli con add type ethernet con-name provider-net ifname $P_DEV 802-3-ethernet.mac-address {{ p_mac }} ipv4.method manual ipv4.addresses {{ target_p_ip }}/24 connection.autoconnect yes"
@@ -151,7 +152,6 @@
   when: 
     - item != 'helper'
     - hostvars[item].discovery_data is defined
-  register: network_config_jobs
 
 - name: "3.4.2 - Wait for Network Configuration to Finish"
   async_status:
