@@ -75,9 +75,9 @@
   delegate_to: localhost
   shell: |
     ipa dnsrecord-del {{ c_zone }} k8s-api --a-rec=192.168.100.29 || true
+    ipa dnsrecord-del {{ rev_cloud }}. 29 --ptr-rec=k8s-api.cloud.home.morinsoft.ca. || true
   register: dns_cleanup
   ignore_errors: yes
-
 # - name: 1.2 - Ensure clean A record for k8s-api (Force to .30)
 #   delegate_to: localhost
 #   shell: |
