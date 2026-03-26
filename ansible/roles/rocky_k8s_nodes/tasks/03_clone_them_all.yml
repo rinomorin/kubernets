@@ -99,27 +99,34 @@
   loop: "{{ temp_net_map.results }}"
   when: item.stdout is defined
 
+# ============================================================
+# 3.3 - Discovery (Mapping KVM MACs to Intended IPs)
+# ============================================================
 - name: "3.3.1 - Discovery: Map KVM MACs to Intended IPs"
   delegate_to: "{{ VM_HOST_IP }}"
   become: true
   shell: |
     VM="{{ item.split('.')[0] }}"
-    # Get MACs from virsh
+    # Get MACs from virsh config for this VM
     P_MAC=$(virsh domiflist $VM | grep 'default' | awk '{print $5}')
     C_MAC=$(virsh domiflist $VM | grep 'br-cluster' | awk '{print $5}')
     N_MAC=$(virsh domiflist $VM | grep 'br-nat' | awk '{print $5}')
     
-    # Get the Maintenance (NAT) IP
+    # Get the Maintenance (NAT) IP from DHCP leases
     M_IP=$(virsh net-dhcp-leases br-nat | grep -i "$N_MAC" | awk '{print $5}' | cut -d/ -f1)
     
+    # Exit with error if the VM hasn't pulled a DHCP IP yet (triggers the 'until' retry)
     if [ -z "$M_IP" ]; then exit 1; fi
 
-    # Create the formatted row (VM | Provider | Cluster | NAT/Maint)
-    # Using printf for alignment
-    printf "%-12s | P: %s (%-12s) | C: %s (%-12s) | N: %s (%-12s)" \
+    # Create the formatted row
+    # Column 1: VM Name
+    # Column 2: Provider (NIC 3) - MAC (Static IP)
+    # Column 3: Cluster (NIC 2)  - MAC (Static IP)
+    # Column 4: NAT/Maint (NIC 1)- MAC (DHCP IP)
+    printf "%-12s | P: %s (%-15s) | C: %s (%-15s) | N: %s (%-15s)" \
       "$VM" \
       "$P_MAC" "{{ hostvars[item].provider_ip | default('N/A') }}" \
-      "$C_MAC" "{{ hostvars[item].node_ip }}" \
+      "$C_MAC" "{{ hostvars[item].provision_ip }}" \
       "$N_MAC" "$M_IP"
   register: temp_net_map
   until: temp_net_map.rc == 0
@@ -131,12 +138,11 @@
 - name: "3.3.2 - DISPLAY NETWORK MAP TABLE"
   debug:
     msg: 
-      - "----------------------------------------------------------------------------------------------------------------------"
-      - "VM NAME      | PROVIDER (MAC/STATIC)            | CLUSTER (MAC/STATIC)             | NAT/MAINT (MAC/DHCP)"
-      - "----------------------------------------------------------------------------------------------------------------------"
+      - "------------------------------------------------------------------------------------------------------------------------"
+      - "VM NAME      | PROVIDER (MAC / STATIC)             | CLUSTER (MAC / PROVISION)           | NAT/MAINT (MAC / DHCP)"
+      - "------------------------------------------------------------------------------------------------------------------------"
       - "{{ temp_net_map.results | selectattr('stdout', 'defined') | map(attribute='stdout') | list | join('\n') }}"
-      - "----------------------------------------------------------------------------------------------------------------------"
-
+      - "------------------------------------------------------------------------------------------------------------------------"
 - name: "3.3.1.b - Set Discovery Facts on Nodes"
   set_fact:
     discovery_data: "{{ item.stdout }}"
