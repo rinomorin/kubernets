@@ -1,0 +1,50 @@
+# ============================================================
+# Live Scrub of the Template VM
+# ============================================================
+- name: "Boot Template for Network Scrubbing"
+  delegate_to: "{{ VM_HOST_IP }}"
+  become: true
+  shell: "virsh start {{ vm_host}}"
+  ignore_errors: true
+
+- name: Discover Maintenance IPs
+  delegate_to: "{{ VM_HOST_IP }}"
+  become: true
+  shell: |
+    VM="{{ item.split('.')[0] }}"
+    M_MAC=$(virsh domiflist {{ vm_host}} | grep 'br-nat' | awk '{print $5}')
+    # Wait for DHCP lease
+    while ! virsh net-dhcp-leases br-nat | grep -q "$M_MAC"; do sleep 2; done
+    # Return M_IP and MACs for mapping
+    C_MAC=$(virsh domiflist $VM | grep 'br-cluster' | awk '{print $5}')
+    P_MAC=$(virsh domiflist $VM | grep 'default' | awk '{print $5}')
+    M_IP=$(virsh net-dhcp-leases br-nat | grep "$M_MAC" | awk '{print $5}' | cut -d/ -f1)
+    echo "M_IP=$M_IP|C_MAC=$C_MAC|P_MAC=$P_MAC"
+  register: node_discovery
+  loop: "{{ groups['cluster_nodes'] }}"
+  until: node_discovery.stdout is search('M_IP=[0-9]')
+  retries: 50
+  delay: 5
+
+- name: "3.1.3 - Wipe NIC Artifacts and Hardware Affinity"
+  delegate_to: localhost
+  become: false
+  shell: |
+    # 1. Delete all NetworkManager connection profiles
+    ssh -o StrictHostKeyChecking=no core@{{ M_IP }} "sudo find /etc/NetworkManager/system-connections/ -type f -delete"
+    
+    # 2. Clear out the persistent net rules (if any)
+    ssh -o StrictHostKeyChecking=no core@{{ M_IP }} "sudo rm -f /etc/udev/rules.d/70-persistent-net.rules"
+    
+    # 3. Clear machine-id so it's regenerated on next boot
+    ssh -o StrictHostKeyChecking=no core@{{ M_IP }} "sudo truncate -s 0 /etc/machine-id"
+    
+    # 4. Clean cloud-init so it treats the clone as a new instance
+    ssh -o StrictHostKeyChecking=no core@{{ M_IP }} "sudo cloud-init clean --logs --seed"
+  
+- name: "3.1.4 - Final Shutdown for Cloning"
+  delegate_to: "{{ VM_HOST_IP }}"
+  become: true
+  shell: |
+    virsh destroy msrlv9mast01 || true
+    while [ "$(virsh domstate {{ vm_host}})" != "shut off" ]; do sleep 2; done

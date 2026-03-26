@@ -22,5 +22,9 @@
     - name: Wait for Auto-Install shutdown
       import_tasks: 01_wait_for_shutdown.yml
       delegate_to: "{{ VM_HOST_IP }}"
+
+    - name: sysprep
+      import_tasks: 02_sysprep.yml
+      delegate_to: "{{ VM_HOST_IP }}"
   when: 
     - "'kvm' in group_names"
