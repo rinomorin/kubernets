@@ -96,11 +96,11 @@
       - "------------------------------------------------------------------------------------------------------------------------"
       - |
         {% for result in temp_net_map.results if result.stdout is defined %}
-        {% set p_mac = (result.stdout|regex_search('P_MAC=([0-9a-f:]+)', '\1'))[0] %}
-        {% set c_mac = (result.stdout|regex_search('C_MAC=([0-9a-f:]+)', '\1'))[0] %}
-        {% set n_mac = (result.stdout|regex_search('N_MAC=([0-9a-f:]+)', '\1'))[0] %}
-        {% set m_ip  = (result.stdout|regex_search('M_IP=([0-9.]+)', '\1'))[0] %}
-        {{ result.item | ljust(12) }} | P: {{ p_mac }} ({{ hostvars[result.item].provider_ip | default('N/A') | ljust(15) }}) | C: {{ c_mac }} ({{ hostvars[result.item].provision_ip | ljust(15) }}) | N: {{ n_mac }} ({{ m_ip | ljust(15) }})
+        {% set p_mac = (result.stdout | regex_search('P_MAC=([0-9a-f:]+)', '\1')) | first | default('00:00:00:00:00:00') %}
+        {% set c_mac = (result.stdout | regex_search('C_MAC=([0-9a-f:]+)', '\1')) | first | default('00:00:00:00:00:00') %}
+        {% set n_mac = (result.stdout | regex_search('N_MAC=([0-9a-f:]+)', '\1')) | first | default('00:00:00:00:00:00') %}
+        {% set m_ip  = (result.stdout | regex_search('M_IP=([0-9.]+)', '\1')) | first | default('0.0.0.0') %}
+        {{ "%-12s" | format(result.item) }} | P: {{ p_mac }} ({{ "%-15s" | format(hostvars[result.item].provider_ip | default('N/A')) }}) | C: {{ c_mac }} ({{ "%-15s" | format(hostvars[result.item].provision_ip) }}) | N: {{ n_mac }} ({{ "%-15s" | format(m_ip) }})
         {% endfor %}
       - "------------------------------------------------------------------------------------------------------------------------"
 
