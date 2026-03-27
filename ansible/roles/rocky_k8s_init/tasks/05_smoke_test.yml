@@ -81,26 +81,25 @@
   ignore_errors: true
 
 - name: "5.4 - Verify Pod Networking (The Black Hole Test)"
-  environment:
-    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
   shell: |
     {% raw %}
-    # 1. Get the first pod name
-    FIRST_POD=$(kubectl get pods -l app=nginx -o jsonpath='{.items[0].metadata.name}' --ignore-not-found)
+    # 1. Get Target IP
+    TARGET_IP=$(kubectl get pods -l app=nginx -o jsonpath='{.items[0].status.podIP}')
     
-    # 2. Get the last pod IP (the target)
-    LAST_IP=$(kubectl get pods -l app=nginx -o jsonpath='{.items[-1].status.podIP}' --ignore-not-found)
-    
-    if [ -n "$FIRST_POD" ] && [ -n "$LAST_IP" ]; then
-      echo "Testing Connectivity: $FIRST_POD -> http://$LAST_IP:80"
-      
-      # Use curl instead of ping. Nginx images almost always have curl or we use stdout check.
-      # --connect-timeout 2 ensures we don't hang forever if there's a black hole.
-      kubectl exec "$FIRST_POD" -- curl -s --connect-timeout 2 "http://$LAST_IP" > /dev/null
-    else
-      echo "Failed to retrieve Pod information."
+    if [ -z "$TARGET_IP" ]; then
+      echo "Error: No Nginx pods found."
       exit 1
     fi
+
+    # 2. Run the probe with -i (interactive) to allow --rm to work
+    # We use a timestamp in the name to ensure uniqueness
+    echo "Probing http://$TARGET_IP from a fresh busybox pod..."
+    
+    kubectl run "probe-$(date +%s)" \
+      --image=busybox \
+      --restart=Never \
+      --rm -i \
+      -- wget -qO- --timeout=2 "http://$TARGET_IP"
     {% endraw %}
   delegate_to: localhost
   register: networking_test
@@ -108,3 +107,5 @@
   delay: 5
   until: networking_test.rc == 0
   run_once: true
+  environment:
+    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
