@@ -17,7 +17,7 @@ all:
       ansible_user: core
       ansible_host: 192.168.100.21
       provision_ip: 10.0.0.21
-      node_ip: 10.0.0.2
+      node_ip: 10.0.0.21
       hostname: msrlv9l01.cloud.home.morinsoft.ca 
       provider_ip: 192.168.100.21
 
