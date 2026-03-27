@@ -30,18 +30,20 @@
     - name: Template Configs to Staging
       delegate_to: localhost
       template:
-        src: "{{ item.src }}"
-        dest: "/tmp/k8s_lb_configs/{{ host_item }}/{{ item.dest }}"
-      loop:
-        - { src: 'haproxy.cfg.j2', dest: 'haproxy.cfg' }
-        - { src: 'keepalived.conf.j2', dest: 'keepalived.conf' }
-      loop_control:
-        loop_var: item
-      vars:
-        host_item: "{{ outer_item }}"
+        src: "{{ file_item.src }}"
+        dest: "/tmp/k8s_lb_configs/{{ host_item }}/{{ file_item.dest }}"
       loop: "{{ groups['hahost'] }}"
       loop_control:
-        loop_var: outer_item
+        loop_var: host_item
+      vars:
+        # This nested loop handles both files for each host
+        files_to_template:
+          - { src: 'haproxy.cfg.j2', dest: 'haproxy.cfg' }
+          - { src: 'keepalived.conf.j2', dest: 'keepalived.conf' }
+      # We use include_tasks or a manual sub-loop logic here for clarity:
+      with_items: "{{ files_to_template }}"
+      loop_control:
+        loop_var: file_item
 
     - name: Push and Enable LB Services
       delegate_to: localhost
