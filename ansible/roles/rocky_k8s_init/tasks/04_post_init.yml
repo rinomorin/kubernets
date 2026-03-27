@@ -1,40 +1,35 @@
----
-# 1. Pull the config from the Seed Master to the Ansible Controller (localhost)
-- name: 4.1 - Fetch admin.conf from Seed Master
+# 1. Pull directly to the final destination
+- name: 4.1 - Fetch admin.conf to local kubeconfig
   fetch:
     src: /etc/kubernetes/admin.conf
-    dest: "/tmp/admin.conf"
+    dest: "/home/{{ lookup('env', 'USER') }}/.kube/config"
     flat: yes
   when: inventory_hostname == groups['control_nodes'][0]
 
-# 2. Push the config to the Helper node
-- name: 4.2 - Copy admin.conf to Helper Node
-  copy:
-    src: "/tmp/admin.conf"
-    dest: "/home/{{ lookup('env', 'USER') }}/.kube/config"
-    owner: "{{ lookup('env', 'USER') }}"
-    group: "{{ lookup('env', 'USER') }}"
-    mode: '0600'
-  delegate_to: helper
-  run_once: true
-
-# 3. Clean up the temporary file on the Ansible Controller
-- name: 4.3 - Remove local temporary admin.conf
-  file:
-    path: "/tmp/admin.conf"
-    state: absent
+# 2. Fix local permissions (Fetch uses the remote file's permissions/owner by default)
+- name: 4.2 - Fix local kubeconfig permissions
   delegate_to: localhost
   run_once: true
+  file:
+    path: "/home/{{ lookup('env', 'USER') }}/.kube/config"
+    owner: "{{ lookup('env', 'USER') }}"
+    mode: '0600'
+    state: file
 
-# 4. Verify Cluster Health from Helper
-- name: 4.4 - Verify Cluster Nodes are Ready
+# 3. Verify and Apply (Always use localhost for the helper node)
+- name: 4.3 - Verify Cluster Nodes
   shell: "kubectl get nodes"
-  delegate_to: helper
+  delegate_to: localhost
   register: nodes_ready
-  run_once: true
+  until: nodes_ready.rc == 0
   retries: 10
   delay: 10
-  until: nodes_ready.rc == 0
+  run_once: true
+
+- name: 4.4 - Apply Flannel Pod Network
+  command: "kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml"
+  delegate_to: localhost
+  run_once: true
 
 - name: 4.5 - Show Cluster Status
   debug:
