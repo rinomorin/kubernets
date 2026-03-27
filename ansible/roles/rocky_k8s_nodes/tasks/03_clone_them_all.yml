@@ -31,30 +31,32 @@
 # ============================================================
 # 3.2 - Clone and Prepare the Remaining Nodes
 # ============================================================
-- name: "3.2.1 - Clone Nodes with Unique MACs"
+- name: "3.2.1 - Clone the remaining nodes from Lead Master"
   delegate_to: "{{ VM_HOST_IP }}"
   command: >
-    sudo virt-clone --original {{ groups['control_nodes'][0].split('.')[0]}} 
-    --name {{ item.split('.')[0] }}{{ groups['control_nodes'][0].split('.')[0]}}
+    sudo virt-clone 
+    --original {{ groups['control_nodes'][0].split('.')[0] }}
+    --name {{ item.split('.')[0] }} 
     --file /var/lib/libvirt/images/{{ item.split('.')[0] }}.qcow2
-    --mac RANDOM --mac RANDOM --mac RANDOM
   loop: "{{ groups['cluster_nodes'] }}"
   when: 
     - item != 'helper'
-    - item != '{{ groups['control_nodes'][0].split('.')[0]}}'
+    - item != groups['control_nodes'][0]
   args:
+    # This prevents re-cloning if the disk already exists
     creates: "/var/lib/libvirt/images/{{ item.split('.')[0] }}.qcow2"
 
 - name: "3.2.2 - Sysprep the Clones"
   delegate_to: "{{ VM_HOST_IP }}"
   command: >
-    sudo virt-sysprep -d {{ item.split('.')[0] }}
-    --operations machine-id,net-hostname,net-hwaddr,ssh-hostkeys,customize
+    sudo virt-sysprep -d {{ item.split('.')[0] }} \
+    --operations machine-id,net-hostname,net-hwaddr,ssh-hostkeys,customize \
     --hostname {{ item.split('.')[0] }}.{{ c_zone }}
   loop: "{{ groups['cluster_nodes'] }}"
   when: 
     - item != 'helper'
     - item != groups['control_nodes'][0].split('.')[0]
+
 
 - name: "3.2.3 - Power On All Nodes"
   delegate_to: "{{ VM_HOST_IP }}"
