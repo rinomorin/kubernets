@@ -17,22 +17,16 @@
     mode: '0600'
     state: file
 
-- name: 4.3 - Wait for OpenAPI Schema to be available
+- name: 4.3 - Apply Flannel Pod Network (The 'Enabler')
+  command: >
+    kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml 
+    --validate=false
   delegate_to: localhost
   run_once: true
-  uri:
-    url: "https://192.168.100.30:6443/openapi/v2"
-    validate_certs: no
-    status_code: 200
-  register: api_schema
-  until: api_schema.status == 200
-  retries: 20
+  register: flannel_result
+  until: flannel_result.rc == 0
+  retries: 15
   delay: 10
-
-- name: 4.4 - Apply Flannel (Validation will now work)
-  command: "kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml"
-  delegate_to: localhost
-  run_once: true
 
 # 2. Now verify that the cluster is actually healthy
 - name: 4.4 - Verify Cluster Health
