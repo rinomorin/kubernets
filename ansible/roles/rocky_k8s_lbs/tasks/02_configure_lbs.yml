@@ -17,36 +17,60 @@
     ssh {{ ssh_opts }} core@{{ target_ip }} sudo firewall-cmd --permanent --add-rich-rule='rule protocol value="vrrp" accept'
     ssh {{ ssh_opts }} core@{{ target_ip }} sudo firewall-cmd --reload
     
-- name: Push and Enable LB Services
-  delegate_to: localhost
-  loop: "{{ groups['hahost'] }}"
-  vars:
-    ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
-    target_ip: "{{ hostvars[item].ansible_host }}"
-    ghost_ip: "192.168.100.29"
-    correct_vip: "{{ k8s_api_vip }}"
-  shell: >+
-    REMOTE_IFACE=$(ssh {{ ssh_opts }} core@{{ target_ip }} "ip -4 -o addr show | grep '192.168.100.' | awk '{print \$2}' | head -n1") &&
-    sed -i "s|interface .*|interface ${REMOTE_IFACE}|g" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf &&
-    sed -i "s|[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}/24|{{ correct_vip }}/24|g" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf &&
-    sed -i "s|bind .*:6443|bind {{ correct_vip }}:6443|g" /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg &&
-    scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg &&
-    scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf &&
-    ssh {{ ssh_opts }} core@{{ target_ip }} "
-      if ip addr show | grep -q '{{ ghost_ip }}'; then
-        sudo ip addr del {{ ghost_ip }}/24 dev ${REMOTE_IFACE} || true;
-      fi;
-      sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg;
-      sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf;
-      sudo sed -i 's/interface .*$/interface $REMOTE_IFACE/g' /etc/keepalived/keepalived.conf;
-      sudo chown root:root /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf;
-      sudo chmod 644 /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf;
-      sudo restorecon -v /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf;
-      sudo systemctl stop haproxy keepalived;
-      sudo systemctl enable --now keepalived;
-      sleep 2;
-      sudo systemctl enable --now haproxy;
-    "
+- name: Prepare and Push LB Configs
+  block:
+    - name: Create local staging directories
+      delegate_to: localhost
+      file:
+        path: "/tmp/k8s_lb_configs/{{ item }}"
+        state: directory
+        mode: '0755'
+      loop: "{{ groups['hahost'] }}"
+
+    - name: Template Configs to Staging
+      delegate_to: localhost
+      template:
+        src: "{{ item.src }}"
+        dest: "/tmp/k8s_lb_configs/{{ host_item }}/{{ item.dest }}"
+      loop:
+        - { src: 'haproxy.cfg.j2', dest: 'haproxy.cfg' }
+        - { src: 'keepalived.conf.j2', dest: 'keepalived.conf' }
+      loop_control:
+        loop_var: item
+      vars:
+        host_item: "{{ outer_item }}"
+      loop: "{{ groups['hahost'] }}"
+      loop_control:
+        loop_var: outer_item
+
+    - name: Push and Enable LB Services
+      delegate_to: localhost
+      loop: "{{ groups['hahost'] }}"
+      vars:
+        ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
+        target_ip: "{{ hostvars[item].ansible_host }}"
+        ghost_ip: "192.168.100.29"
+        correct_vip: "{{ k8s_api_vip }}"
+      shell: >+
+        REMOTE_IFACE=$(ssh {{ ssh_opts }} core@{{ target_ip }} "ip -4 -o addr show | grep '192.168.100.' | awk '{print \$2}' | head -n1") &&
+        sed -i "s|interface .*|interface ${REMOTE_IFACE}|g" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf &&
+        sed -i "s|[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}/24|{{ correct_vip }}/24|g" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf &&
+        sed -i "s|bind .*:6443|bind {{ correct_vip }}:6443|g" /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg &&
+        scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg &&
+        scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf &&
+        ssh {{ ssh_opts }} core@{{ target_ip }} "
+          if ip addr show | grep -q '{{ ghost_ip }}'; then
+            sudo ip addr del {{ ghost_ip }}/24 dev ${REMOTE_IFACE} || true;
+          fi;
+          sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg;
+          sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf;
+          sudo chown root:root /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf;
+          sudo chmod 644 /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf;
+          sudo restorecon -v /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf;
+          sudo systemctl restart keepalived;
+          sleep 1;
+          sudo systemctl restart haproxy;
+        "
 
 # - name: 2.1 - Correct IP in LB configurations and reload
 #   hosts: localhost
