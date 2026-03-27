@@ -26,31 +26,8 @@
       Please open a NEW terminal on your helper node and run:
       kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
       
-      Once you see 'daemonset.apps/kube-flannel-ds created', 
+      Once you see 'daemonset.apps/kube-flannel-ds created',
+      run kubectl get nodes to see if ready, 
       press ENTER here to continue the playbook.
       -------------------------------------------------------------------------
-  run_once: true
-
-# 4. Verification of Nodes (Checking they exist)
-- name: 4.4 - Verify Nodes are recognized by API
-  delegate_to: localhost
-  run_once: true
-  shell: "kubectl get nodes"
-  register: final_nodes
-  changed_when: false
-
-- name: 4.5 - Show Current Cluster Membership
-  debug:
-    msg: "{{ final_nodes.stdout_lines }}"
-  run_once: true
-
-# 5. Automated Wait for 'Ready' Status
-- name: 4.6 - Wait for all 5 nodes to transition to Ready
-  shell: "kubectl get nodes | grep ' Ready ' | wc -l"
-  delegate_to: localhost
-  register: ready_count
-  # We expect 5 (msrlv9mast01-03 + msrlv9wrk01-02)
-  until: ready_count.stdout | trim | int == 5
-  retries: 30
-  delay: 10
   run_once: true
