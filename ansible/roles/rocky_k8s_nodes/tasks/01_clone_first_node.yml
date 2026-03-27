@@ -3,7 +3,7 @@
   command: >
     sudo virt-clone 
     --original golden-base 
-    --name msrlv9mast01 
+    --name {{ groups['control_nodes'][0].split('.')[0])}}
     --file /var/lib/libvirt/images/{{ groups['control_nodes'][0].split('.')[0])}}.qcow2
   args:
     # This ensures we don't error out if the file already exists
