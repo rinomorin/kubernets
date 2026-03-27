@@ -1,16 +1,13 @@
 # 1. Pull directly to the final destination
+# 1. Fetch the config
 - name: 4.1 - Fetch admin.conf to local kubeconfig
   fetch:
     src: /etc/kubernetes/admin.conf
     dest: "/home/{{ lookup('env', 'USER') }}/.kube/config"
     flat: yes
   when: inventory_hostname == groups['control_nodes'][0]
-  # Ensure the file actually exists and is populated before fetching
-  register: fetch_config
-  until: fetch_config is succeeded
-  retries: 5
-  delay: 10
 
+# 2. Fix permissions locally
 - name: 4.2 - Fix local kubeconfig permissions
   delegate_to: localhost
   run_once: true
@@ -20,14 +17,18 @@
     mode: '0600'
     state: file
 
-- name: 4.3 - Verify LB Connectivity
+# 3. Use a more resilient verification
+- name: 4.3 - Verify Cluster Connectivity (Resilient)
   delegate_to: localhost
   run_once: true
-  shell: "kubectl cluster-info"
-  register: lb_check
-  until: lb_check.rc == 0
-  retries: 15
+  shell: "kubectl get --raw '/healthz'"
+  register: health_check
+  until: health_check.stdout == "ok"
+  retries: 20
   delay: 10
+  changed_when: false
+
+# 4. Apply Flannel (This will move nodes from NotReady to Ready)
 - name: 4.4 - Apply Flannel Pod Network
   command: "kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml"
   delegate_to: localhost
