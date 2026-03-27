@@ -54,7 +54,7 @@
   loop: "{{ groups['cluster_nodes'] }}"
   when: 
     - item != 'helper'
-    - item != {{ groups['control_nodes'][0].split('.')[0]}}
+    - item != groups['control_nodes'][0].split('.')[0]
 
 - name: "3.2.3 - Power On All Nodes"
   delegate_to: "{{ VM_HOST_IP }}"
