@@ -22,22 +22,22 @@
     ssh {{ ssh_opts }} core@{{ target_ip }} sudo firewall-cmd --permanent --add-rich-rule='rule protocol value="vrrp" accept'
     ssh {{ ssh_opts }} core@{{ target_ip }}sudo firewall-cmd --reload
     
-
 - name: Push and Enable LB Services
   delegate_to: localhost
   loop: "{{ groups['hahost'] }}"
   vars:
     ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
     target_ip: "{{ hostvars[item].ansible_host }}"
-    ghost_ip: "192.168.100.29"  # KILL the .29
-    correct_vip: "{{ k8s_api_vip }}" # USE the .30
+    ghost_ip: "192.168.100.29"
+    correct_vip: "{{ k8s_api_vip }}"
   shell: |
     # 1. Get the remote interface name (enp3s0)
+    # We escape the $ for awk and the variable assignment
     REMOTE_IFACE=$(ssh {{ ssh_opts }} core@{{ target_ip }} "ip -4 -o addr show | grep '192.168.100.' | awk '{print \$2}' | head -n1")
 
     # 2. Update local configs on CONTROLLER
-    # We use a very broad regex to ensure we catch 'interface anyname'
-    sed -i "s|interface .*|interface ${REMOTE_IFACE}|g" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
+    # Note: we use \$REMOTE_IFACE to prevent Ansible from thinking it's a Jinja2 var
+    sed -i "s|interface .*|interface \$REMOTE_IFACE|g" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
     sed -i "s|[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}/24|{{ correct_vip }}/24|g" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
     sed -i "s|bind .*:6443|bind {{ correct_vip }}:6443|g" /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg
 
@@ -47,9 +47,9 @@
 
     # 4. Remote Deployment
     ssh {{ ssh_opts }} core@{{ target_ip }} << EOF
-      # Remove the OLD .29 if it's still lingering
+      # Use \$REMOTE_IFACE here to ensure Bash on the node reads it
       if ip addr show | grep -q "{{ ghost_ip }}"; then
-        sudo ip addr del {{ ghost_ip }}/24 dev ${REMOTE_IFACE} || true
+        sudo ip addr del {{ ghost_ip }}/24 dev \$REMOTE_IFACE || true
       fi
 
       sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
@@ -58,12 +58,13 @@
       sudo chmod 644 /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
       sudo restorecon -v /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
 
-      # Restart to pick up the brand new config
       sudo systemctl stop haproxy keepalived
       sudo systemctl enable --now keepalived
       sleep 2
       sudo systemctl enable --now haproxy
     EOF
+
+
 # - name: 2.1 - Correct IP in LB configurations and reload
 #   hosts: localhost
 #   gather_facts: no
