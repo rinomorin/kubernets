@@ -1,17 +1,17 @@
 ---
 - name: 5.1 - Deploy Nginx Smoke Test
   command: "kubectl apply -f https://k8s.io/examples/controllers/nginx-deployment.yaml"
-  delegate_to: helper
+  delegate_to: localhost
   run_once: true
 
 - name: 5.2 - Scale Deployment to verify Worker communication
   command: "kubectl scale deployment nginx-deployment --replicas={{ groups['worker_nodes'] | length }}"
-  delegate_to: helper
+  delegate_to: localhost
   run_once: true
 
 - name: 5.3 - Wait for Nginx Pods to be Running
   shell: "kubectl get pods -l app=nginx | grep -i Running | wc -l"
-  delegate_to: helper
+  delegate_to: localhost
   register: pod_count
   until: pod_count.stdout | trim | int == (groups['worker_nodes'] | length)
   retries: 15
@@ -23,14 +23,14 @@
     FIRST_POD=$(kubectl get pods -l app=nginx -o jsonpath='{.items[0].metadata.name}')
     LAST_POD_IP=$(kubectl get pods -l app=nginx -o jsonpath='{.items[-1].status.podIP}')
     kubectl exec $FIRST_POD -- ping -c 2 $LAST_POD_IP
-  delegate_to: helper
+  delegate_to: localhost
   register: ping_test
   run_once: true
   failed_when: ping_test.rc != 0
 
 - name: 5.5 - Cleanup Smoke Test
   command: "kubectl delete deployment nginx-deployment"
-  delegate_to: helper
+  delegate_to: localhost
   run_once: true
 
 - name: 5.6 - Final Cluster Summary
