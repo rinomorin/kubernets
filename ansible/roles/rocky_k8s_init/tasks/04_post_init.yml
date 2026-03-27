@@ -38,20 +38,24 @@
     flat: yes
   delegate_to: "{{ groups['control_nodes'][0] }}"
 
-# 3. Interactive Pause for Manual Intervention
-- name: 4.3 - MANUAL STEP REQUIRED
-  pause:
-    prompt: |
-      -------------------------------------------------------------------------
-      KUBERNETES API IS INITIALIZING. 
+# # 3. Interactive Pause for Manual Intervention
+# - name: 4.3 - MANUAL STEP REQUIRED
+#   pause:
+#     prompt: |
+#       -------------------------------------------------------------------------
+#       KUBERNETES API IS INITIALIZING. 
       
-      Please open a NEW terminal on your helper node and run:
-      kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+#       Please open a NEW terminal on your helper node and run:
+#       kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
       
-      Once you see 'daemonset.apps/kube-flannel-ds created',
-      run kubectl get nodes to see if ready, 
-      press ENTER here to continue the playbook.
-      -------------------------------------------------------------------------
+#       Once you see 'daemonset.apps/kube-flannel-ds created',
+#       run kubectl get nodes to see if ready, 
+#       press ENTER here to continue the playbook.
+#       -------------------------------------------------------------------------
+#   run_once: true
+- name: 4.4 - Apply Flannel Pod Network
+  command: "kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml"
+  delegate_to: localhost
   run_once: true
   environment:
     KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
