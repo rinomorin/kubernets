@@ -15,7 +15,7 @@
     # Firewall setup
     ssh {{ ssh_opts }} core@{{ target_ip }} sudo firewall-cmd --permanent --add-port=6443/tcp
     ssh {{ ssh_opts }} core@{{ target_ip }} sudo firewall-cmd --permanent --add-rich-rule='rule protocol value="vrrp" accept'
-    ssh {{ ssh_opts }} core@{{ target_ip }}sudo firewall-cmd --reload
+    ssh {{ ssh_opts }} core@{{ target_ip }} sudo firewall-cmd --reload
     
 - name: Push and Enable LB Services
   delegate_to: localhost
