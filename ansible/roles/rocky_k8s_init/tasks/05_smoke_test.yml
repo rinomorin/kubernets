@@ -61,5 +61,3 @@
   delegate_to: localhost
   register: ping_test
   run_once: true
-  environment:
-    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
