@@ -12,6 +12,7 @@ defaults
     timeout client 50000ms
     timeout server 50000ms
 
+# --- K8S API SERVER (6443) ---
 frontend k8s-api
     bind {{ k8s_api_vip }}:6443
     default_backend k8s-masters
@@ -21,10 +22,11 @@ backend k8s-masters
     http-check expect status 200
     balance roundrobin
     {% for host in groups['control_nodes'] %}
-    server {{ host }} {{ hostvars[host].ansible_host }}:6443 check check-ssl verify none
+    # USE PROVISION_IP (10.x) for reliable internal discovery
+    server {{ host }} {{ hostvars[host].provision_ip }}:6443 check check-ssl verify none
     {% endfor %}
 
-# --- APPLICATION TRAFFIC (HTTPS) ---
+# --- APPLICATION TRAFFIC (HTTPS - 443) ---
 frontend k8s-ingress-https
     bind {{ k8s_api_vip }}:443
     default_backend k8s-workers-https
@@ -32,10 +34,11 @@ frontend k8s-ingress-https
 backend k8s-workers-https
     balance roundrobin
     {% for host in groups['control_nodes'] %}
+    # Pointing to the Ingress Controller NodePorts on the 10.x network
     server {{ host }} {{ hostvars[host].provision_ip }}:30443 check check-ssl verify none
     {% endfor %}
 
-# --- APPLICATION TRAFFIC (HTTP) ---
+# --- APPLICATION TRAFFIC (HTTP - 80) ---
 frontend k8s-ingress-http
     bind {{ k8s_api_vip }}:80
     default_backend k8s-workers-http

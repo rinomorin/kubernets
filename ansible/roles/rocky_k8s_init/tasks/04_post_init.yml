@@ -31,6 +31,12 @@
 #       press ENTER here to continue the playbook.
 #       -------------------------------------------------------------------------
 #   run_once: true
+- name: 4.2b - Ensure KUBECONFIG is present on localhost
+  fetch:
+    src: /etc/kubernetes/admin.conf
+    dest: "{{ lookup('env', 'HOME') }}/.kube/config"
+    flat: yes
+  delegate_to: "{{ groups['control_nodes'][0] }}"
 
 # 3. Interactive Pause for Manual Intervention
 - name: 4.3 - MANUAL STEP REQUIRED
