@@ -17,8 +17,18 @@
     mode: '0600'
     state: file
 
-# 3. Use a more resilient verification
-- name: 4.3 - Verify Cluster Connectivity (Resilient)
+# 1. Fire the Flannel manifest as soon as the file is fetched
+- name: 4.3 - Apply Flannel Pod Network (The 'Enabler')
+  command: "kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml"
+  delegate_to: localhost
+  run_once: true
+  register: flannel_result
+  until: flannel_result.rc == 0
+  retries: 10
+  delay: 5
+
+# 2. Now verify that the cluster is actually healthy
+- name: 4.4 - Verify Cluster Health
   delegate_to: localhost
   run_once: true
   shell: "kubectl get --raw '/healthz'"
@@ -26,14 +36,6 @@
   until: health_check.stdout == "ok"
   retries: 20
   delay: 10
-  changed_when: false
-
-# 4. Apply Flannel (This will move nodes from NotReady to Ready)
-- name: 4.4 - Apply Flannel Pod Network
-  command: "kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml"
-  delegate_to: localhost
-  run_once: true
-
 - name: 4.5 - Show Cluster Status
   debug:
     var: nodes_ready.stdout_lines
