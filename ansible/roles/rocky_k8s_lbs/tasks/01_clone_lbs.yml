@@ -1,3 +1,4 @@
+# 01_clone_lbs.yml
 ---
 - name: Clone Load Balancer nodes from Golden Image
   delegate_to: "{{ VM_HOST_IP }}"
@@ -77,6 +78,35 @@
     {{ ssh_cmd }} "sudo nmcli con up provider"
   loop: "{{ groups['hahost'] }}"
 
+- name: 2.3 - Discover Cluster MAC from br-cluster
+  delegate_to: "{{ VM_HOST_IP }}"
+  shell: |
+    sudo virsh domiflist {{ item.split('.')[0] }} | grep 'br-cluster' | awk '{print $5}'
+  register: cluster_mac_raw
+  loop: "{{ groups['hahost'] }}"
+
+- name: 2.4 - Configure Cluster IP (10.x) via Maintenance Tunnel
+  delegate_to: localhost
+  vars:
+    node_ip: "{{ hostvars[item].node_ip }}"
+    m_ip: "{{ maintenance_map[item] }}"
+    c_mac: "{{ (cluster_mac_raw.results | selectattr('item', 'equalto', item) | first).stdout }}"
+    key_path: "/home/cloud_helper/.ssh/id_rsa"
+    ssh_cmd: "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ key_path }} core@{{ m_ip }}"
+  shell: |
+    # 1. Get the Device name (e.g. eth2) by matching the Cluster MAC
+    DEV=$({{ ssh_cmd }} "nmcli -t -f GENERAL.DEVICE,GENERAL.HWADDR device show" | grep -B 1 -i "{{ c_mac }}" | head -n 1 | cut -d: -f2)
+
+    # 2. Cleanup existing profile if it exists
+    {{ ssh_cmd }} "sudo nmcli con delete cluster || true"
+
+    # 3. Add and Configure the 10.0.0.x connection
+    # Note: No gateway here, as the default GW stays on the Provider network
+    {{ ssh_cmd }} "sudo nmcli con add type ethernet con-name cluster ifname $DEV ipv4.method manual ipv4.addresses {{ node_ip }}/24 connection.autoconnect yes"
+
+    # 4. Bring it up
+    {{ ssh_cmd }} "sudo nmcli con up cluster"
+  loop: "{{ groups['hahost'] }}"
 
 - name: Verify SSH reachability on Static IPs
   wait_for:

@@ -1,3 +1,4 @@
+# 02_configure_lbs.yml 
 ---
 - name: Install HA Software Stack
   delegate_to: localhost
@@ -119,7 +120,7 @@
 - name: Final Cleanup - Isolate Cluster and NAT Networks
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
-    TARGET_MACS=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep -E 'br-nat|br-cluster' | awk '{print $5}')
+    TARGET_MACS=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep -E 'br-nat' | awk '{print $5}')
     for MAC in $TARGET_MACS; do
       cat <<EOF > /tmp/{{ item }}_${MAC}_dead.xml
       <interface type='network'>

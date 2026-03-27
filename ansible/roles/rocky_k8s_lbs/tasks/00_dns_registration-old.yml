@@ -1,3 +1,4 @@
+# 00_pre_registration.yml
 ---
 - name: Register DNS Records via Localhost
   run_once: true
