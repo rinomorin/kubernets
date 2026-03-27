@@ -44,31 +44,36 @@
 - name: "5.4 - Verify Pod Networking (The Black Hole Test)"
   shell: |
     {% raw %}
-    # Set KUBECONFIG if it's not in the default location
-    export KUBECONFIG=~/.kube/config 
-
-    # 1. Wait for API to be stable
-    until kubectl get nodes &> /dev/null; do
-      echo "Waiting for API Server to respond via VIP..."
-      sleep 2
+    # 1. Wait for the API to actually respond via the LB
+    # This prevents the "requested resource not found" error
+    MAX_RETRIES=10
+    COUNT=0
+    until kubectl get nodes &> /dev/null || [ $COUNT -eq $MAX_RETRIES ]; do
+      echo "Waiting for K8s API to stabilize..."
+      sleep 3
+      ((COUNT++))
     done
 
-    # 2. Get Pod info with explicit namespace if needed
+    # 2. Get the first pod name
     FIRST_POD=$(kubectl get pods -l app=nginx -o jsonpath='{.items[0].metadata.name}' --ignore-not-found)
+    
+    # 3. Get the last pod IP
     LAST_IP=$(kubectl get pods -l app=nginx -o jsonpath='{.items[-1].status.podIP}' --ignore-not-found)
-
-    if [ -z "$FIRST_POD" ] || [ -z "$LAST_IP" ]; then
-      echo "DEBUG: API is up but Pods are not found or not assigned IPs yet."
+    
+    # 4. Execute the ping test if we have the data
+    if [ -n "$FIRST_POD" ] && [ -n "$LAST_IP" ]; then
+      echo "Pinging $LAST_IP from $FIRST_POD..."
+      kubectl exec "$FIRST_POD" -- ping -c 2 "$LAST_IP"
+    else
+      echo "Failed to retrieve Pod information. Current Pod Status:"
       kubectl get pods -o wide
       exit 1
     fi
-
-    # 3. Execute the ping test
-    kubectl exec "$FIRST_POD" -- ping -c 2 "$LAST_IP"
     {% endraw %}
   delegate_to: localhost
   register: ping_test
-  retries: 5
-  delay: 10
+  # Adding Ansible-level retries for extra safety
+  retries: 3
+  delay: 5
   until: ping_test.rc == 0
   run_once: true
