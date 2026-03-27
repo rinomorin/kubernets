@@ -38,6 +38,7 @@
       fi;
       sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg;
       sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf;
+      sudo sed -i 's/interface .*$/interface $REMOTE_IFACE/g' /etc/keepalived/keepalived.conf;
       sudo chown root:root /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf;
       sudo chmod 644 /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf;
       sudo restorecon -v /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf;
