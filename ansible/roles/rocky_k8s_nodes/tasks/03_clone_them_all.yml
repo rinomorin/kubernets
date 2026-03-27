@@ -2,13 +2,13 @@
 # ============================================================
 # 3.1 - Prepare and "Wash" the Lead Master (Silver Image)
 # ============================================================
-- name: "3.1.1 - Power off msrlv9mast01 for cleaning"
+- name: "3.1.1 - Power off {{ groups['control_nodes'][0].split('.')[0]}} for cleaning"
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
-    if sudo virsh list --all | grep -q "msrlv9mast01"; then
-      sudo virsh destroy msrlv9mast01 || true
+    if sudo virsh list --all | grep -q "{{ groups['control_nodes'][0].split('.')[0]}}"; then
+      sudo virsh destroy {{ groups['control_nodes'][0].split('.')[0]}} || true
       for i in {1..15}; do
-        STATE=$(sudo virsh domstate msrlv9mast01)
+        STATE=$(sudo virsh domstate {{ groups['control_nodes'][0].split('.')[0]}})
         if [ "$STATE" == "shut off" ]; then exit 0; fi
         sleep 2
       done
@@ -18,9 +18,9 @@
 - name: "3.1.2 - Sysprep Lead Master (The Silver Image)"
   delegate_to: "{{ VM_HOST_IP }}"
   command: >
-    sudo virt-sysprep -d msrlv9mast01
+    sudo virt-sysprep -d {{ groups['control_nodes'][0].split('.')[0]}} \
     --operations machine-id,net-hostname,net-hwaddr,ssh-hostkeys,customize
-    --hostname msrlv9mast01.{{ c_zone }}
+    --hostname {{ groups['control_nodes'][0].split('.')[0]}}.{{ c_zone }}
 
 - name: "3.1.3 - Force Remove Cluster Nodes from known_hosts"
   delegate_to: localhost
@@ -34,14 +34,14 @@
 - name: "3.2.1 - Clone Nodes with Unique MACs"
   delegate_to: "{{ VM_HOST_IP }}"
   command: >
-    sudo virt-clone --original msrlv9mast01 
-    --name {{ item.split('.')[0] }} 
+    sudo virt-clone --original {{ groups['control_nodes'][0].split('.')[0]}} 
+    --name {{ item.split('.')[0] }}{{ groups['control_nodes'][0].split('.')[0]}}
     --file /var/lib/libvirt/images/{{ item.split('.')[0] }}.qcow2
     --mac RANDOM --mac RANDOM --mac RANDOM
   loop: "{{ groups['cluster_nodes'] }}"
   when: 
     - item != 'helper'
-    - item != 'msrlv9mast01'
+    - item != '{{ groups['control_nodes'][0].split('.')[0]}}'
   args:
     creates: "/var/lib/libvirt/images/{{ item.split('.')[0] }}.qcow2"
 
@@ -54,7 +54,7 @@
   loop: "{{ groups['cluster_nodes'] }}"
   when: 
     - item != 'helper'
-    - item != 'msrlv9mast01'
+    - item != {{ groups['control_nodes'][0].split('.')[0]}}
 
 - name: "3.2.3 - Power On All Nodes"
   delegate_to: "{{ VM_HOST_IP }}"

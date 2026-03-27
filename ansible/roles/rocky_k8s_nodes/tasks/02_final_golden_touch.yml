@@ -198,7 +198,7 @@
     # We run this on the KVM host while the VM is OFF
     virt-sysprep -d {{ groups['control_nodes'][0].split('.')[0]}} \
       --operations machine-id,net-hostname,net-hwaddr,ssh-hostkeys,customize \
-      --hostname msrlv9mast01.{{ c_zone }}
+      --hostname {{ groups['control_nodes'][0].split('.')[0]}}.{{ c_zone }}
 
 - name: rm local downloaded crictl archive
   delegate_to: localhost
