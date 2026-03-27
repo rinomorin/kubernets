@@ -2,22 +2,10 @@
 - name: Install HA Software Stack
   delegate_to: localhost
   shell: |
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }} core@{{ hostvars[item].ansible_host }} "sudo dnf install -y haproxy keepalived"
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }} core@{{ hostvars[item].ansible_host }} "sudo dnf install -y haproxy keepalived policycoreutils-python-utils"
   loop: "{{ groups['hahost'] }}"
 
-- name: Push firewall and Enable LB Services
-  delegate_to: localhost
-  loop: "{{ groups['hahost'] }}"
-  vars:
-    ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
-    target_ip: "{{ hostvars[item].ansible_host }}"
-  shell: |
-    # Firewall setup
-    ssh {{ ssh_opts }} core@{{ target_ip }} sudo firewall-cmd --permanent --add-port=6443/tcp
-    ssh {{ ssh_opts }} core@{{ target_ip }} sudo firewall-cmd --permanent --add-rich-rule='rule protocol value="vrrp" accept'
-    ssh {{ ssh_opts }} core@{{ target_ip }} sudo firewall-cmd --reload
-    
-- name: Prepare and Push LB Configs
+- name: Configure Load Balancer Infrastructure
   block:
     - name: Create local staging directories
       delegate_to: localhost
@@ -56,66 +44,72 @@
       delegate_facts: true
       loop: "{{ detected_iface.results }}"
 
-    - name: Fix local templates and Push
+    - name: Push and Prepare Node Configuration
       delegate_to: localhost
       loop: "{{ groups['hahost'] }}"
+      vars:
+        ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
+        target_ip: "{{ hostvars[item].ansible_host }}"
       shell: |
-        # Fix local files using the fact we just found
+        # 1. Update local configs with detected interface and VIP
         sed -i "s|interface .*|interface {{ hostvars[item].active_iface }}|g" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
         sed -i "s|[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}/24|{{ k8s_api_vip }}/24|g" /tmp/k8s_lb_configs/{{ item }}/keepalived.conf
         sed -i "s|bind .*:6443|bind {{ k8s_api_vip }}:6443|g" /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg
         
-        # SCP to temp location
-        scp -o StrictHostKeyChecking=no -i {{ ssh_key_path }} /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg core@{{ hostvars[item].ansible_host }}:/tmp/haproxy.cfg
-        scp -o StrictHostKeyChecking=no -i {{ ssh_key_path }} /tmp/k8s_lb_configs/{{ item }}/keepalived.conf core@{{ hostvars[item].ansible_host }}:/tmp/keepalived.conf
+        # 2. SCP configs to temporary location on host
+        scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
+        scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
 
-    - name: Deploy configs and fix SELinux
-      delegate_to: localhost
-      loop: "{{ groups['hahost'] }}"
-      shell: |
-        ssh -o StrictHostKeyChecking=no -i {{ ssh_key_path }} core@{{ hostvars[item].ansible_host }} "
-          # Clean ghost IP
-          sudo ip addr del 192.168.100.29/24 dev {{ hostvars[item].active_iface }} || true;
-          
-          # Move files
-          sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg;
-          sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf;
-          sudo chown root:root /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf;
-          sudo chmod 644 /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf;
-          sudo restorecon -v /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf;
+        # 3. Apply Host-Level fixes (Firewall, Sysctl, SELinux, and File Moves)
+        ssh {{ ssh_opts }} core@{{ target_ip }} "
+          # Firewall
+          sudo firewall-cmd --permanent --add-port=6443/tcp
+          sudo firewall-cmd --permanent --add-rich-rule='rule protocol value=\"vrrp\" accept'
+          sudo firewall-cmd --reload
 
-          # Fix SELinux for HAProxy (The Critical Part)
+          # Sysctl for Non-Local Binding (Prevents HAProxy crash)
+          sudo sysctl -w net.ipv4.ip_nonlocal_bind=1
+          echo 'net.ipv4.ip_nonlocal_bind = 1' | sudo tee /etc/sysctl.d/99-haproxy.conf
+
+          # SELinux for Port 6443
           sudo setsebool -P haproxy_connect_any 1 || true
           sudo semanage port -a -t http_port_t -p tcp 6443 || sudo semanage port -m -t http_port_t -p tcp 6443
 
-          # Allow binding to the VIP before it's fully 'up'
-          sudo sysctl -w net.ipv4.ip_nonlocal_bind=1
+          # Deployment
+          sudo ip addr del 192.168.100.29/24 dev {{ hostvars[item].active_iface }} || true
+          sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
+          sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf
+          sudo chown root:root /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
+          sudo chmod 644 /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
+          sudo restorecon -Rv /etc/haproxy /etc/keepalived
+
+          # Start Logic
+          sudo systemctl daemon-reload
+          sudo systemctl enable keepalived haproxy
+          sudo systemctl restart keepalived
+          sleep 2
+          sudo systemctl restart haproxy
         "
-    - name: Start Load Balancer Services
+
+    - name: Start and Verify Services
       delegate_to: localhost
       loop: "{{ groups['hahost'] }}"
       shell: |
         ssh -o StrictHostKeyChecking=no -i {{ ssh_key_path }} core@{{ hostvars[item].ansible_host }} "
           sudo systemctl restart keepalived
-          sleep 3
-          sudo systemctl restart haproxy
+          sleep 2
+          sudo systemctl enable --now haproxy
+          systemctl is-active haproxy keepalived
         "
-
-    - name: Verify LB Health
-      delegate_to: localhost
-      loop: "{{ groups['hahost'] }}"
-      shell: ssh -o StrictHostKeyChecking=no -i {{ ssh_key_path }} core@{{ hostvars[item].ansible_host }} "systemctl is-active keepalived haproxy && ip addr show {{ hostvars[item].active_iface }} | grep {{ k8s_api_vip }}"
-      register: lb_status
-      failed_when: lb_status.rc != 0
+      register: final_verify
+      failed_when: final_verify.rc != 0
 
 - name: Create Isolated Dummy Network
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
     if ! sudo virsh net-info black-hole >/dev/null 2>&1; then
       cat <<EOF > /tmp/black-hole.xml
-      <network>
-        <name>black-hole</name>
-      </network>
+      <network><name>black-hole</name></network>
     EOF
       sudo virsh net-define /tmp/black-hole.xml
       sudo virsh net-autostart black-hole
@@ -125,12 +119,8 @@
 - name: Final Cleanup - Isolate Cluster and NAT Networks
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |
-    # 1. Get MACs for everything EXCEPT the 'default' network
-    # This grabs the MACs for br-cluster and br-nat
     TARGET_MACS=$(sudo virsh domiflist {{ item.split('.')[0] }} | grep -E 'br-nat|br-cluster' | awk '{print $5}')
-    
     for MAC in $TARGET_MACS; do
-      # 2. Create the "Dead" XML for this specific interface
       cat <<EOF > /tmp/{{ item }}_${MAC}_dead.xml
       <interface type='network'>
         <mac address='$MAC'/>
@@ -139,8 +129,6 @@
         <model type='virtio'/>
       </interface>
     EOF
-
-      # 3. Apply to the VM (Live and Config)
       sudo virsh update-device {{ item.split('.')[0] }} /tmp/{{ item }}_${MAC}_dead.xml --live --config
     done
   loop: "{{ groups['hahost'] }}"
