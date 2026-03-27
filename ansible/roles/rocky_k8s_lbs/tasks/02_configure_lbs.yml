@@ -69,20 +69,28 @@
         scp -o StrictHostKeyChecking=no -i {{ ssh_key_path }} /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg core@{{ hostvars[item].ansible_host }}:/tmp/haproxy.cfg
         scp -o StrictHostKeyChecking=no -i {{ ssh_key_path }} /tmp/k8s_lb_configs/{{ item }}/keepalived.conf core@{{ hostvars[item].ansible_host }}:/tmp/keepalived.conf
 
-    - name: Deploy configs and clean ghost IP
+    - name: Deploy configs and fix SELinux
       delegate_to: localhost
       loop: "{{ groups['hahost'] }}"
       shell: |
         ssh -o StrictHostKeyChecking=no -i {{ ssh_key_path }} core@{{ hostvars[item].ansible_host }} "
+          # Clean ghost IP
           sudo ip addr del 192.168.100.29/24 dev {{ hostvars[item].active_iface }} || true;
+          
+          # Move files
           sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg;
           sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf;
           sudo chown root:root /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf;
           sudo chmod 644 /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf;
           sudo restorecon -v /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf;
+
+          # Fix SELinux for HAProxy (The Critical Part)
+          sudo setsebool -P haproxy_connect_any 1 || true
+          sudo semanage port -a -t http_port_t -p tcp 6443 || sudo semanage port -m -t http_port_t -p tcp 6443
+
+          # Allow binding to the VIP before it's fully 'up'
           sudo sysctl -w net.ipv4.ip_nonlocal_bind=1
         "
-
     - name: Start Load Balancer Services
       delegate_to: localhost
       loop: "{{ groups['hahost'] }}"
