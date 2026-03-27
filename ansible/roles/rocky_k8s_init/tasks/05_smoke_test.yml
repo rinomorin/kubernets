@@ -30,15 +30,23 @@
   delay: 10
   run_once: true
 
-- name: 5.4 - Verify Pod Networking (The Black Hole Test)
+- name: "5.4 - Verify Pod Networking (The Black Hole Test)"
   shell: |
-    # Grab the first pod and the last pod's IP
+    {% raw %}
+    # 1. Get the first pod name
     FIRST_POD=$(kubectl get pods -l app=nginx -o jsonpath='{.items[0].metadata.name}')
+    
+    # 2. Get the last pod IP
     LAST_IP=$(kubectl get pods -l app=nginx -o jsonpath='{.items[-1].status.podIP}')
     
-    # Try to ping. If CNI (Calico/Flannel) is working, this works even if the 
-    # underlying physical bridge is "Black Holed" for external traffic.
-    kubectl exec $FIRST_POD -- ping -c 2 $LAST_IP
+    # 3. Execute the ping test
+    if [ -n "$FIRST_POD" ] && [ -n "$LAST_IP" ]; then
+      kubectl exec "$FIRST_POD" -- ping -c 2 "$LAST_IP"
+    else
+      echo "Failed to retrieve Pod information"
+      exit 1
+    fi
+    {% endraw %}
   delegate_to: localhost
   register: ping_test
   run_once: true
