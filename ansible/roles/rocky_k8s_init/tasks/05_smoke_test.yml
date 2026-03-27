@@ -42,6 +42,8 @@
     KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
 
 - name: "5.4 - Verify Pod Networking (The Black Hole Test)"
+  environment:
+    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
   shell: |
     {% raw %}
     # 1. Wait for the API to actually respond via the LB
