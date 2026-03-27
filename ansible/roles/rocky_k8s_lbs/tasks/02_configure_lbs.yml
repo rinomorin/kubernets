@@ -12,12 +12,7 @@
     ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
     target_ip: "{{ hostvars[item].ansible_host }}"
   shell: |
-    # Securely transfer the prepared files
-    scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
-    scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
-
-    # 4. Remote Deployment
-     # Firewall setup
+    # Firewall setup
     ssh {{ ssh_opts }} core@{{ target_ip }} sudo firewall-cmd --permanent --add-port=6443/tcp
     ssh {{ ssh_opts }} core@{{ target_ip }} sudo firewall-cmd --permanent --add-rich-rule='rule protocol value="vrrp" accept'
     ssh {{ ssh_opts }} core@{{ target_ip }}sudo firewall-cmd --reload
