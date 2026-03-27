@@ -41,6 +41,49 @@
   environment:
     KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
 
+- name: Repair K8s CNI Networking (Fix No Route to Host)
+  hosts: k8s_nodes
+  become: true
+  tasks:
+    - name: Ensure IP Forwarding is enabled in the kernel
+      ansible.posix.sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        state: present
+        sysctl_file: /etc/sysctl.d/99-k8s-networking.conf
+        reload: yes
+      loop:
+        - { name: 'net.ipv4.ip_forward', value: '1' }
+        - { name: 'net.bridge.bridge-nf-call-iptables', value: '1' }
+        - { name: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
+        - { name: 'net.ipv4.conf.all.rp_filter', value: '1' }
+        - { name: 'net.ipv4.conf.default.rp_filter', value: '1' }
+
+    - name: Open Firewall for CNI Traffic
+      ansible.posix.firewalld:
+        port: "{{ item }}"
+        permanent: true
+        state: enabled
+      loop:
+        - 8472/udp   # Flannel VXLAN
+        - 4789/udp   # Calico VXLAN / Geneve
+        - 179/tcp    # Calico BGP
+        - 10250/tcp  # Kubelet API
+        - 6443/tcp   # API Server (on Masters)
+
+    - name: Reload Firewalld to apply changes
+      service:
+        name: firewalld
+        state: reloaded
+
+    - name: Restart CNI Pods to force re-peering
+      shell: |
+        kubectl delete pods -n kube-system -l k8s-app=flannel --force --grace-period=0 || \
+        kubectl delete pods -n kube-system -l k8s-app=calico-node --force --grace-period=0
+      delegate_to: "{{ groups['masters'][0] }}"
+      run_once: true
+      ignore_errors: true
+
 - name: "5.4 - Verify Pod Networking (The Black Hole Test)"
   environment:
     KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
