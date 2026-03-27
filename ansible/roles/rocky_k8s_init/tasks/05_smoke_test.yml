@@ -6,10 +6,12 @@
   delegate_to: "{{ groups['control_nodes'][0] }}"
 
 - name: 5.1 - Deploy Nginx Smoke Test
-  # We use --validate=false to bypass the OpenAPI download if the aggregator is slow
   command: "kubectl apply -f https://k8s.io/examples/controllers/nginx-deployment.yaml --validate=false"
   delegate_to: localhost
   run_once: true
+  environment:
+    # Force it to use the exact config we fetched and fixed permissions for
+    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
   register: nginx_deploy
   until: nginx_deploy.rc == 0
   retries: 5
