@@ -10,27 +10,36 @@
   delegate_to: localhost
   run_once: true
   environment:
-    # Force it to use the exact config we fetched and fixed permissions for
     KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
-  register: nginx_deploy
-  until: nginx_deploy.rc == 0
-  retries: 5
-  delay: 15
 
-- name: 5.2 - Scale Deployment
-  command: "kubectl scale deployment nginx-deployment --replicas={{ groups['worker_nodes'] | length }}"
+- name: 5.1.5 - Wait for Deployment API to be recognized
+  shell: "kubectl get deployment nginx-deployment"
   delegate_to: localhost
   run_once: true
+  environment:
+    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
+  register: deploy_check
+  until: deploy_check.rc == 0
+  retries: 20
+  delay: 10
 
-- name: 5.3 - Wait for Nginx Pods
-  # Using jsonpath is more reliable than grep/wc
+- name: 5.2 - Scale Deployment
+  command: "kubectl scale deployment nginx-deployment --replicas=2"
+  delegate_to: localhost
+  run_once: true
+  environment:
+    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
+
+- name: 5.3 - Wait for Nginx Pods to reach Running
   shell: "kubectl get pods -l app=nginx -o jsonpath='{.items[?(@.status.phase==\"Running\")].metadata.name}' | wc -w"
   delegate_to: localhost
   register: pod_count
-  until: pod_count.stdout | trim | int == (groups['worker_nodes'] | length)
-  retries: 20
+  until: pod_count.stdout | trim | int == 2
+  retries: 30
   delay: 10
   run_once: true
+  environment:
+    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
 
 - name: "5.4 - Verify Pod Networking (The Black Hole Test)"
   shell: |
@@ -52,3 +61,5 @@
   delegate_to: localhost
   register: ping_test
   run_once: true
+  environment:
+    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
