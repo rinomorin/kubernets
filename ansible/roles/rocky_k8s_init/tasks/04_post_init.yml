@@ -1,4 +1,3 @@
-# 1. Pull directly to the final destination
 # 1. Fetch the config
 - name: 4.1 - Fetch admin.conf to local kubeconfig
   fetch:
@@ -17,50 +16,41 @@
     mode: '0600'
     state: file
 
-- name: 4.2.5 - Give the Cluster 6 minutes to finish its morning coffee
+# 3. Interactive Pause for Manual Intervention
+- name: 4.3 - MANUAL STEP REQUIRED
   pause:
-    minutes: 6
+    prompt: |
+      -------------------------------------------------------------------------
+      KUBERNETES API IS INITIALIZING. 
+      
+      Please open a NEW terminal on your helper node and run:
+      kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+      
+      Once you see 'daemonset.apps/kube-flannel-ds created', 
+      press ENTER here to continue the playbook.
+      -------------------------------------------------------------------------
   run_once: true
 
-- name: 4.3 - Apply Flannel Pod Network (The 'Enabler')
-  command: >
-    kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml 
-    --validate=false
-  delegate_to: localhost
-  run_once: true
-  register: flannel_result
-  until: flannel_result.rc == 0
-  retries: 15
-  delay: 10
-
-- name: 4.4 - Verify Nodes are transitioning to Ready
+# 4. Verification of Nodes (Checking they exist)
+- name: 4.4 - Verify Nodes are recognized by API
   delegate_to: localhost
   run_once: true
   shell: "kubectl get nodes"
   register: final_nodes
   changed_when: false
 
-- name: 4.5 - Show Cluster Status
+- name: 4.5 - Show Current Cluster Membership
   debug:
-    var: nodes_ready.stdout_lines
+    msg: "{{ final_nodes.stdout_lines }}"
   run_once: true
 
-# # 5. Apply Flannel CNI to allow Nodes to reach 'Ready' state
-# - name: 4.6 - Apply Flannel Pod Network
-#   command: "kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml"
-#   delegate_to: helper
-#   run_once: true
-#   environment:
-#     KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
-
-# 6. Wait for Nodes to transition to 'Ready'
-- name: 4.7 - Wait for all nodes to be Ready
-  shell: "kubectl get nodes | grep -v STATUS | grep -v 'NotReady' | wc -l"
-  delegate_to: helper
+# 5. Automated Wait for 'Ready' Status
+- name: 4.6 - Wait for all 5 nodes to transition to Ready
+  shell: "kubectl get nodes | grep ' Ready ' | wc -l"
+  delegate_to: localhost
   register: ready_count
-  until: ready_count.stdout | trim | int == (groups['cluster_nodes'] | length - 1) 
-  retries: 24
+  # We expect 5 (msrlv9mast01-03 + msrlv9wrk01-02)
+  until: ready_count.stdout | trim | int == 5
+  retries: 30
   delay: 10
   run_once: true
-  # Note: we subtract 1 from the group length because 'helper' is in 'cluster_nodes' 
-  # but is not a K8s node.

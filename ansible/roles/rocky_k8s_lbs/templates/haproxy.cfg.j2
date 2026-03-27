@@ -24,3 +24,24 @@ backend k8s-masters
     server {{ host }} {{ hostvars[host].ansible_host }}:6443 check check-ssl verify none
     {% endfor %}
 
+# --- APPLICATION TRAFFIC (HTTPS) ---
+frontend k8s-ingress-https
+    bind {{ k8s_api_vip }}:443
+    default_backend k8s-workers-https
+
+backend k8s-workers-https
+    balance roundrobin
+    {% for host in groups['control_nodes'] %}
+    server {{ host }} {{ hostvars[host].provision_ip }}:30443 check check-ssl verify none
+    {% endfor %}
+
+# --- APPLICATION TRAFFIC (HTTP) ---
+frontend k8s-ingress-http
+    bind {{ k8s_api_vip }}:80
+    default_backend k8s-workers-http
+
+backend k8s-workers-http
+    balance roundrobin
+    {% for host in groups['control_nodes'] %}
+    server {{ host }} {{ hostvars[host].provision_ip }}:30080 check
+    {% endfor %}

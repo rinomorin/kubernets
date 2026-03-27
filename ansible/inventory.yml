@@ -16,14 +16,27 @@ all:
     msrlv9l01:
       ansible_user: core
       ansible_host: 192.168.100.21
+      provision_ip: 10.0.0.21
+      node_ip: 10.0.0.2
+      hostname: msrlv9l01.cloud.home.morinsoft.ca 
+      provider_ip: 192.168.100.21
 
     msrlv9l02:
       ansible_user: core
       ansible_host: 192.168.100.22
+      provision_ip: 10.0.0.22
+      node_ip: 10.0.0.22 
+      hostname: msrlv9l02.cloud.home.morinsoft.ca 
+      provider_ip: 192.168.100.22
 
     msrlv9l03:
       ansible_user: core
       ansible_host: 192.168.100.23
+      provision_ip: 10.0.0.23
+      node_ip: 10.0.0.23 
+      hostname: msrlv9l03.cloud.home.morinsoft.ca 
+      provider_ip: 192.168.100.23
+
 
     msrlv9mast01: 
       ansible_user: core
