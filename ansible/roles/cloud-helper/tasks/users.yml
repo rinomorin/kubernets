@@ -81,3 +81,10 @@
     group: "{{ cloud_helper_user }}"
     mode: '0755'
   become: true
+
+- name: Ensure helper secops_id groups
+  user:
+    name: "{{ secops_id }}"
+    groups: "{{ awx_group }}"
+    append: true
+  become: true
