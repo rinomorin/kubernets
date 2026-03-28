@@ -3,6 +3,7 @@
   hosts: all
   gather_facts: false
   tasks:
+    
     - name: load environment
       set_fact:
         VM_HOST: "{{ lookup('env','VM_HOST')}}"

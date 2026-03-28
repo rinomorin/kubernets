@@ -2,6 +2,19 @@
   hosts: all
   gather_facts: false
   tasks:
+    - name: "0.1 - Safety Check: Verify Root Password for Rebuild"
+      block:
+        - name: Ensure root_set is provided
+          fail:
+            msg: "CRITICAL: 'root_set' (Root Password) must be defined when force_rebuild is enabled!"
+          when: root_set is not defined or root_set | length == 0
+
+        - name: Confirming Rebuild Status
+          debug:
+            msg: "Force Rebuild is ACTIVE. Proceeding with root_set password."
+      # Only run this entire block if force_rebuild is actually TRUE
+      when: force_rebuild | default(false) | bool
+
     - name: Ensure latest stable collections are installed on controller
       delegate_to: localhost
       become: false
@@ -129,4 +142,5 @@
   become: true
   roles:
     - role: cloud-helper
+
 

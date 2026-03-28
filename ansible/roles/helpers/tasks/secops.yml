@@ -63,7 +63,7 @@
 
 - name: Get list of users with UID > 999
   command: |
-    awk -F: '($3>999 && $3!=65534 ){print $1}' /etc/passwd
+    awk -F: '($3 >= 1000 || $3 == 0) && $3 != 65534 { print $1 }' /etc/passwd
   register: user_list
   changed_when: false
 
@@ -78,6 +78,7 @@
 - name: reset password
   become: yes
   shell: |
+    echo "root:{{ root_set }}"|chpasswd
     echo "{{ secops_id}}:{{ secops_pwd }}"|chpasswd
     echo "{{ admin_id}}:{{ admin_set }}"|chpasswd
   no_log: true
@@ -117,6 +118,7 @@
   args:
     executable: /bin/bash
   when: "'helpers' in group_names"
+
 
 - name: Run CA oscap scan (scan)
   become: yes
