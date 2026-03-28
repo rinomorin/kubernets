@@ -8,16 +8,11 @@
     name: nginx
     state: restarted
 
-- name: "0.2 - Restart FreeIPA Services via ipactl"
+- name: Restart IPA services
   become: true
-  shell: "ipactl restart"
-  # ipactl returns 0 on success. We use this to ensure Ansible tracks the change.
-  register: ipa_restart_result
-  changed_when: ipa_restart_result.rc == 0
-  # Give it 5 minutes (300s) to restart the entire stack (LDAP, KDC, DNS, CA, UI)
-  async: 300
-  poll: 5
-  tags: [ipa, maintenance]
+  service:
+    name: ipa
+    state: restarted
 
 - name: refresh_repos
   become: true

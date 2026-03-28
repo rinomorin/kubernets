@@ -12,6 +12,7 @@
   when: "'helpers' in group_names"
   notify: Restart IPA services
 
+
 - name: Bind SSL VirtualHost to helper IPA only
   replace:
     path: /etc/httpd/conf.d/ssl.conf
@@ -28,5 +29,5 @@
   when: "'helpers' in group_names"
   notify: Restart IPA services
 
-- name: Restart IPA services
+- name: last Restart IPA services
   command: ipactl restart
