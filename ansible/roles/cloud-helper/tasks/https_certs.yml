@@ -10,8 +10,8 @@
     regexp: '^Listen\s+443'
     replace: 'Listen {{ helper_node_ip}}:443'
   when: "'helpers' in group_names"
-  notify: Restart IPA services
-
+  # notify: Restart IPA services
+#
 
 - name: Bind SSL VirtualHost to helper IPA only
   replace:
@@ -19,7 +19,7 @@
     regexp: '<VirtualHost _default_:443>'
     replace: '<VirtualHost {{ helper_node_ip }}:443>'
   when: "'helpers' in group_names"
-  notify: Restart IPA services
+  # notify: Restart IPA services
 
 - name: Disable wildcard listeners in httpd.conf
   replace:
@@ -27,7 +27,7 @@
     regexp: '^Listen 80$'
     replace: 'Listen {{ helper_node_ip }}:80'
   when: "'helpers' in group_names"
-  notify: Restart IPA services
+  # notify: Restart IPA services
 
 - name: last Restart IPA services
-  command: ipactl restart
+  command: sudo ipactl restart

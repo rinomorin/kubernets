@@ -5,8 +5,8 @@
   file:
     path: "{{ item }}"
     state: directory
-    owner: "{{ cloud_helper_api_user }}"
-    group: "{{ cloud_helper_api_group }}"
+    owner: "{{ cloud_helper_user }}"
+    group: "{{ cloud_helper_user }}"
     mode: "0755"
   loop:
     - "{{ helper_workdir }}"

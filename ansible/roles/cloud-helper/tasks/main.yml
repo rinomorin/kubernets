@@ -8,10 +8,10 @@
 
 # Orchestrator: include focused task files in order
 - import_tasks: users.yml
-- import_tasks: preflight.yml
-  vars:
-    ansible_user: "{{ admin_id }}"
-    ansible_ssh_pass: "{{ admin_set }}"
+# - import_tasks: preflight.yml
+#   vars:
+#     ansible_user: "{{ admin_id }}"
+#     ansible_ssh_pass: "{{ admin_set }}"
 
 - import_tasks: helper_space.yml
 - import_tasks: keys.yml
