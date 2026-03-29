@@ -80,6 +80,14 @@
   run_once: true
   become: true
 
+- name: Restart CNI Pods to force re-peering 2
+  shell: |
+    # Force delete the pods so the DaemonSet recreates them with new network rules
+    kubectl --kubeconfig=/etc/kubernetes/admin.conf delete pods -n kube-system -l k8s-app=flannel --force --grace-period=0
+  delegate_to: "{{ groups['control_nodes'][0] }}"
+  run_once: true
+  become: true
+
 - name: "5.4 - Verify Pod Networking (The Black Hole Test)"
   shell: |
     {% raw %}
