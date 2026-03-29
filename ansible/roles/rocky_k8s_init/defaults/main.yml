@@ -1,0 +1,1 @@
+cloud_helper={{ lookup('env', 'CLOUD_HELPER') | default('cloud_helper', true)   }}
