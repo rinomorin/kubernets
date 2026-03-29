@@ -74,12 +74,11 @@
 
 - name: Restart CNI Pods to force re-peering
   shell: |
-    kubectl delete pods -n kube-system -l k8s-app=flannel --force --grace-period=0 || \
-    kubectl delete pods -n kube-system -l k8s-app=calico-node --force --grace-period=0
+    kubectl --kubeconfig=/etc/kubernetes/admin.conf delete pods -n kube-system -l k8s-app=flannel --force --grace-period=0 || \
+    kubectl --kubeconfig=/etc/kubernetes/admin.conf delete pods -n kube-system -l k8s-app=calico-node --force --grace-period=0
   delegate_to: "{{ groups['control_nodes'][0] }}"
   run_once: true
-  ignore_errors: true
-
+  become: true
 
 - name: "5.4 - Verify Pod Networking (The Black Hole Test)"
   shell: |
