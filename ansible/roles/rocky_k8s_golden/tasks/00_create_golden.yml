@@ -8,8 +8,6 @@
   delegate_to: "{{ VM_HOST_IP }}"
   changed_when: false
 
-- debug:
-    msg: "show ssh key being used: {{ core_ssh_key }}" 
 - name: Wipe existing golden-base if 'new-image' is requested
   delegate_to: "{{ VM_HOST_IP }}"
   block:
@@ -49,6 +47,8 @@
   when: not existing_vms
   register: iso_perms
 
+- debug:
+    msg: "show ssh key being used: {{ core_ssh_key }}" 
 
 - name: Generate Kickstart from template for golden-base
   template:
