@@ -1,9 +1,10 @@
-- name: 5.0 - Ensure KUBECONFIG is present on localhost
-  fetch:
-    src: /etc/kubernetes/admin.conf
-    dest: "{{ lookup('env', 'HOME') }}/.kube/config"
-    flat: yes
-  delegate_to: "{{ groups['control_nodes'][0] }}"
+
+# - name: 5.0 - Ensure KUBECONFIG is present on localhost
+#   fetch:
+#     src: /etc/kubernetes/admin.conf
+#     dest: "{{ lookup('env', 'HOME') }}/.kube/config"
+#     flat: yes
+#   delegate_to: "{{ groups['control_nodes'][0] }}"
 
 - name: 5.1 - Deploy Nginx Smoke Test
   command: "kubectl apply -f https://k8s.io/examples/controllers/nginx-deployment.yaml --validate=false"
