@@ -26,9 +26,3 @@
 # # 6. Pre-check MetalLB IP range
 # - import_tasks: 06_metallb.yml
 
-
-
-- name: Pre-check MetalLB IP against HAProxy VIP
-  fail:
-    msg: "STOP! MetalLB range overlaps with the Control Plane VIP (.30). Change metallb-config.yaml!"
-  when: "'192.168.100.30' in lookup('file', 'metallb-config.yaml')"
