@@ -1,14 +1,17 @@
+---
+- name: Calculate Dynamic Gateway and IP for HAProxy
+  ansible.builtin.set_fact:
+    # Logic: Split ansible_host, take first 3 parts, join with dots, add .1
+    dynamic_gw: "{{ ansible_host.split('.')[0:3] | join('.') }}.1"
+  when: inventory_hostname in groups['hahost']
 
 - name: Fix HAProxy routing priority for external traffic
+  become: true
   ansible.builtin.shell: |
-    # Derive gateway from the first 3 octets of the current host's IP
-    {% set ip_parts = ansible_host.split('.') %}
-    {% set dynamic_gw = ip_parts[0] + '.' + ip_parts[1] + '.' + ip_parts[2] + '.1' %}
-    
-    sudo nmcli connection modify enp3s0 ipv4.routes "{{ ansible_host }}/24 {{ dynamic_gw }} 50"
-    sudo nmcli connection up enp3s0
-  # This ensures it ONLY runs on your HAProxy nodes
+    nmcli connection modify enp3s0 ipv4.routes "{{ ansible_host }}/24 {{ dynamic_gw }} 50"
+    nmcli connection up enp3s0
   when: inventory_hostname in groups['hahost']
+  # This ensures we don't try to run nmcli on nodes where dynamic_gw wasn't set
 
 - name: Configure Firewalld for Kubernetes Networking
   ansible.posix.firewalld:
