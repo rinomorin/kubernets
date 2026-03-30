@@ -27,6 +27,7 @@
   when: inventory_hostname == groups['control_nodes'][0]
 
 - name: 2.4 - copy admin.conf to user's home and set permissions
+  become: true
   copy:
     src: /etc/kubernetes/admin.conf
     dest: /home/{{ cloud_helper_user }}/admin.conf
