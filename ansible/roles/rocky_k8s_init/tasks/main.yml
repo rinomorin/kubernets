@@ -9,8 +9,8 @@
 - import_tasks: 03_k8s_join.yml
 
 # 4. run post init
-- import_tasks: 04_post_init.yml
 - import_tasks: 04b_fix_firewall.yml
+- import_tasks: 04_post_init.yml
 
 # - name: Setup Dashboard Infrastructure
 #   ansible.builtin.import_tasks: dashboard.yml
