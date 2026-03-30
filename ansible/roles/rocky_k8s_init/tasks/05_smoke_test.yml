@@ -101,7 +101,7 @@
       --rm -i -- wget -qO- --timeout=5 "http://${TARGET_IP}"
   delegate_to: localhost
   run_once: true
-  register: test_result
+  register: network_verify
 
 - debug:
     msg: "Cluster Network is Healthy: {{ network_verify.stdout }}"  
