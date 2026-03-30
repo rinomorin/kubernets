@@ -30,13 +30,17 @@
     - flannel.1
     - cni0
 
-- name: Allow intra-zone forwarding in trusted zone
+- name: Allow intra-zone forwarding in trusted zone (Permanent)
   ansible.posix.firewalld:
     zone: trusted
     target: ACCEPT
-    state: enabled
     permanent: yes
-    immediate: yes
+    state: enabled
+
+- name: Reload firewalld to apply zone target changes
+  service:
+    name: firewalld
+    state: reloaded
 
 - name: Enable Masquerading for Pod Network
   ansible.posix.firewalld:
