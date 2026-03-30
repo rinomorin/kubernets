@@ -12,11 +12,20 @@
 - import_tasks: 04_post_init.yml
 - import_tasks: 04b_fix_firewall.yml
 
+- name: Setup Dashboard Infrastructure
+  ansible.builtin.import_tasks: dashboard.yml
+  when: inventory_hostname in groups['masters'][0]
+
+- name: Verify Dashboard and Get Token
+  ansible.builtin.import_tasks: verify_dashboard.yml
+  when: inventory_hostname in groups['masters'][0]
+
 # 5. test it
 - import_tasks: 05_smoke_test.yml
 
-# 6. Pre-check MetalLB IP range
-- import_tasks: 06_metallb.yml
+# # 6. Pre-check MetalLB IP range
+# - import_tasks: 06_metallb.yml
+
 
 
 - name: Pre-check MetalLB IP against HAProxy VIP
