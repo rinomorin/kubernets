@@ -1,58 +1,24 @@
 # 1. Fetch the config
-- name: 4.1 - Fetch admin.conf to local kubeconfig
+- name: Fetch Kubeconfig from Primary Master
   fetch:
     src: /etc/kubernetes/admin.conf
-    dest: "/home/{{ lookup('env', 'USER') }}/.kube/config"
-    flat: yes
-  when: inventory_hostname == groups['control_nodes'][0]
-
-# 2. Fix permissions locally
-- name: 4.2 - Fix local kubeconfig permissions
-  delegate_to: localhost
-  run_once: true
-  file:
-    path: "/home/{{ lookup('env', 'USER') }}/.kube/config"
-    owner: "{{ lookup('env', 'USER') }}"
-    mode: '0600'
-    state: file
-
-# # 3. Interactive Pause for Manual Intervention
-# - name: 4.3 - MANUAL STEP REQUIRED
-#   pause:
-#     prompt: |
-#       -------------------------------------------------------------------------
-#       KUBERNETES API IS INITIALIZING. 
-      
-#       Please open a NEW terminal on your helper node and run:
-#       kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
-      
-#       Once you see 'daemonset.apps/kube-flannel-ds created',
-#       run kubectl get nodes to see if ready, 
-#       press ENTER here to continue the playbook.
-#       -------------------------------------------------------------------------
-#   run_once: true
-- name: 4.2b - Ensure KUBECONFIG is present on localhost
-  fetch:
-    src: /etc/kubernetes/admin.conf
-    dest: "{{ lookup('env', 'HOME') }}/.kube/config"
+    dest: /tmp/admin.conf
     flat: yes
   delegate_to: "{{ groups['control_nodes'][0] }}"
+  run_once: true
 
-# # 3. Interactive Pause for Manual Intervention
-# - name: 4.3 - MANUAL STEP REQUIRED
-#   pause:
-#     prompt: |
-#       -------------------------------------------------------------------------
-#       KUBERNETES API IS INITIALIZING. 
-      
-#       Please open a NEW terminal on your helper node and run:
-#       kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
-      
-#       Once you see 'daemonset.apps/kube-flannel-ds created',
-#       run kubectl get nodes to see if ready, 
-#       press ENTER here to continue the playbook.
-#       -------------------------------------------------------------------------
-#   run_once: true
+- name: Distribute Kubeconfig to all nodes
+  copy:
+    src: /tmp/admin.conf
+    dest: "{{ item }}"
+    owner: core
+    group: core
+    mode: '0600'
+  loop:
+    - /etc/kubernetes/admin.conf
+    - /home/core/.kube/config
+  become: yes
+
 - name: 4.4 - Apply Flannel Pod Network (Fixed Interface)
   shell: |
     # 1. Download the latest manifest
