@@ -1,19 +1,17 @@
 ---
 - name: Fix HAProxy routing priority for external traffic
   become: true
-  # This tells the current host (Master) to run this command ON the LB nodes
   delegate_to: "{{ item }}"
-  ansible.builtin.shell: |
-    # Calculate gateway from the looped host's IP
-    LB_IP="{{ hostvars[item].ansible_host }}"
-    GATEWAY="$(echo $LB_IP | cut -d'.' -f1-3).1"
-    
-    nmcli connection modify enp3s0 ipv4.routes "$LB_IP/24 $GATEWAY 50"
-    nmcli connection up enp3s0
-  loop: "{{ groups['hahost'] }}"
-  # We only need one Master to perform this delegation once for all LBs
   run_once: true
-  # Ensure we have hostvars for the LBs
+  loop: "{{ groups['hahost'] }}"
+  vars:
+    # Gets 192.168.100.21
+    current_lb_ip: "{{ hostvars[item].ansible_host }}"
+    # Splits to ['192','168','100','21'], takes first 3, joins them, adds .1
+    current_lb_gw: "{{ hostvars[item].ansible_host.split('.')[0:3] | join('.') }}.1"
+  ansible.builtin.shell: |
+    nmcli connection modify enp3s0 ipv4.routes "{{ current_lb_ip }}/24 {{ current_lb_gw }} 50"
+    nmcli connection up enp3s0
   when: groups['hahost'] is defined
 
 - name: Configure Firewalld for Kubernetes Networking
