@@ -88,15 +88,12 @@
   run_once: true
   become: true
 
-
 - name: 5.4 - Verify Pod Networking (The Black Hole Test)
   shell: |
     TARGET_IP=$(kubectl get pods -l app=nginx -o jsonpath='{.items[0].status.podIP}')
-    kubectl run "ansible-probe" --image=busybox --restart=Never --rm -i -- wget -qO- --timeout=5 "http://$TARGET_IP"
-  environment:
-    KUBECONFIG: "{{ lookup('env', 'HOME') }}/.kube/config"
-  register: network_verify
+    kubectl run "ansible-probe-{{ inventory_hostname_short }}" --image=busybox --restart=Never --rm -i -- wget -qO- --timeout=5 "http://$TARGET_IP"
   delegate_to: localhost
+  run_once: true  # This prevents the "AlreadyExists" error
 
 - debug:
     msg: "Cluster Network is Healthy: {{ network_verify.stdout }}"  
