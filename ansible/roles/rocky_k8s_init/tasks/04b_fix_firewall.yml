@@ -1,0 +1,58 @@
+- name: Fetch Kubeconfig from Primary Master
+  fetch:
+    src: /etc/kubernetes/admin.conf
+    dest: /tmp/admin.conf
+    flat: yes
+  delegate_to: msrlv9mast01.cloud.home.morinsoft.ca
+  run_once: true
+
+- name: Distribute Kubeconfig to all nodes
+  copy:
+    src: /tmp/admin.conf
+    dest: "{{ item }}"
+    owner: core
+    group: core
+    mode: '0600'
+  loop:
+    - /etc/kubernetes/admin.conf
+    - /home/core/.kube/config
+  become: yes
+
+- name: Configure Firewalld for Kubernetes Networking
+  ansible.posix.firewalld:
+    zone: trusted
+    interface: "{{ item }}"
+    state: enabled
+    permanent: yes
+    immediate: yes
+  loop:
+    - enp2s0
+    - flannel.1
+    - cni0
+
+- name: Allow intra-zone forwarding in trusted zone
+  ansible.posix.firewalld:
+    zone: trusted
+    target: ACCEPT
+    state: enabled
+    permanent: yes
+    immediate: yes
+
+- name: Enable Masquerading for Pod Network
+  ansible.posix.firewalld:
+    masquerade: yes
+    state: enabled
+    permanent: yes
+    immediate: yes
+
+- name: Set Bridge and Routing Sysctls
+  ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+  loop:
+    - { name: 'net.bridge.bridge-nf-call-iptables', value: '1' }
+    - { name: 'net.ipv4.ip_forward', value: '1' }
+    - { name: 'net.ipv4.conf.all.rp_filter', value: '2' }
+    - { name: 'net.ipv4.conf.default.rp_filter', value: '2' }

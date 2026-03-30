@@ -88,32 +88,15 @@
   run_once: true
   become: true
 
-- name: "5.4 - Verify Pod Networking (The Black Hole Test)"
-  shell: |
-    {% raw %}
-    # 1. Get Target IP
-    TARGET_IP=$(kubectl get pods -l app=nginx -o jsonpath='{.items[0].status.podIP}')
-    
-    if [ -z "$TARGET_IP" ]; then
-      echo "Error: No Nginx pods found."
-      exit 1
-    fi
 
-    # 2. Run the probe with -i (interactive) to allow --rm to work
-    # We use a timestamp in the name to ensure uniqueness
-    echo "Probing http://$TARGET_IP from a fresh busybox pod..."
-    
-    kubectl run "probe-$(date +%s)" \
-      --image=busybox \
-      --restart=Never \
-      --rm -i \
-      -- wget -qO- --timeout=2 "http://$TARGET_IP"
-    {% endraw %}
-  delegate_to: localhost
-  register: networking_test
-  retries: 3
-  delay: 5
-  until: networking_test.rc == 0
-  run_once: true
+- name: 5.4 - Verify Pod Networking (The Black Hole Test)
+  shell: |
+    TARGET_IP=$(kubectl get pods -l app=nginx -o jsonpath='{.items[0].status.podIP}')
+    kubectl run "ansible-probe" --image=busybox --restart=Never --rm -i -- wget -qO- --timeout=5 "http://$TARGET_IP"
   environment:
-    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
+    KUBECONFIG: "{{ lookup('env', 'HOME') }}/.kube/config"
+  register: network_verify
+  delegate_to: localhost
+
+- debug:
+    msg: "Cluster Network is Healthy: {{ network_verify.stdout }}"  

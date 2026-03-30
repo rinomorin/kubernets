@@ -10,6 +10,7 @@
 
 # 4. run post init
 - import_tasks: 04_post_init.yml
+- import_tasks: 04b_fix_firewall.yml
 
 # 5. test it
 - import_tasks: 05_smoke_test.yml
