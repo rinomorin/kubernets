@@ -2,27 +2,16 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: main-ingress
-  annotations:
-    kubernetes.io/ingress.class: "nginx"
 spec:
+  ingressClassName: nginx  # This fixes the warning you saw
   rules:
-  - host: nginx.home.morinsoft.ca
+  - host: nginx.cloud.morinsoft.ca  # MUST match your /etc/hosts exactly
     http:
       paths:
       - path: /
         pathType: Prefix
         backend:
           service:
-            name: nginx-service # The name of your existing Nginx service
-            port:
-              number: 80
-  - host: httpd.home.morinsoft.ca
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: httpd-service # The name of your existing Httpd service
+            name: nginx-external # Ensure this is the EXACT name of your service
             port:
               number: 80
