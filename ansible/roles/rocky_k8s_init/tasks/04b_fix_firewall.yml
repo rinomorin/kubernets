@@ -1,13 +1,12 @@
 
 - name: Fix HAProxy routing priority for external traffic
-  become: true
   ansible.builtin.shell: |
     # Derive gateway from the first 3 octets of the current host's IP
     {% set ip_parts = ansible_host.split('.') %}
     {% set dynamic_gw = ip_parts[0] + '.' + ip_parts[1] + '.' + ip_parts[2] + '.1' %}
     
-    nmcli connection modify enp3s0 ipv4.routes "{{ ansible_host }}/24 {{ dynamic_gw }} 50"
-    nmcli connection up enp3s0
+    sudo nmcli connection modify enp3s0 ipv4.routes "{{ ansible_host }}/24 {{ dynamic_gw }} 50"
+    sudo nmcli connection up enp3s0
   # This ensures it ONLY runs on your HAProxy nodes
   when: inventory_hostname in groups['hahost']
 
