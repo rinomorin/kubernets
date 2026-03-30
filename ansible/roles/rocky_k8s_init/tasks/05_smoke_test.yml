@@ -1,11 +1,4 @@
 
-# - name: 5.0 - Ensure KUBECONFIG is present on localhost
-#   fetch:
-#     src: /etc/kubernetes/admin.conf
-#     dest: "{{ lookup('env', 'HOME') }}/.kube/config"
-#     flat: yes
-#   delegate_to: "{{ groups['control_nodes'][0] }}"
-
 - name: 5.1 - Deploy Nginx Smoke Test
   command: "kubectl apply -f https://k8s.io/examples/controllers/nginx-deployment.yaml --validate=false"
   delegate_to: localhost
@@ -95,13 +88,16 @@
     TARGET_IP=$(kubectl get pods -l app=nginx -o jsonpath='{.items[0].status.podIP}')
     
     # Use a unique name for the probe and ensure it's removed
+    # Note: We use \${TARGET_IP} or quotes to ensure Ansible doesn't try to parse it
     kubectl run "probe-{{ inventory_hostname_short }}" \
       --image=busybox \
       --restart=Never \
-      --rm -i -- wget -qO- --timeout=5 "http://${TARGET_IP}"
+      --rm -i -- wget -qO- --timeout=5 "http://$TARGET_IP"
   delegate_to: localhost
   run_once: true
+  environment:
+    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
   register: network_verify
 
 - debug:
-    msg: "Cluster Network is Healthy: {{ network_verify.stdout }}"  
+    var: network_verify.stdout_lines
