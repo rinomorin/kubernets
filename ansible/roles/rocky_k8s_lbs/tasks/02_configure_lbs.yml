@@ -135,3 +135,19 @@
     fi
 
   
+- name: Fix HAProxy routing priority for external traffic
+  become: true
+  delegate_to: "{{ item }}"
+  run_once: true
+  loop: "{{ groups['hahost'] }}"
+  vars:
+    # Gets 192.168.100.21
+    current_lb_ip: "{{ hostvars[item].ansible_host }}"
+    # Splits to ['192','168','100','21'], takes first 3, joins them, adds .1
+    current_lb_gw: "{{ hostvars[item].ansible_host.split('.')[0:3] | join('.') }}.1"
+  ansible.builtin.shell: |
+    ssh -o StrictHostKeyChecking=no -i {{ ssh_key_path }} core@{{ hostvars[item].ansible_host }} "
+    sudo nmcli connection modify enp3s0 ipv4.routes "{{ current_lb_ip }}/24 {{ current_lb_gw }} 50"
+    sudo nmcli connection up enp3s0
+    "
+  when: groups['hahost'] is defined
