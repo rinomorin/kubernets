@@ -5,10 +5,15 @@ metadata:
   namespace: metallb-system
 spec:
   addresses:
-  - 192.168.100.35/32  # Give your apps their own IP
+  - 192.168.100.35/32
 ---
 apiVersion: metallb.io/v1beta1
 kind: L2Advertisement
 metadata:
   name: advertisement
   namespace: metallb-system
+spec:
+  ipAddressPools:
+  - first-pool
+  interfaces:
+  - enp2s0    # <--- THIS IS THE MAGIC LINE
