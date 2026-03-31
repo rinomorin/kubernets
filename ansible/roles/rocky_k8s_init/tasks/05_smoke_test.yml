@@ -184,7 +184,7 @@
   delegate_to: localhost
   run_once: true
   ansible.builtin.template:
-    src: "../../rocky_k8s_lbs/templates/k8s-cluster.cfg.j2"
+    src: "k8s-cluster.cfg.j2"
     dest: "/tmp/ingress-nginx-controller.cfg"
   vars:
     # Splitting the stdout into a list: index 0 is http, index 1 is https
