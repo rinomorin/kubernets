@@ -14,12 +14,8 @@
   delegate_to: localhost
   loop: "{{ groups['hahost'] }}"
 
-- name: remove temporary file in /tmp
-  ansible.builtin.command: "rm -f /tmp/haproxy.cfg.generated"
-  delegate_to: localhost
-
 - name: Move staging to live config on {{ item }}
-  ansible.builtin.command: "sudo mv /tmp/haproxy.cfg.tmp /etc/haproxy/haproxy.cfg"
+  ansible.builtin.command: "sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg"
   delegate_to: "{{ item }}"
   
 - name: Move staging to live config on {{ item }}
@@ -30,4 +26,6 @@
   ansible.builtin.command: "sudo systemctl restart haproxy"
   delegate_to: "{{ item }}"
 
-
+- name: remove temporary file in /tmp
+  ansible.builtin.command: "rm -f /tmp/haproxy.cfg.generated"
+  delegate_to: localhost
