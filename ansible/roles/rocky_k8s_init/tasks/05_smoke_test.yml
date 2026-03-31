@@ -190,25 +190,10 @@
 - debug:
     var: haproxy_config_output.stdout_lines
 
-- name: 5.6 - Push and Restart LBs
-  delegate_to: "{{ lb_node }}"
+- name: 5.6 - Run Stage/Move/Restart Loop
+  include_tasks: update_lb.yml
   loop: "{{ groups['hahost'] }}"
-  loop_control:
-    loop_var: lb_node
-  become: true
-  tasks:
-    - name: Upload Config
-      ansible.builtin.copy:
-        src: "/tmp/haproxy.cfg.generated"
-        dest: "/etc/haproxy/haproxy.cfg"
-        owner: root
-        group: root
-        mode: '0644'
-
-    - name: Restart Service
-      ansible.builtin.systemd:
-        name: haproxy
-        state: restarted
+  run_once: true
 
 # - name: 5.7 - Restart HAProxy on Config Change
 #   delegate_to: "{{ item }}"
