@@ -119,8 +119,9 @@
         mgt_ip: "{{ lb_ip_list | selectattr('maintenance_lb', 'defined') | map(attribute='maintenance_lb') | first | default(hostvars[item].ansible_host) }}"
         external_ip: "{{ hostvars[item].ansible_host }}"
         external_gw: "{{ external_ip.split('.')[0:3] | join('.') }}.1"
+        ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o LogLevel=ERROR -i {{ ssh_key_path }}"
       ansible.builtin.shell: |
-        ssh -o StrictHostKeyChecking=no core@{{ mgt_ip }} \
+        ssh {{ ssh_opts }} core@{{ mgt_ip }} \
         "sudo nmcli connection modify enp3s0 ipv4.routes '{{ external_ip }}/24 {{ external_gw }} 50' && \
         sudo nmcli connection up enp3s0"
 
