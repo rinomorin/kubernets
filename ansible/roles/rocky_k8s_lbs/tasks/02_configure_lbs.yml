@@ -108,24 +108,23 @@
           fi
         "
 
-    - name: Fix HAProxy routing priority via SSH jump
+    - name: Fix HAProxy routing priority (Safe Version via Maintenance Network)
       delegate_to: localhost
       run_once: true
       loop: "{{ groups['hahost'] }}"
       vars:
-        # Get the IP of the LB we are currently looking at in the loop
-        ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o LogLevel=ERROR -i {{ ssh_key_path }}"
-        target_ip: "{{ hostvars[item].ansible_host }}"
-        # Calculate the gateway (.1) from that IP
-        target_gw: "{{ hostvars[item].ansible_host.split('.')[0:3] | join('.') }}.1"
+        # Pull the maintenance IP discovered in your previous '01' task
+        # We use the hostvars for the specific item in the loop
+        mgt_ip: "{{ hostvars[item].maintenance_lb }}"
+        external_ip: "{{ hostvars[item].ansible_host }}"
+        external_gw: "{{ external_ip.split('.')[0:3] | join('.') }}.1"
       ansible.builtin.shell: |
-        # 1. Check if we can even reach the IP first
-        # 2. Use -i with a path that definitely exists, or remove -i to use default ssh-agent
-        ssh {{ ssh_opts }} core@{{ target_ip }} \
-        "sudo nmcli connection modify enp3s0 ipv4.routes '{{ target_ip }}/24 {{ target_gw }} 50' && \
+        ssh -o StrictHostKeyChecking=no core@{{ mgt_ip }} \
+        "sudo nmcli connection modify enp3s0 ipv4.routes '{{ external_ip }}/24 {{ external_gw }} 50' && \
         sudo nmcli connection up enp3s0"
-      register: ssh_res
-      failed_when: ssh_res.rc != 0 and "Permission denied" in ssh_res.stderr
+      # Optional: add a short timeout so it doesn't hang if an LB is truly dark
+      async: 30
+      poll: 5
 
     - name: Start and Verify Services
       delegate_to: localhost

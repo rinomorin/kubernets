@@ -46,6 +46,12 @@
     maintenance_map: "{{ maintenance_map | default({}) | combine({ item.item: item.stdout }) }}"
   loop: "{{ maintenance_ip_raw.results }}"
 
+- name: "update lb_ip_list with discovered maintenance IPs"
+  set_fact:
+    lb_ip_list: 
+      - maintenance_lb: "{{ item.stdout }}"
+  loop: "{{ maintenance_ip_raw.results }}"
+
 - name: 2.1 - Discover Provider MAC from default network
   delegate_to: "{{ VM_HOST_IP }}"
   shell: |

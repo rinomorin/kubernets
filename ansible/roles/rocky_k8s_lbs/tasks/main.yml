@@ -1,4 +1,12 @@
 ---
+- name: initialize IPs
+  set_fact:
+    lb_ip_list:
+      - maintenance_lb: ""
+      - provider_lb: ""
+      - provision_lb: ""
+      - cluster_lb: ""
+
 ## 00 precheck
 - import_tasks: 00_pre_check.yml
 - debug:
