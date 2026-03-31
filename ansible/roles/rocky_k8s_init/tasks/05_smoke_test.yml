@@ -187,8 +187,7 @@
     # We strip and split here to ensure NO whitespace ruins the Jinja template
     ingress_http_nodeport: "{{ discovered_nodeports.stdout.split()[0] | trim }}"
     ingress_https_nodeport: "{{ discovered_nodeports.stdout.split()[1] | trim }}"
-  register: haproxy_config_output
-
+ 
 - debug:
     var: haproxy_config_output.stdout_lines
 
