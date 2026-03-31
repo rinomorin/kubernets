@@ -49,3 +49,5 @@ backend k8s-workers-http
     {% for host in groups['control_nodes'] %}
     server {{ host }} {{ hostvars[host].provision_ip }}:{{ ingress_http_nodeport | default('30080') }} check
     {% endfor %}
+
+# end here
