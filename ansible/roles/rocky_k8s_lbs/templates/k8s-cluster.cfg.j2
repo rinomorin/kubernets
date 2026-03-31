@@ -1,17 +1,14 @@
 
 # --- KUBERNETES API SERVER (6443) ---
-frontend k8s-api
+# --- DUMMY KUBERNETES API (For Startup) ---
+frontend k8s-api-dummy
     bind {{ k8s_api_vip }}:6443
-    default_backend k8s-masters
+    default_backend k8s-masters-dummy
 
-backend k8s-masters
-    option httpchk GET /healthz
-    http-check expect status 200
+backend k8s-masters-dummy
     balance roundrobin
-    {% for host in groups['control_nodes'] %}
-    # Master Node: {{ host }}
-    server {{ host }} {{ hostvars[host].provision_ip }}:6443 check check-ssl verify none
-    {% endfor %}
+    server dummy 127.0.0.1:6443 check
+
 
 # --- INGRESS TRAFFIC (HTTPS - 443) ---
 frontend k8s-ingress-https

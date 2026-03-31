@@ -31,3 +31,5 @@ defaults
 # IMPORTANT: This line tells HAProxy to load your service-specific files
 # Note: In HAProxy 2.x, you can also use "extra-config-path" in systemd 
 # but putting a placeholder here is a good practice.
+# ADD THIS TO THE BOTTOM OF YOUR haproxy.cfg.j2
+cfg-dir /etc/haproxy/conf.d
