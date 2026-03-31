@@ -1,5 +1,5 @@
 - name: Push to staging area on {{ item }}
-  ansible.builtin.template:
+  template:
     src: "../../rocky_k8s_lbs/templates/haproxy.cfg.j2"
     dest: "/tmp/haproxy.cfg.generated"
     mode: '0644'
@@ -28,3 +28,5 @@
 - name: Move staging to live config on {{ item }}
   ansible.builtin.command: "sudo systemctl restart haproxy"
   delegate_to: "{{ item }}"
+
+
