@@ -1,0 +1,27 @@
+- name: Push to staging area on {{ item }}
+  ansible.builtin.copy:
+    src: "/tmp/haproxy.cfg.generated"
+    dest: "/tmp/haproxy.cfg.tmp"
+    mode: '0644'
+  delegate_to: "{{ item }}"
+
+- name: Move staging to live config on {{ item }}
+  ansible.builtin.command: "mv /tmp/haproxy.cfg.tmp /etc/haproxy/haproxy.cfg"
+  delegate_to: "{{ item }}"
+  become: true
+
+- name: Ensure correct ownership on {{ item }}
+  ansible.builtin.file:
+    path: /etc/haproxy/haproxy.cfg
+    owner: root
+    group: root
+    mode: '0644'
+  delegate_to: "{{ item }}"
+  become: true
+
+- name: Restart HAProxy on {{ item }}
+  ansible.builtin.systemd:
+    name: haproxy
+    state: restarted
+  delegate_to: "{{ item }}"
+  become: true
