@@ -156,7 +156,7 @@
   ansible.builtin.shell: "kubectl apply -f {{ role_path }}/files/nginx-ingress.yaml"
   run_once: true
 
-- name: 5.5 - Discover Actual NodePor- name: 5.5 - Discover Actual NodePorts from K8s
+- name: 5.5 - Discover Actual NodePorts from K8s
   delegate_to: localhost
   run_once: true
   environment:
