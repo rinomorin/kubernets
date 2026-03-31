@@ -135,19 +135,20 @@
     fi
 
   
-- name: Fix HAProxy routing priority for external traffic
-  become: true
-  delegate_to: "{{ item }}"
+- name: Fix HAProxy routing priority via SSH jump
+  delegate_to: localhost
   run_once: true
   loop: "{{ groups['hahost'] }}"
   vars:
-    # Gets 192.168.100.21
-    current_lb_ip: "{{ hostvars[item].ansible_host }}"
-    # Splits to ['192','168','100','21'], takes first 3, joins them, adds .1
-    current_lb_gw: "{{ hostvars[item].ansible_host.split('.')[0:3] | join('.') }}.1"
+    # Get the IP of the LB we are currently looking at in the loop
+    target_ip: "{{ hostvars[item].ansible_host }}"
+    # Calculate the gateway (.1) from that IP
+    target_gw: "{{ hostvars[item].ansible_host.split('.')[0:3] | join('.') }}.1"
   ansible.builtin.shell: |
-    ssh -o StrictHostKeyChecking=no -i {{ ssh_key_path }} core@{{ hostvars[item].ansible_host }} "
-    sudo nmcli connection modify enp3s0 ipv4.routes "{{ current_lb_ip }}/24 {{ current_lb_gw }} 50"
-    sudo nmcli connection up enp3s0
-    "
-  when: groups['hahost'] is defined
+    # 1. Check if we can even reach the IP first
+    # 2. Use -i with a path that definitely exists, or remove -i to use default ssh-agent
+    ssh -o StrictHostKeyChecking=no core@{{ target_ip }} \
+    "sudo nmcli connection modify enp3s0 ipv4.routes '{{ target_ip }}/24 {{ target_gw }} 50' && \
+     sudo nmcli connection up enp3s0"
+  register: ssh_res
+  failed_when: ssh_res.rc != 0 and "Permission denied" in ssh_res.stderr
