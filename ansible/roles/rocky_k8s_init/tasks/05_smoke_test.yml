@@ -1,3 +1,23 @@
+- name: Open HTTP and HTTPS on Load Balancers
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['hahost'] }}"
+  ansible.builtin.firewalld:
+    service: "{{ item_service }}"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop_control:
+    loop_var: item_service
+  with_items:
+    - http
+    - https
+
+- name: Open NodePort range for Ingress Controller
+  ansible.builtin.firewalld:
+    port: 30000-32767/tcp
+    permanent: true
+    state: enabled
+    immediate: true
 
 - name: 5.1 - Deploy Nginx Smoke Test
   command: "kubectl apply -f https://k8s.io/examples/controllers/nginx-deployment.yaml --validate=false"
@@ -139,16 +159,38 @@
   ansible.builtin.shell: "kubectl apply -f {{ role_path }}/files/nginx-ingress.yaml"
   run_once: true
 
-- name: Open HTTP and HTTPS on Load Balancers
+- name: 5.5 - Discover and Update LBs with Actual NodePorts
+  delegate_to: localhost
+  run_once: true
+  environment:
+    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
+  block:
+    - name: Get Actual Ports
+      ansible.builtin.shell: |
+        kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort} {.spec.ports[?(@.name=="https")].nodePort}'
+      register: discovered_nodeports
+
+    - name: Set Discovery Facts
+      ansible.builtin.set_fact:
+        ingress_http_nodeport: "{{ discovered_nodeports.stdout.split()[0] }}"
+        ingress_https_nodeport: "{{ discovered_nodeports.stdout.split()[1] }}"
+      delegate_to: "{{ item }}"
+      delegate_facts: true
+      loop: "{{ groups['hahost'] }}"
+
+- name: 5.6 - Re-apply HAProxy Template and Restart
   delegate_to: "{{ item }}"
   loop: "{{ groups['hahost'] }}"
-  ansible.builtin.firewalld:
-    service: "{{ item_service }}"
-    permanent: true
-    state: enabled
-    immediate: true
-  loop_control:
-    loop_var: item_service
-  with_items:
-    - http
-    - https
+  become: true
+  tasks:
+    - name: Update haproxy.cfg
+      ansible.builtin.template:
+        src: "../../rocky_k8s_lbs/templates/haproxy.cfg.j2"
+        dest: /etc/haproxy/haproxy.cfg
+      register: haproxy_conf
+
+    - name: Restart HAProxy if config changed
+      ansible.builtin.systemd:
+        name: haproxy
+        state: restarted
+      when: haproxy_conf.changed

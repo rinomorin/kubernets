@@ -31,11 +31,11 @@ frontend k8s-ingress-https
     bind {{ k8s_api_vip }}:443
     default_backend k8s-workers-https
 
+# --- APPLICATION TRAFFIC (HTTPS - 443) ---
 backend k8s-workers-https
     balance roundrobin
     {% for host in groups['control_nodes'] %}
-    # Pointing to the Ingress Controller NodePorts on the 10.x network
-    server {{ host }} {{ hostvars[host].provision_ip }}:30443 check check-ssl verify none
+    server {{ host }} {{ hostvars[host].provision_ip }}:{{ ingress_https_nodeport | default('30443') }} check
     {% endfor %}
 
 # --- APPLICATION TRAFFIC (HTTP - 80) ---
@@ -43,8 +43,9 @@ frontend k8s-ingress-http
     bind {{ k8s_api_vip }}:80
     default_backend k8s-workers-http
 
+# --- APPLICATION TRAFFIC (HTTP - 80) ---
 backend k8s-workers-http
     balance roundrobin
     {% for host in groups['control_nodes'] %}
-    server {{ host }} {{ hostvars[host].provision_ip }}:30080 check
+    server {{ host }} {{ hostvars[host].provision_ip }}:{{ ingress_http_nodeport | default('30080') }} check
     {% endfor %}

@@ -108,21 +108,6 @@
           fi
         "
 
-        
-    # - name: Fix HAProxy routing priority (Safe via Maintenance)
-    #   delegate_to: localhost
-    #   loop: "{{ groups['hahost'] }}"
-    #   vars:
-    #     # Use the discovered maintenance IP
-    #     mgt_ip: "{{ hostvars[item].maintenance_lb }}"
-    #     ext_ip: "{{ hostvars[item].ansible_host }}"
-    #     ext_gw: "{{ ext_ip.split('.')[0:3] | join('.') }}.1"
-    #     # Pre-build the options to keep the shell block clean
-    #     ssh_base: "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o LogLevel=ERROR -i {{ ssh_key_path }}"
-    #     # Pre-build the full command string
-    #     remote_cmd: "sudo nmcli connection modify enp3s0 ipv4.routes '{{ ext_ip }}/24 {{ ext_gw }} 50' && sudo nmcli connection up enp3s0"
-    #   ansible.builtin.shell: "{{ ssh_base }} core@{{ mgt_ip }} \"{{ remote_cmd }}\""
-
     - name: Start and Verify Services
       delegate_to: localhost
       loop: "{{ groups['hahost'] }}"
