@@ -113,18 +113,16 @@
       run_once: true
       loop: "{{ groups['hahost'] }}"
       vars:
-        # Pull the maintenance IP discovered in your previous '01' task
-        # We use the hostvars for the specific item in the loop
-        mgt_ip: "{{ hostvars[item].maintenance_lb }}"
+        # 1. Look into lb_ip_list, find the entry for this specific host
+        # 2. Extract the maintenance_lb value
+        # 3. If that fails, we fallback to the ansible_host (192.x) just in case
+        mgt_ip: "{{ lb_ip_list | selectattr('maintenance_lb', 'defined') | map(attribute='maintenance_lb') | first | default(hostvars[item].ansible_host) }}"
         external_ip: "{{ hostvars[item].ansible_host }}"
         external_gw: "{{ external_ip.split('.')[0:3] | join('.') }}.1"
       ansible.builtin.shell: |
         ssh -o StrictHostKeyChecking=no core@{{ mgt_ip }} \
         "sudo nmcli connection modify enp3s0 ipv4.routes '{{ external_ip }}/24 {{ external_gw }} 50' && \
         sudo nmcli connection up enp3s0"
-      # Optional: add a short timeout so it doesn't hang if an LB is truly dark
-      async: 30
-      poll: 5
 
     - name: Start and Verify Services
       delegate_to: localhost
