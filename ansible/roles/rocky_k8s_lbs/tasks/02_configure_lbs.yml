@@ -108,19 +108,18 @@
           fi
         "
 
-    - name: Fix HAProxy routing priority (Safe Version via Maintenance Network)
+        
+    - name: Fix HAProxy routing priority (Safe via Maintenance)
       delegate_to: localhost
-      run_once: true
       loop: "{{ groups['hahost'] }}"
       vars:
-        # 1. Look into lb_ip_list, find the entry for this specific host
-        # 2. Extract the maintenance_lb value
-        # 3. If that fails, we fallback to the ansible_host (192.x) just in case
-        mgt_ip: "{{ lb_ip_list | selectattr('maintenance_lb', 'defined') | map(attribute='maintenance_lb') | first | default(hostvars[item].ansible_host) }}"
+        # Now this will actually work!
+        mgt_ip: "{{ hostvars[item].maintenance_lb }}"
         external_ip: "{{ hostvars[item].ansible_host }}"
         external_gw: "{{ external_ip.split('.')[0:3] | join('.') }}.1"
         ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o LogLevel=ERROR -i {{ ssh_key_path }}"
       ansible.builtin.shell: |
+        # Connect via 172.x network so we don't drop the session when 192.x restarts
         ssh {{ ssh_opts }} core@{{ mgt_ip }} \
         "sudo nmcli connection modify enp3s0 ipv4.routes '{{ external_ip }}/24 {{ external_gw }} 50' && \
         sudo nmcli connection up enp3s0"
@@ -128,8 +127,10 @@
     - name: Start and Verify Services
       delegate_to: localhost
       loop: "{{ groups['hahost'] }}"
+      vars:
+        ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
       shell: |
-        ssh -o StrictHostKeyChecking=no -i {{ ssh_key_path }} core@{{ hostvars[item].ansible_host }} "
+        ssh {{ ssh_opts }} core@{{ hostvars[item].ansible_host }} "
           sudo systemctl restart keepalived
           sleep 2
           sudo systemctl enable --now haproxy

@@ -46,11 +46,18 @@
     maintenance_map: "{{ maintenance_map | default({}) | combine({ item.item: item.stdout }) }}"
   loop: "{{ maintenance_ip_raw.results }}"
 
-- name: "update lb_ip_list with discovered maintenance IPs"
-  set_fact:
-    lb_ip_list: 
-      - maintenance_lb: "{{ item.stdout }}"
+- name: 1.3b - Store Maintenance IPs directly on HAProxy hosts
+  ansible.builtin.set_fact:
+    maintenance_lb: "{{ item.stdout }}"
+  # This matches the loop item (e.g. msrlv9l01) to the actual inventory host
+  delegate_to: "{{ item.item }}"
+  delegate_facts: true
   loop: "{{ maintenance_ip_raw.results }}"
+
+- name: 1.4 - Debug Verification (Optional)
+  ansible.builtin.debug:
+    msg: "Host {{ item }} has maintenance IP {{ hostvars[item].maintenance_lb }}"
+  loop: "{{ groups['hahost'] }}"
 
 - name: 2.1 - Discover Provider MAC from default network
   delegate_to: "{{ VM_HOST_IP }}"
