@@ -1,51 +1,33 @@
 global
-    log /dev/log local0
-    group haproxy
-    user haproxy
+    log         127.0.0.1 local2
+    chroot      /var/lib/haproxy
+    pidfile     /var/run/haproxy.pid
+    maxconn     4000
+    user        haproxy
+    group       haproxy
     daemon
 
+    # Turn on the stats socket for troubleshooting
+    stats socket /var/lib/haproxy/stats mode 660 level admin expose-fd listeners
+    stats timeout 30s
+
 defaults
-    log global
-    mode tcp
-    option tcplog
-    timeout connect 5000ms
-    timeout client 50000ms
-    timeout server 50000ms
+    mode                    tcp
+    log                     global
+    option                  tcplog
+    option                  dontlognull
+    option http-server-close
+    option                  redispatch
+    retries                 3
+    timeout http-request    10s
+    timeout queue           1m
+    timeout connect         10s
+    timeout client          1m
+    timeout server          1m
+    timeout http-keep-alive 10s
+    timeout check           10s
+    maxconn                 3000
 
-# --- K8S API SERVER (6443) ---
-frontend k8s-api
-    bind {{ k8s_api_vip }}:6443
-    default_backend k8s-masters
-
-backend k8s-masters
-    option httpchk GET /healthz
-    http-check expect status 200
-    balance roundrobin
-    {% for host in groups['control_nodes'] %}
-    # USE PROVISION_IP (10.x) for reliable internal discovery
-    server {{ host }} {{ hostvars[host].provision_ip }}:6443 check check-ssl verify none
-    {% endfor %}
-
-# --- APPLICATION TRAFFIC (HTTPS - 443) ---
-frontend k8s-ingress-https
-    bind {{ k8s_api_vip }}:443
-    default_backend k8s-workers-https
-
-# --- APPLICATION TRAFFIC (HTTPS - 443) ---
-backend k8s-workers-https
-    balance roundrobin
-    {% for host in groups['control_nodes'] %}
-    server {{ host }} {{ hostvars[host].provision_ip }}:{{ ingress_https_nodeport | default('30443') }} check
-    {% endfor %}
-
-# --- APPLICATION TRAFFIC (HTTP - 80) ---
-frontend k8s-ingress-http
-    bind {{ k8s_api_vip }}:80
-    default_backend k8s-workers-http
-
-# --- APPLICATION TRAFFIC (HTTP - 80) ---
-backend k8s-workers-http
-    balance roundrobin
-    {% for host in groups['control_nodes'] %}
-    server {{ host }} {{ hostvars[host].provision_ip }}:{{ ingress_http_nodeport | default('30080') }} check
-    {% endfor %}
+# IMPORTANT: This line tells HAProxy to load your service-specific files
+# Note: In HAProxy 2.x, you can also use "extra-config-path" in systemd 
+# but putting a placeholder here is a good practice.

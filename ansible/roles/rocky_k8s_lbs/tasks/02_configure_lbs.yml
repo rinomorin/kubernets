@@ -24,6 +24,14 @@
         force: true
       loop: "{{ groups['hahost'] }}"
 
+    - name: Deploy HAProxy Service Config
+      delegate_to: localhost
+      template:
+        src: "k8s-cluster.cfg.j2"
+        dest: "/tmp/k8s_lb_configs/{{ item }}/haproxy_dflt.cfg"
+        # The 'validate' command checks the merge of BOTH files
+      loop: "{{ groups['hahost'] }}"
+
     - name: Template Keepalived Config
       delegate_to: localhost
       template:
@@ -62,6 +70,7 @@
 
         # 2. SCP configs to the LB node
         scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/haproxy.cfg core@{{ target_ip }}:/tmp/haproxy.cfg
+        scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/haproxy_dflt.cfg core@{{ target_ip }}:/tmp/haproxy_dflt.cfg
         scp {{ ssh_opts }} /tmp/k8s_lb_configs/{{ item }}/keepalived.conf core@{{ target_ip }}:/tmp/keepalived.conf
 
         # 3. Apply Host-Level fixes and start services
@@ -81,9 +90,10 @@
 
           # Move configs to final destination
           sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
+          sudo mv /tmp/haproxy_dflt.cfg /etc/haproxy/conf.d/haproxy_dflt.cfg
           sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf
-          sudo chown root:root /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
-          sudo chmod 644 /etc/haproxy/haproxy.cfg /etc/keepalived/keepalived.conf
+          sudo chown root:root /etc/haproxy/haproxy.cfg /etc/haproxy/conf.d/haproxy_dflt.cfg /etc/keepalived/keepalived.conf
+          sudo chmod 644 /etc/haproxy/haproxy.cfg /etc/haproxy/conf.d/haproxy_dflt.cfg /etc/keepalived/keepalived.conf
           sudo restorecon -Rv /etc/haproxy /etc/keepalived
 
           # PRE-FLIGHT SYNTAX CHECK
