@@ -1,3 +1,12 @@
+- name: 3.0 - Join Nodes to Cluster
+  delegate_to: localhost
+  environment:
+    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
+  shell: |
+    kubectl get nodes -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "No nodes found"
+  register: node_check
+
+
 - name: 3.1 - Join Additional Masters
   command: >
     kubeadm join {{ k8s_api_vip }}:6443 
@@ -10,7 +19,7 @@
     - "'control_nodes' in group_names"
     - inventory_hostname != groups['control_nodes'][0]
   args:
-    creates: /etc/kubernetes/admin.conf
+    creates: /etc/kubernetes/admin.con
 
 - name: 4.1 - Join Worker Nodes
   command: >

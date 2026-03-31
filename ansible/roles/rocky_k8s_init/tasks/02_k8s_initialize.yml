@@ -1,4 +1,10 @@
 
+- name: Check if Kubernetes is already initialized
+  ansible.builtin.stat:
+    path: /etc/kubernetes/admin.conf
+  register: kube_init_check
+  when: inventory_hostname == groups['control_nodes'][0]
+
 # 02_k8s_initialize.yml
 - name: 2.1 - Initialize Control Plane on Seed Master
   command: >
@@ -9,7 +15,9 @@
     --pod-network-cidr=10.244.0.0/16
     --apiserver-advertise-address={{ node_ip }}
     --ignore-preflight-errors=SystemVerification
-  when: inventory_hostname == groups['control_nodes'][0]
+  when: 
+    - inventory_hostname == groups['control_nodes'][0]
+    - not kube_init_check.stat.exists
   register: kubeadm_init
 
 - name: 2.2 - Handle Existing Cluster (Extract Key if 2.1 Skipped)
