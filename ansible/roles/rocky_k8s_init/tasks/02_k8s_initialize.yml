@@ -15,6 +15,7 @@
     --pod-network-cidr=10.244.0.0/16
     --apiserver-advertise-address={{ node_ip }}
     --ignore-preflight-errors=SystemVerification
+    --v=5
   when: 
     - inventory_hostname == groups['control_nodes'][0]
     - not kube_init_check.stat.exists
