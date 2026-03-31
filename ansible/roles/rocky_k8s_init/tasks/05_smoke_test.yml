@@ -180,18 +180,53 @@
 - debug:
     var: discovered_nodeports.stdout_lines
 
+- name: 5.5.5 - Generate Config Fragment on Helper
+  delegate_to: localhost
+  run_once: true
+  ansible.builtin.template:
+    src: "../../rocky_k8s_lbs/templates/k8s-cluster.cfg.j2"
+    dest: "/tmp/ingress-nginx-controller.cfg"
+  vars:
+    # Splitting the stdout into a list: index 0 is http, index 1 is https
+    ingress_http_nodeport: "{{ discovered_nodeports.stdout.split()[0] | trim }}"
+    ingress_https_nodeport: "{{ discovered_nodeports.stdout.split()[1] | trim }}"
 
-# - name: 5.5.5 - Generate Config on Helper
-#   delegate_to: localhost
-#   run_once: true
-#   ansible.builtin.template:
-#     src: "../../rocky_k8s_lbs/templates/haproxy.cfg.j2"
-#     dest: "/tmp/haproxy.cfg.generated"
-#   vars:
-#     # We strip and split here to ensure NO whitespace ruins the Jinja template
-#     ingress_http_nodeport: "{{ discovered_nodeports.stdout.split()[0] | trim }}"
-#     ingress_https_nodeport: "{{ discovered_nodeports.stdout.split()[1] | trim }}"
- 
+- name: 5.5.6 - Push and Move Service Fragment to LBs
+  delegate_to: localhost
+  loop: "{{ groups['hahost'] }}"
+  vars:
+    ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {{ ssh_key_path }}"
+    target_ip: "{{ hostvars[item].ansible_host }}"
+  ansible.builtin.shell: |
+    # 1. SCP to /tmp first (since core user cannot write to /etc/haproxy directly)
+    scp {{ ssh_opts }} /tmp/ingress-nginx-controller.cfg core@{{ target_ip }}:/tmp/ingress-nginx-controller.cfg
+
+    # 2. Move to final destination and set proper system permissions
+    ssh {{ ssh_opts }} core@{{ target_ip }} "
+      sudo mv /tmp/ingress-nginx-controller.cfg /etc/haproxy/conf.d/ingress-nginx-controller.cfg
+      sudo chown root:root /etc/haproxy/conf.d/ingress-nginx-controller.cfg
+      sudo chmod 644 /etc/haproxy/conf.d/ingress-nginx-controller.cfg
+    "
+
+- name: 5.5.7 - Remote Validation and Reload
+  delegate_to: localhost
+  loop: "{{ groups['hahost'] }}"
+  vars:
+    ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {{ ssh_key_path }}"
+    target_ip: "{{ hostvars[item].ansible_host }}"
+  ansible.builtin.shell: |
+    ssh {{ ssh_opts }} core@{{ target_ip }} "
+      # Validate the full config (Main + all fragments in conf.d)
+      if sudo /usr/sbin/haproxy -c -f /etc/haproxy/haproxy.cfg -f /etc/haproxy/conf.d/; then
+        echo 'Configuration valid for {{ item }}, reloading HAProxy...'
+        sudo systemctl reload haproxy
+      else
+        echo 'CRITICAL: HAProxy configuration merge failed on {{ item }}'
+        exit 1
+      fi
+    "
+  register: lb_reload_status 
+
 # - debug:
 #     var: haproxy_config_output.stdout_lines
 
