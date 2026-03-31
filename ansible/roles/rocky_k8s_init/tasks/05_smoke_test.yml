@@ -175,19 +175,22 @@
       delegate_facts: true
       loop: "{{ groups['hahost'] }}"
 
-- name: 5.6 - Re-apply HAProxy Template and Restart
+- name: 5.6 - Re-apply HAProxy Template
   delegate_to: "{{ item }}"
   loop: "{{ groups['hahost'] }}"
   become: true
-  tasks:
-    - name: Update haproxy.cfg
-      ansible.builtin.template:
-        src: "../../rocky_k8s_lbs/templates/haproxy.cfg.j2"
-        dest: /etc/haproxy/haproxy.cfg
-      register: haproxy_conf
+  ansible.builtin.template:
+    src: "../../rocky_k8s_lbs/templates/haproxy.cfg.j2"
+    dest: /etc/haproxy/haproxy.cfg
+    mode: '0644'
+  register: haproxy_conf
 
-    - name: Restart HAProxy if config changed
-      ansible.builtin.systemd:
-        name: haproxy
-        state: restarted
-      when: haproxy_conf.changed
+- name: 5.7 - Restart HAProxy on Config Change
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['hahost'] }}"
+  become: true
+  ansible.builtin.systemd:
+    name: haproxy
+    state: restarted
+  # We check the 'changed' status specifically for the host in this loop iteration
+  when: hostvars[item].haproxy_conf.changed
