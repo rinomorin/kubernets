@@ -1,3 +1,4 @@
+
 # --- KUBERNETES API SERVER (6443) ---
 frontend k8s-api
     bind {{ k8s_api_vip }}:6443
@@ -33,5 +34,6 @@ backend k8s-workers-http
     {% for host in groups['control_nodes'] %}
     server {{ host }} {{ hostvars[host].provision_ip }}:{{ ingress_http_nodeport | default('30080') }} check
     {% endfor %}
+
 
 # MANDATORY EMPTY LINE BELOW - DO NOT DELETE
