@@ -1,18 +1,13 @@
 - name: Open HTTP and HTTPS on Load Balancers
-  delegate_to: "{{ item_host }}"
-  loop: "{{ groups['hahost'] }}"
-  loop_control:
-    loop_var: item_host
-  # We use a nested block or separate tasks usually, 
-  # but to keep your logic, we can simplify:
+  delegate_to: "{{ item[0] }}"
+  # This creates a list of [ ('lb01', 'http'), ('lb01', 'https'), ('lb02', 'http')... ]
+  loop: "{{ groups['hahost'] | product(['http', 'https']) | list }}"
   ansible.builtin.firewalld:
-    service: "{{ item_service }}"
+    service: "{{ item[1] }}"
     permanent: true
     state: enabled
     immediate: true
-  with_items: # You can't mix loop and with_items easily on one task
-    - http
-    - https
+  become: true
 
 - name: Open NodePort range for Ingress Controller
   ansible.builtin.firewalld:
