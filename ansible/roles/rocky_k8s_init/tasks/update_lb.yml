@@ -15,19 +15,20 @@
   loop: "{{ groups['hahost'] }}"
 
 - name: Copy staging to live config on {{ item }}
-  ansible.builtin.command: "sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg"
+  ansible.builtin.command: "sudo mv -f /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg"
   delegate_to: "{{ item }}"
   loop: "{{ groups['hahost'] }}"
 
 - name: Move staging to live config on {{ item }}
-  ansible.builtin.command: "sudo chmod 644 /etc/haproxy/haproxy.cfg && sudo chown root:root /etc/haproxy/haproxy.cfg"
+  shell: |
+    sudo chmod 644 /etc/haproxy/haproxy.cfg
+    sudo chown root:root /etc/haproxy/haproxy.cfg
   delegate_to: "{{ item }}"
   loop: "{{ groups['hahost'] }}"
   
 - name: Move staging to live config on {{ item }}
   ansible.builtin.command: "sudo systemctl restart haproxy"
   delegate_to: "{{ item }}"
-  loop: "{{ groups['hahost'] }}"
 
 - name: remove temporary file in /tmp
   ansible.builtin.command: "rm -f /tmp/haproxy.cfg.generated"
