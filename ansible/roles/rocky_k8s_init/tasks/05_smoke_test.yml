@@ -156,7 +156,7 @@
   ansible.builtin.shell: "kubectl apply -f {{ role_path }}/files/nginx-ingress.yaml"
   run_once: true
 
-- name: 5.5 - Discover Actual NodePorts from K8s
+- name: 5.5 - Discover Actual NodePorts
   delegate_to: localhost
   run_once: true
   environment:
@@ -165,26 +165,50 @@
     kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort} {.spec.ports[?(@.name=="https")].nodePort}'
   register: discovered_nodeports
 
-- name: 5.5.5 - Set NodePort Facts on LB hosts
-  ansible.builtin.set_fact:
+- name: 5.5.5 - Generate Config on Helper
+  delegate_to: localhost
+  run_once: true
+  ansible.builtin.template:
+    src: "../../rocky_k8s_lbs/templates/haproxy.cfg.j2"
+    dest: "/tmp/haproxy.cfg.generated"
+  vars:
     ingress_http_nodeport: "{{ discovered_nodeports.stdout.split()[0] }}"
     ingress_https_nodeport: "{{ discovered_nodeports.stdout.split()[1] }}"
-  delegate_to: "{{ item }}"
-  delegate_facts: true
-  loop: "{{ groups['hahost'] }}"
-  run_once: true
 
-- name: 5.6 - Re-apply HAProxy Template and Restart
-  include_tasks: update_lb.yml
-  loop: "{{ groups['hahost'] }}"
-  run_once: true
-
-- name: 5.7 - Restart HAProxy on Config Change
+- name: 5.6 - Stage and Move Config to LBs
   delegate_to: "{{ item }}"
   loop: "{{ groups['hahost'] }}"
+  run_once: true
   become: true
-  ansible.builtin.systemd:
-    name: haproxy
-    state: restarted
-  # We check the 'changed' status specifically for the host in this loop iteration
-  when: hostvars[item].haproxy_conf.changed
+  block:
+    - name: Push to staging area
+      ansible.builtin.copy:
+        src: "/tmp/haproxy.cfg.generated"
+        dest: "/tmp/haproxy.cfg.tmp"
+        owner: "{{ ansible_user }}"
+        mode: '0644'
+
+    - name: Move staging to live config
+      ansible.builtin.command: "mv /tmp/haproxy.cfg.tmp /etc/haproxy/haproxy.cfg"
+
+    - name: Ensure correct ownership and permissions
+      ansible.builtin.file:
+        path: /etc/haproxy/haproxy.cfg
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Restart HAProxy
+      ansible.builtin.systemd:
+        name: haproxy
+        state: restarted
+
+# - name: 5.7 - Restart HAProxy on Config Change
+#   delegate_to: "{{ item }}"
+#   loop: "{{ groups['hahost'] }}"
+#   become: true
+#   ansible.builtin.systemd:
+#     name: haproxy
+#     state: restarted
+#   # We check the 'changed' status specifically for the host in this loop iteration
+#   when: hostvars[item].haproxy_conf.changed
