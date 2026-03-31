@@ -101,3 +101,32 @@
 
 - debug:
     var: network_verify.stdout_lines
+
+
+- name: Deploy NGINX Ingress Controller (Baremetal)
+  delegate_to: localhost
+  run_once: true
+  environment:
+    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
+  ansible.builtin.shell: |
+    kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/baremetal/deploy.yaml
+  register: ingress_deploy
+  changed_when: "'created' in ingress_deploy.stdout or 'configured' in ingress_deploy.stdout"
+
+- name: Create Nginx Service (NodePort)
+  delegate_to: localhost
+  run_once: true
+  environment:
+    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
+  ansible.builtin.shell: |
+    kubectl expose deployment nginx-deployment --port=80 --target-port=80 --type=NodePort --name=nginx-service
+  register: svc_out
+  failed_when: svc_out.rc != 0 and 'already exists' not in svc_out.stderr
+  changed_when: "'exposed' in svc_out.stdout"
+
+- name: Apply Ingress Resource from files
+  delegate_to: localhost
+  run_once: true
+  environment:
+    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
+  ansible.builtin.shell: "kubectl apply -f {{ role_path }}/files/nginx-ingress.yaml"
