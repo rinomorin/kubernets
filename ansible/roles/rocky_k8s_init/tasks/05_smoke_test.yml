@@ -138,3 +138,17 @@
     KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
   ansible.builtin.shell: "kubectl apply -f {{ role_path }}/files/nginx-ingress.yaml"
   run_once: true
+
+- name: Open HTTP and HTTPS on Load Balancers
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['hahost'] }}"
+  ansible.builtin.firewalld:
+    service: "{{ item_service }}"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop_control:
+    loop_var: item_service
+  with_items:
+    - http
+    - https
