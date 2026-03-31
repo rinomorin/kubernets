@@ -177,6 +177,10 @@
     kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort} {.spec.ports[?(@.name=="https")].nodePort}'
   register: discovered_nodeports
 
+- debug:
+    var: discovered_nodeports.stdout_lines
+
+
 # - name: 5.5.5 - Generate Config on Helper
 #   delegate_to: localhost
 #   run_once: true
