@@ -2,6 +2,7 @@
   delegate_to: "{{ item[0] }}"
   # This creates a list of [ ('lb01', 'http'), ('lb01', 'https'), ('lb02', 'http')... ]
   loop: "{{ groups['hahost'] | product(['http', 'https']) | list }}"
+  run_once: true
   ansible.builtin.firewalld:
     service: "{{ item[1] }}"
     permanent: true
@@ -119,7 +120,6 @@
 - debug:
     var: network_verify.stdout_lines
 
-
 - name: Deploy NGINX Ingress Controller (Baremetal)
   delegate_to: localhost
   run_once: true
@@ -177,38 +177,38 @@
     kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort} {.spec.ports[?(@.name=="https")].nodePort}'
   register: discovered_nodeports
 
-- name: 5.5.5 - Generate Config on Helper
-  delegate_to: localhost
-  run_once: true
-  ansible.builtin.template:
-    src: "../../rocky_k8s_lbs/templates/haproxy.cfg.j2"
-    dest: "/tmp/haproxy.cfg.generated"
-  vars:
-    # We strip and split here to ensure NO whitespace ruins the Jinja template
-    ingress_http_nodeport: "{{ discovered_nodeports.stdout.split()[0] | trim }}"
-    ingress_https_nodeport: "{{ discovered_nodeports.stdout.split()[1] | trim }}"
+# - name: 5.5.5 - Generate Config on Helper
+#   delegate_to: localhost
+#   run_once: true
+#   ansible.builtin.template:
+#     src: "../../rocky_k8s_lbs/templates/haproxy.cfg.j2"
+#     dest: "/tmp/haproxy.cfg.generated"
+#   vars:
+#     # We strip and split here to ensure NO whitespace ruins the Jinja template
+#     ingress_http_nodeport: "{{ discovered_nodeports.stdout.split()[0] | trim }}"
+#     ingress_https_nodeport: "{{ discovered_nodeports.stdout.split()[1] | trim }}"
  
-- debug:
-    var: haproxy_config_output.stdout_lines
+# - debug:
+#     var: haproxy_config_output.stdout_lines
 
-- name: 5.6 - Loop over Load Balancers
-  include_tasks: update_lb_physically.yml
-  loop: "{{ groups['hahost'] }}"
-  loop_control:
-    loop_var: lb_node
-  run_once: true
-
-- name: 5.6 - Run Stage/Move/Restart Loop
-  include_tasks: update_lb.yml
-  loop: "{{ groups['hahost'] }}"
-  run_once: true
-
-# - name: 5.7 - Restart HAProxy on Config Change
-#   delegate_to: "{{ item }}"
+# - name: 5.6 - Loop over Load Balancers
+#   include_tasks: update_lb_physically.yml
 #   loop: "{{ groups['hahost'] }}"
-#   become: true
-#   ansible.builtin.systemd:
-#     name: haproxy
-#     state: restarted
-#   # We check the 'changed' status specifically for the host in this loop iteration
-#   when: hostvars[item].haproxy_conf.changed
+#   loop_control:
+#     loop_var: lb_node
+#   run_once: true
+
+# - name: 5.6 - Run Stage/Move/Restart Loop
+#   include_tasks: update_lb.yml
+#   loop: "{{ groups['hahost'] }}"
+#   run_once: true
+
+# # - name: 5.7 - Restart HAProxy on Config Change
+# #   delegate_to: "{{ item }}"
+# #   loop: "{{ groups['hahost'] }}"
+# #   become: true
+# #   ansible.builtin.systemd:
+# #     name: haproxy
+# #     state: restarted
+# #   # We check the 'changed' status specifically for the host in this loop iteration
+# #   when: hostvars[item].haproxy_conf.changed
