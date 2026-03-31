@@ -165,6 +165,9 @@
     kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort} {.spec.ports[?(@.name=="https")].nodePort}'
   register: discovered_nodeports
 
+- debug:
+    var: discovered_nodeports.stdout_lines
+
 - name: 5.5.5 - Generate Config on Helper
   delegate_to: localhost
   run_once: true
@@ -172,13 +175,40 @@
     src: "../../rocky_k8s_lbs/templates/haproxy.cfg.j2"
     dest: "/tmp/haproxy.cfg.generated"
   vars:
-    ingress_http_nodeport: "{{ discovered_nodeports.stdout.split()[0] }}"
-    ingress_https_nodeport: "{{ discovered_nodeports.stdout.split()[1] }}"
+    # Explicitly pulling from the registered result of the previous task
+    ingress_http_nodeport: "{{ discovered_nodeports.stdout.split()[0] | trim }}"
+    ingress_https_nodeport: "{{ discovered_nodeports.stdout.split()[1] | trim }}"
+    # Ensure the VIP is also passed if it's not in your group_vars
+    k8s_api_vip: "192.168.100.30"
 
-- name: 5.6 - Run Stage/Move/Restart Loop
-  include_tasks: update_lb.yml
-  loop: "{{ groups['hahost'] }}"
+- name: 5.5.6 - Show Generated Config (Debug)
+  delegate_to: localhost
   run_once: true
+  ansible.builtin.shell: "cat /tmp/haproxy.cfg.generated"
+  register: haproxy_config_output
+  changed_when: false
+- debug:
+    var: haproxy_config_output.stdout_lines
+
+- name: 5.6 - Push and Restart LBs
+  delegate_to: "{{ lb_node }}"
+  loop: "{{ groups['hahost'] }}"
+  loop_control:
+    loop_var: lb_node
+  become: true
+  tasks:
+    - name: Upload Config
+      ansible.builtin.copy:
+        src: "/tmp/haproxy.cfg.generated"
+        dest: "/etc/haproxy/haproxy.cfg"
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Restart Service
+      ansible.builtin.systemd:
+        name: haproxy
+        state: restarted
 
 # - name: 5.7 - Restart HAProxy on Config Change
 #   delegate_to: "{{ item }}"
