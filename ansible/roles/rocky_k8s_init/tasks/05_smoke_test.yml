@@ -124,9 +124,17 @@
   failed_when: svc_out.rc != 0 and 'already exists' not in svc_out.stderr
   changed_when: "'exposed' in svc_out.stdout"
 
+- name: Remove broken admission webhook (Temporary Fix)
+  delegate_to: localhost
+  environment:
+    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
+  ansible.builtin.shell: |
+    kubectl delete validatingwebhookconfigurations ingress-nginx-admission --ignore-not-found
+  run_once: true
+
 - name: Apply Ingress Resource from files
   delegate_to: localhost
-  run_once: true
   environment:
     KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
   ansible.builtin.shell: "kubectl apply -f {{ role_path }}/files/nginx-ingress.yaml"
+  run_once: true
