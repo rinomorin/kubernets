@@ -156,7 +156,7 @@
   ansible.builtin.shell: "kubectl apply -f {{ role_path }}/files/nginx-ingress.yaml"
   run_once: true
 
-- name: 5.5 - Discover Actual NodePorts from K8s
+- name: 5.5 - Discover Actual NodePor- name: 5.5 - Discover Actual NodePorts from K8s
   delegate_to: localhost
   run_once: true
   environment:
@@ -165,7 +165,7 @@
     kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort} {.spec.ports[?(@.name=="https")].nodePort}'
   register: discovered_nodeports
 
-- name: 5.5.5 - Set NodePort Facts on all LB hosts
+- name: 5.5.5 - Set NodePort Facts on LB hosts
   ansible.builtin.set_fact:
     ingress_http_nodeport: "{{ discovered_nodeports.stdout.split()[0] }}"
     ingress_https_nodeport: "{{ discovered_nodeports.stdout.split()[1] }}"
@@ -175,21 +175,9 @@
   run_once: true
 
 - name: 5.6 - Re-apply HAProxy Template and Restart
-  delegate_to: "{{ item }}"
+  include_tasks: update_lb.yml
   loop: "{{ groups['hahost'] }}"
   run_once: true
-  become: true
-  block:
-    - name: Update haproxy.cfg
-      ansible.builtin.template:
-        src: "../../rocky_k8s_lbs/templates/haproxy.cfg.j2"
-        dest: /etc/haproxy/haproxy.cfg
-      # Inside a block, we can just use a simple notify/handler or manual restart
-    
-    - name: Restart HAProxy Service
-      ansible.builtin.systemd:
-        name: haproxy
-        state: restarted
 
 - name: 5.7 - Restart HAProxy on Config Change
   delegate_to: "{{ item }}"
