@@ -37,12 +37,3 @@
     cert_key: "{{ kubeadm_init.stdout | regex_search('--certificate-key\\s+([a-f0-9]+)', '\\1') | first if kubeadm_init.changed else cert_reupload.stdout | trim }}"
   when: inventory_hostname == groups['control_nodes'][0]
 
-# - name: 2.4 - copy admin.conf to user's home and set permissions
-#   become: true
-#   copy:
-#     src: /etc/kubernetes/admin.conf
-#     dest: /home/{{ cloud_helper_user }}/admin.conf
-#     owner: "{{ cloud_helper_user }}"
-#     group: "{{ cloud_helper_user }}"
-#     mode: '0600'
-#   when: inventory_hostname == groups['control_nodes'][0]
