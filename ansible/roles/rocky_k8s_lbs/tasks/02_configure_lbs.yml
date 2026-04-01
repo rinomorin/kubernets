@@ -89,7 +89,7 @@
 
           # Move configs to final destination
           print "\n" >> /tmp/haproxy.cfg # Ensure trailing newline for HAProxy
-          print "\n" >> /tmp/haproxy_dflt.cfg # Ensure trailing newline for HAProxy
+          
           sudo mv /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg
           sudo mv /tmp/haproxy_dflt.cfg /etc/haproxy/conf.d/haproxy_dflt.cfg
           sudo mv /tmp/keepalived.conf /etc/keepalived/keepalived.conf
