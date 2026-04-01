@@ -24,5 +24,4 @@
 - import_tasks: 05_smoke_test.yml
 
 # 6. Pre-check MetalLB IP range
-- import_tasks: 06_metallb.yml
-
+- import_tasks: 06_setup_bridge.yml
