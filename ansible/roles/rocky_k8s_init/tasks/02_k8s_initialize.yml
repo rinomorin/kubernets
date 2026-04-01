@@ -7,6 +7,8 @@
 
 # 02_k8s_initialize.yml
 - name: 2.1 - Initialize Control Plane on Seed Master
+  run_once: true
+  delegate_to: "{{ groups['control_nodes'][0] }}"
   command: >
     kubeadm init 
     --control-plane-endpoint "{{ k8s_api_vip }}:6443" 
