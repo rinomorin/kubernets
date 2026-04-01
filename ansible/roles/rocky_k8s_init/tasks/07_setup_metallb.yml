@@ -1,13 +1,17 @@
 ---
 - name: Allow MetalLB Memberlist traffic
-  firewalld:
-    port: "{{ item }}"
-    permanent: true
-    state: enabled
-    immediate: true
-  loop:
-    - 7946/tcp
-    - 7946/udp
+  delegate_to: localhost
+  become: false
+  vars:
+    ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i {{ ssh_key_path }}"
+  shell: |
+    ssh {{ ssh_opts }} core@{{ hostvars[item].provision_ip }} sudo firewall-cmd --permanent --add-port=7946/tcp 
+    ssh {{ ssh_opts }} core@{{ hostvars[item].provision_ip }} sudo firewall-cmd --permanent --add-port=7946/udp
+    ssh {{ ssh_opts }} core@{{ hostvars[item].provision_ip }} sudo firewall-cmd --reload
+  loop: "{{ groups['cluster_nodes'] }}"
+
+  register: metallb_fw_out
+  # failed_when: metallb_fw_out.rc != 0
 
 - name: 7.1 - Enable Strict ARP in Kube-Proxy (Required for MetalLB)
   shell: |
