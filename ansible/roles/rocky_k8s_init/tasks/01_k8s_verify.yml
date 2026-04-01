@@ -70,6 +70,7 @@
     - 10250/tcp  # Kubelet API
     - 30000-32767/tcp # NodePort Services
     - 7946/udp # MetalLB Memberlist (UDP)
+    - 7946/tcp # MetalLB Memberlist (TCP)
     - 4789/udp # MetalLB VXLAN (UDP)
   
 - name: 1.10 - Open Control Plane Specific Ports

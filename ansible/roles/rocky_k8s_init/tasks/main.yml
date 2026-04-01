@@ -23,5 +23,9 @@
 # 5. test it
 - import_tasks: 05_smoke_test.yml
 
+# 7. Setup MetalLB and Test Ingress
+- import_tasks: 07_setup_metallb.yml
+  when: inventory_hostname == groups['control_nodes'][0]
+
 # 6. Pre-check MetalLB IP range
 - import_tasks: 06_setup_bridge.yml
