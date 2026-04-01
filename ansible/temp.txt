@@ -25,6 +25,7 @@ export secops_pwd="On32Secure4Sec0ps~"
 export secops_hash=$(echo -n "$secops_pwd" | openssl passwd -6 -stdin)
 export ipa_admin_password="On32L00kUpToo~"
 export ipa_dm_password="On32dr1v3H0me~"
+export metallb_vip="10.0.0.200"
 
 # 4. SSH Key Management (Golden Image Injection)
 export ssh_key_path="/home/cloud_helper/.ssh/id_rsa.pub"
