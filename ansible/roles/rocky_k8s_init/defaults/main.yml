@@ -26,6 +26,7 @@ ipa_master_fqdn: "{{ lookup('env', 'ipa_master') | default('ipa.' ~ cloud_zone, 
 tram_size: "{{ lookup('env', 'VM_RAM') | default(4096, true) }}"
 tcpu_count: "{{ lookup('env', 'VM_CPUS') | default(2, true) }}"
 tdisk_size: "{{ lookup('env', 'VM_DISK') | default(50, true) }}"
+ssh_key_path: "{{ lookup('env', 'ssh_key_path') | default('~/.ssh/id_rsa', true) | regex_replace('\\.pub$', '') }}"
 
 # OS & Repo Versions
 tos_name: "rocky"
