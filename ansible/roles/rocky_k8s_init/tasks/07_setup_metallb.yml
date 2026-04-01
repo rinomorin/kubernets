@@ -4,9 +4,10 @@
   vars:
     ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o LogLevel=ERROR -i {{ ssh_key_path }}"
   shell: |
-    ssh {{ ssh_opts }} core@"{{ hostvars[item].provision_ip }}" sudo firewall-cmd --zone=public --add-port=7946/udp --permanent
-    ssh {{ ssh_opts }} core@"{{ hostvars[item].provision_ip }}" sudo firewall-cmd --zone=public --add-port=7946/tcp --permanent
-    ssh {{ ssh_opts }} core@"{{ hostvars[item].provision_ip }}" sudo firewall-cmd --reload
+    ssh {{ ssh_opts }} core@{{ hostvars[item].provision_ip }} "
+      sudo firewall-cmd --zone=public --add-port=7946/udp --permanent;
+      sudo firewall-cmd --zone=public --add-port=7946/tcp --permanent;
+      sudo firewall-cmd --reload"
   loop: "{{ groups['cluster_nodes'] }}"
   run_once: true
 
