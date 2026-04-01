@@ -12,9 +12,6 @@
 - import_tasks: 04b_fix_firewall.yml
 - import_tasks: 04_post_init.yml
 
-# 7. Setup MetalLB and Test Ingress
-- import_tasks: 07_setup_metallb.yml
-  when: inventory_hostname == groups['control_nodes'][0]
 # - name: Setup Dashboard Infrastructure
 #   ansible.builtin.import_tasks: dashboard.yml
 #   when: inventory_hostname in groups['masters'][0]
