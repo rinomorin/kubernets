@@ -1,25 +1,16 @@
-vrrp_script check_haproxy {
-    script "/usr/bin/pgrep -x haproxy"
-    interval 2
-    weight 2
-    # Add rise/fall to prevent flapping on a quick service restart
-    rise 2
-    fall 2
-}
-
 vrrp_instance VI_1 {
-    # Use 'inventory_hostname' if this is running inside a host-loop
-    state {{ 'MASTER' if inventory_hostname == groups['hahost'][0] else 'BACKUP' }}
+    # Use 'item' because that is the host we are currently templating for
+    state {{ 'MASTER' if item == groups['hahost'][0] else 'BACKUP' }}
     
-    # Dynamically pick the interface based on the provider IP
-    interface {{ hostvars[inventory_hostname].provider_interface | default('enp3s0') }}
+    # Pull facts specifically for the 'item' host
+    interface {{ hostvars[item].provider_interface | default('enp3s0') }}
     
     virtual_router_id 51
-    priority {{ 100 - (groups['hahost'].index(inventory_hostname) * 10) }}
-    advert_int 1
     
-    # Prevent the MASTER from grabbing the VIP back immediately if it reboots
-    # This prevents a second brief outage when the "better" node comes back up
+    # Calculate priority based on the item's position in the hahost group
+    priority {{ 100 - (groups['hahost'].index(item) * 10) }}
+    
+    advert_int 1
     nopreempt
 
     authentication {
@@ -27,18 +18,18 @@ vrrp_instance VI_1 {
         auth_pass 42
     }
 
-    # UNICAST SECTION: Critical for stability in private clouds
-    unicast_src_ip {{ hostvars[inventory_hostname].provider_ip }}
+    # Unicast needs to know the IP of the host we are templating (item)
+    unicast_src_ip {{ hostvars[item].provider_ip }}
     unicast_peer {
         {% for host in groups['hahost'] %}
-        {% if host != inventory_hostname %}
+        {% if host != item %}
         {{ hostvars[host].provider_ip }}
         {% endif %}
         {% endfor %}
     }
 
     virtual_ipaddress {
-        {{ k8s_api_vip }} dev {{ hostvars[inventory_hostname].provider_interface | default('enp3s0') }} label {{ hostvars[inventory_hostname].provider_interface | default('enp3s0') }}:vip
+        {{ k8s_api_vip }} dev {{ hostvars[item].provider_interface | default('enp3s0') }}
     }
 
     track_script {
