@@ -1,4 +1,15 @@
 ---
+- name: Allow MetalLB Memberlist traffic
+  delegate_to: localhost
+  vars:
+    ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o LogLevel=ERROR -i {{ ssh_key_path }}"
+  shell: |
+    ssh {{ ssh_opts }} core@"{{ hostvars[item].provision_ip }}" sudo firewall-cmd --zone=public --add-port=7946/udp --permanent
+    ssh {{ ssh_opts }} core@"{{ hostvars[item].provision_ip }}" sudo firewall-cmd --zone=public --add-port=7946/tcp --permanent
+    ssh {{ ssh_opts }} core@"{{ hostvars[item].provision_ip }}" sudo firewall-cmd --reload
+  loop: "{{ groups['cluster_nodes'] }}"
+  run_once: true
+
 - name: 7.1 - Enable Strict ARP in Kube-Proxy (Required for MetalLB)
   shell: |
     kubectl get configmap kube-proxy -n kube-system -o yaml | \
@@ -30,6 +41,9 @@
   failed_when: false # Prevents crashing if the pod isn't created in the first 1 second
   environment:
     KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
+
+- debug:
+    msg: "MetalLB_vip {{ metallb_vip }}"
 
 - name: 7.4 - Configure MetalLB IP Pool and L2 Advertisement
   shell: |
