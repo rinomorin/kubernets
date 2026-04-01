@@ -1,73 +1,48 @@
-## --- PART 1: KUBERNETES INGRESS DEPLOYMENT ---
-# (Keep your existing kubectl apply and wait tasks here...)
-
-- name: 5.5 - Discover Actual NodePorts
+- name: 6.1.0 - Check if Ingress Controller Namespace exists
   delegate_to: localhost
   run_once: true
   environment:
     KUBECONFIG: "/home/{{ ansible_user_id }}/.kube/config"
   ansible.builtin.shell: |
-    kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort} {.spec.ports[?(@.name=="https")].nodePort}'
-  register: discovered_nodeports
-
-## --- PART 2: HAPROXY BRIDGE SETUP (The Troubleshooting Breakdown) ---
-
-- name: Bridge | Step 1 - Generate Fragment (Localhost)
-  delegate_to: localhost
-  run_once: true
-  ansible.builtin.template:
-    src: "k8s-cluster.cfg.j2"
-    dest: "/tmp/k8s-service-ingress.cfg"
-  vars:
-    svc_name: "k8s-ingress"
-    ingress_http_nodeport: "{{ discovered_nodeports.stdout.split()[0] | trim }}"
-    ingress_https_nodeport: "{{ discovered_nodeports.stdout.split()[1] | trim }}"
-
-- name: Bridge | Step 2 - SCP Fragment to /tmp Staging
-  delegate_to: localhost
-  loop: "{{ groups['hahost'] }}"
-  vars:
-    ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {{ ssh_key_path }}"
-    target_ip: "{{ hostvars[item].ansible_host }}"
-  ansible.builtin.shell: |
-    scp {{ ssh_opts }} /tmp/k8s-service-ingress.cfg core@{{ target_ip }}:/tmp/k8s-service-ingress.cfg
-
-- name: Bridge | Step 3 - Validate Fragment on Remote
-  delegate_to: localhost
-  loop: "{{ groups['hahost'] }}"
-  vars:
-    ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {{ ssh_key_path }}"
-    target_ip: "{{ hostvars[item].ansible_host }}"
-  ansible.builtin.shell: |
-    ssh {{ ssh_opts }} core@{{ target_ip }} "sudo /usr/sbin/haproxy -c -f /etc/haproxy/haproxy.cfg -f /etc/haproxy/conf.d/ -f /tmp/k8s-service-ingress.cfg"
-  register: haproxy_validation
+    kubectl get namespace ingress-nginx --no-headers
+  register: ingress_ns_check
+  failed_when: false
   changed_when: false
 
-- name: Bridge | Step 4 - Deploy and Open Firewall
+- name: 6.1.1 - Deploy NGINX Ingress Controller (Only if missing)
   delegate_to: localhost
-  loop: "{{ groups['hahost'] }}"
-  vars:
-    ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {{ ssh_key_path }}"
-    target_ip: "{{ hostvars[item].ansible_host }}"
+  run_once: true
+  environment:
+    KUBECONFIG: "/home/{{ ansible_user_id }}/.kube/config"
   ansible.builtin.shell: |
-    ssh {{ ssh_opts }} core@{{ target_ip }} "
-      # Move to production
-      sudo mv /tmp/k8s-service-ingress.cfg /etc/haproxy/conf.d/k8s-service-ingress.cfg
-      sudo chown root:root /etc/haproxy/conf.d/k8s-service-ingress.cfg
-      sudo chmod 644 /etc/haproxy/conf.d/k8s-service-ingress.cfg
-      
-      # Firewall
-      sudo firewall-cmd --permanent --add-port=80/tcp
-      sudo firewall-cmd --permanent --add-port=443/tcp
-      sudo firewall-cmd --reload
-    "
-  when: haproxy_validation is succeeded
+    kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/baremetal/deploy.yaml
+  when: ingress_ns_check.rc != 0
+  register: ingress_deploy
 
-- name: Bridge | Step 5 - Restart HAProxy Service
+- name: 6.1.2 - Wait for Ingress Controller Pods (Only if we just deployed)
   delegate_to: localhost
-  loop: "{{ groups['hahost'] }}"
-  vars:
-    ssh_opts: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {{ ssh_key_path }}"
-    target_ip: "{{ hostvars[item].ansible_host }}"
+  run_once: true
+  environment:
+    KUBECONFIG: "/home/{{ ansible_user_id }}/.kube/config"
   ansible.builtin.shell: |
-    ssh {{ ssh_opts }} core@{{ target_ip }} "sudo systemctl restart haproxy"
+    kubectl wait --namespace ingress-nginx \
+      --for=condition=ready pod \
+      --selector=app.kubernetes.io/component=controller \
+      --timeout=120s
+  # Only wait if we actually performed a deployment or if the check failed
+  when: ingress_ns_check.rc != 0 or (ingress_deploy is defined and ingress_deploy.changed)
+
+- name: 6.1.3 - Always Discover NodePorts (Needed for HAProxy template)
+  delegate_to: localhost
+  run_once: true
+  environment:
+    KUBECONFIG: "/home/{{ ansible_user_id }}/.kube/config"
+  ansible.builtin.shell: |
+    kubectl get svc ingress-nginx-controller -n ingress-nginx \
+    -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort} {.spec.ports[?(@.name=="https")].nodePort}'
+  register: discovered_nodeports
+
+- name: 6.1.4 - Set Facts for the Bridge
+  ansible.builtin.set_fact:
+    ingress_http_nodeport: "{{ discovered_nodeports.stdout.split()[0] | trim }}"
+    ingress_https_nodeport: "{{ discovered_nodeports.stdout.split()[1] | trim }}"
