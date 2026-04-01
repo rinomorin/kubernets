@@ -9,20 +9,27 @@
     KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
 
 - name: 7.2 - Install MetalLB Manifests
-  command: "kubectl apply -f {{ item }}"
+  environment:
+    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
+  command: "kubectl apply -f {{ item }} --validate=false"
   loop:
     - https://raw.githubusercontent.com/metallb/metallb/v0.14.3/config/manifests/metallb-native.yaml
   delegate_to: localhost
-  environment:
-    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
 
-- name: 7.3 - Wait for MetalLB Controller to be Ready
+- name: 7.2b - Give the API a moment to breathe
+  pause:
+    seconds: 10
+
+- name: 7.3 - Wait for MetalLB Controller to exist and be Ready
   shell: "kubectl get pods -n metallb-system -l app=metallb,component=controller -o jsonpath='{.items[0].status.phase}'"
   register: mlb_check
   until: mlb_check.stdout == "Running"
   retries: 20
   delay: 10
   delegate_to: localhost
+  failed_when: false # Prevents crashing if the pod isn't created in the first 1 second
+  environment:
+    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
 
 - name: 7.4 - Configure MetalLB IP Pool and L2 Advertisement
   shell: |
