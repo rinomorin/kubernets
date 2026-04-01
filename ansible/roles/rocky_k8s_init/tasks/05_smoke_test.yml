@@ -78,6 +78,8 @@
     - 179/tcp    # Calico BGP
     - 10250/tcp  # Kubelet API
     - 6443/tcp   # API Server (on Masters)
+    - 7946/udp   # MetalLB Memberlist
+    - 7946/tcp   # MetalLB Memberlist
 
 - name: Reload Firewalld to apply changes
   service:
