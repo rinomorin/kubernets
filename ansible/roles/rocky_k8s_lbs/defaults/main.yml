@@ -26,6 +26,7 @@ rev_prov:  "{{ prov_cidr | ansible.utils.ipaddr('revdns') | regex_replace('^0\\.
 # Service Configuration
 # ------------------------------------------------------------
 k8s_api_vip: "{{ lookup('env', 'k8s_api_vip') | default('192.168.100.30', true) }}"
+metallb_vip: "{{ lookup('env', 'metallb_vip') | default('10.0.0.200', true) }}"
 ipa_master_fqdn: "ipa.{{ c_zone }}"
 
 # Hypervisor & Credentials
