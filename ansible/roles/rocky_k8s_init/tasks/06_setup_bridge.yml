@@ -13,21 +13,17 @@
   become: yes
   block:
     - name: Create .kube directory
-      file:
-        path: /home/core/.kube
-        state: directory
-        mode: '0755'
-        owner: core
-        group: core
+      shell: |
+        mkdir -p /home/core/.kube
+        chown core:core /home/core/.kube
+        chmod 750 /home/core/.kube
 
     - name: Copy admin.conf to user home
-      copy:
-        src: /etc/kubernetes/admin.conf
-        dest: /home/core/.kube/config
-        remote_src: yes
-        owner: core
-        group: core
-        mode: '0600'
+      shell: |
+        sudo cp -f /etc/kubernetes/admin.conf /home/core/.kube/config
+        sudo chown core:core /home/core/.kube/config
+        sudo chmod 600 /home/core/.kube/config  
+
   when: "'control_nodes' in group_names"
 
 - name: 6.1.1 - Deploy NGINX Ingress Controller
