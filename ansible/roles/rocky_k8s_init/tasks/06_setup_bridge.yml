@@ -9,6 +9,27 @@
   failed_when: false
   changed_when: false
 
+- name: Setup kubeconfig for core user
+  become: yes
+  block:
+    - name: Create .kube directory
+      file:
+        path: /home/core/.kube
+        state: directory
+        mode: '0755'
+        owner: core
+        group: core
+
+    - name: Copy admin.conf to user home
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/core/.kube/config
+        remote_src: yes
+        owner: core
+        group: core
+        mode: '0600'
+  when: "'control_plane' in group_names"
+
 - name: 6.1.1 - Deploy NGINX Ingress Controller
   shell: |
     kubectl apply --validate=false -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/baremetal/deploy.yaml
