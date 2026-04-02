@@ -46,10 +46,10 @@
   environment:
     KUBECONFIG: "/home/{{ ansible_user_id }}/.kube/config"
   ansible.builtin.shell: |
-    kubectl wait  --namespace ingress-nginx \
+    kubectl wait --kubeconfig=$KUBECONFIG --namespace ingress-nginx \
       --for=condition=ready pod \
       --selector=app.kubernetes.io/component=controller \
-      --timeout=120s
+      --timeout=180s
   # Only wait if we actually performed a deployment or if the check failed
   when: ingress_ns_check.rc != 0 or (ingress_deploy is defined and ingress_deploy.changed)
 
