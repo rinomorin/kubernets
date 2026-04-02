@@ -36,15 +36,22 @@
   until: mlb_check.stdout == "Running"
   retries: 20
   delay: 10
-  delegate_to: localhost
+  delegate_to: localhos2
   failed_when: false # Prevents crashing if the pod isn't created in the first 1 second
   environment:
     KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
+
+- name: 7.2c - Give the API a moment to breathe againt
+  pause:
+    seconds: 20
 
 - debug:
     msg: "MetalLB_vip {{ metallb_vip }}"
 
 - name: 7.4 - Configure MetalLB IP Pool and L2 Advertisement
+  delegate_to: localhost
+  environment:
+    KUBECONFIG: "{{ lookup('env', 'HOME') }}/.kube/config"
   shell: |
     cat <<EOF | kubectl apply --validate=false -f -
     apiVersion: metallb.io/v1beta1
