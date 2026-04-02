@@ -46,7 +46,7 @@
   environment:
     KUBECONFIG: "/home/{{ ansible_user_id }}/.kube/config"
   ansible.builtin.shell: |
-    kubectl wait --kubeconfig=$KUBECONFIG --namespace ingress-nginx \
+    kubectl wait --kubeconfig=/home/{{ ansible_user_id }}/.kube/config --namespace ingress-nginx \
       --for=condition=ready pod \
       --selector=app.kubernetes.io/component=controller \
       --timeout=180s
