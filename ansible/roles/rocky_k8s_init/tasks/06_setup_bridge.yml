@@ -58,6 +58,7 @@
 - name: 6.1.3 - Always Discover NodePorts (Needed for HAProxy template)
   delegate_to: localhost
   run_once: true
+  become: false
   environment:
     KUBECONFIG: "/home/{{ ansible_user_id }}/.kube/config"
   ansible.builtin.shell: |
