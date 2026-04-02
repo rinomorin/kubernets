@@ -12,12 +12,16 @@
 - name: 6.1.1 - Deploy NGINX Ingress Controller
   shell: |
     kubectl apply --validate=false -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/baremetal/deploy.yaml
+  # Run this only once from the master node that has the config
+  run_once: true
+  delegate_to: msrlv9mast01
   environment:
-    KUBECONFIG: "{{ lookup('env', 'HOME') }}/.kube/config"
+    # Use the absolute path to the config on that node
+    KUBECONFIG: "/home/core/.kube/config" 
   register: ingress_result
   until: ingress_result.rc == 0
   retries: 5
-  delay: 20
+  delay: 15
 
 - name: 6.1.2 - Wait for Ingress Controller Pods (Only if we just deployed)
   delegate_to: localhost
