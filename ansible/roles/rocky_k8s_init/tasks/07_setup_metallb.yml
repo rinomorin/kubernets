@@ -46,7 +46,7 @@
 
 - name: 7.4 - Configure MetalLB IP Pool and L2 Advertisement
   shell: |
-    cat <<EOF | kubectl apply -f -
+    cat <<EOF | kubectl apply --validate=false -f -
     apiVersion: metallb.io/v1beta1
     kind: IPAddressPool
     metadata:
