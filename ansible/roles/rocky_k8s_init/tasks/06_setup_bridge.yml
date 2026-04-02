@@ -17,7 +17,7 @@
   delegate_to: msrlv9mast01
   environment:
     # Use the absolute path to the config on that node
-    KUBECONFIG: "/home/core/.kube/config" 
+    KUBECONFIG: "/home/{{ ansible_user_id }}/.kube/config" 
   register: ingress_result
   until: ingress_result.rc == 0
   retries: 5
