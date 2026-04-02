@@ -28,7 +28,7 @@
 
 - name: 6.1.1 - Deploy NGINX Ingress Controller
   shell: |
-    kubectl apply --validate=false -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/baremetal/deploy.yaml
+    kubectl apply --kubeconfig=/etc/kubernetes/admin.conf --validate=false -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/baremetal/deploy.yaml
   # Run this only once from the master node that has the config
   run_once: true
   delegate_to: msrlv9mast01
