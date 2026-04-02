@@ -44,6 +44,7 @@
 - name: 6.1.2 - Wait for Ingress Controller Pods (Only if we just deployed)
   delegate_to: localhost
   run_once: true
+  become: false
   environment:
     KUBECONFIG: "/home/{{ ansible_user_id }}/.kube/config"
   ansible.builtin.shell: |
