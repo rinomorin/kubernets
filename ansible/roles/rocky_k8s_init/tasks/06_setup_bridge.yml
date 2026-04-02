@@ -9,15 +9,15 @@
   failed_when: false
   changed_when: false
 
-- name: 6.1.1 - Deploy NGINX Ingress Controller (Only if missing)
-  delegate_to: localhost
-  run_once: true
-  environment:
-    KUBECONFIG: "/home/{{ ansible_user_id }}/.kube/config"
-  ansible.builtin.shell: |
+- name: 6.1.1 - Deploy NGINX Ingress Controller
+  shell: |
     kubectl apply --validate=false -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/baremetal/deploy.yaml
-  when: ingress_ns_check.rc != 0
-  register: ingress_deploy
+  environment:
+    KUBECONFIG: "{{ lookup('env', 'HOME') }}/.kube/config"
+  register: ingress_result
+  until: ingress_result.rc == 0
+  retries: 5
+  delay: 20
 
 - name: 6.1.2 - Wait for Ingress Controller Pods (Only if we just deployed)
   delegate_to: localhost
