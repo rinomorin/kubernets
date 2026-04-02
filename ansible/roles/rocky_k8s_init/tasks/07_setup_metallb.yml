@@ -46,7 +46,6 @@
 
 - name: 7.4 - Configure MetalLB IP Pool and L2 Advertisement
   shell: |
-    source /etc/profile
     cat <<EOF | kubectl apply -f -
     apiVersion: metallb.io/v1beta1
     kind: IPAddressPool
@@ -55,7 +54,7 @@
       namespace: metallb-system
     spec:
       addresses:
-      - {{ metallb_vip }}-{{ metallb_vip }}
+      - 10.0.0.200-10.0.0.200
     ---
     apiVersion: metallb.io/v1beta1
     kind: L2Advertisement
@@ -66,10 +65,10 @@
       ipAddressPools:
       - first-pool
     EOF
-  delegate_to: localhost
-  environment:
-    KUBECONFIG: "/home/{{ lookup('env', 'USER') }}/.kube/config"
-
+  register: apply_result
+  until: apply_result.rc == 0
+  retries: 10
+  delay: 15
 
 - name: 7.5 - Expose Nginx Smoke Test via MetalLB
   shell: |
