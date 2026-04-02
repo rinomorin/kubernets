@@ -28,7 +28,7 @@
         owner: core
         group: core
         mode: '0600'
-  when: "'control_plane' in group_names"
+  when: "'control_nodes' in group_names"
 
 - name: 6.1.1 - Deploy NGINX Ingress Controller
   shell: |
