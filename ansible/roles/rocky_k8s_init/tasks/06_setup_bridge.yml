@@ -32,6 +32,7 @@
   # Run this only once from the master node that has the config
   run_once: true
   delegate_to: msrlv9mast01
+  become: false
   environment:
     # Use the absolute path to the config on that node
     KUBECONFIG: "/home/{{ ansible_user_id }}/.kube/config" 
