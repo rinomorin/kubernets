@@ -89,6 +89,10 @@
 
     # 4. Bring it up
     {{ ssh_cmd }} "sudo nmcli con up provider"
+    
+    # 5. Optional: Verify st hostname
+    {{ ssh_cmd }} "sudo hostnamectl set-hostname {{ item.split('.')[0] }}.{{ c_zone}} && hostnamectl"
+
   loop: "{{ groups['hahost'] }}"
 
 - name: 2.3 - Discover Cluster MAC from br-cluster
