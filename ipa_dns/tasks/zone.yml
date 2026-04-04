@@ -1,7 +1,0 @@
-- name: Ensure IPA DNS zone exists
-  command: >
-    ipa dnszone-add {{ ipa_dns_zone }}
-    --admin-email=hostmaster@{{ ipa_dns_zone }}
-  register: zone_add
-  failed_when: zone_add.rc not in [0, 1, 2]
-  changed_when: zone_add.rc == 0
