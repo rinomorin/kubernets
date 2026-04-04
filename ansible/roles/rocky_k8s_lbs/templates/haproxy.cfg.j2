@@ -40,7 +40,7 @@ frontend k8s-ingress-https
 backend k8s-ingress-backend-https
     mode tcp
     balance roundrobin
-    server metallb-vip 10.0.0.200:443 check
+    server metallb-vip 10.0.0.200:443 check send-proxy-v2
 
 # --- APPLICATION TRAFFIC (HTTP - 80) ---
 # Forwards standard web traffic to the MetalLB VIP
