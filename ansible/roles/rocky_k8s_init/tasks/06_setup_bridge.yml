@@ -38,23 +38,19 @@
   retries: 5
   delay: 15
 
-- name: 6.1.2 - Configure MetalLB Pool and L2 Advertisement
+
+- name: 6.1.2 - Ensure MetalLB Pool is expanded and advertised
   run_once: true
   delegate_to: msrlv9mast01
   environment:
     KUBECONFIG: "/home/core/.kube/config"
   shell: |
-    # Patch or create the pool
-    kubectl apply -f - <<EOF
-    apiVersion: metallb.io/v1beta1
-    kind: IPAddressPool
-    metadata:
-      name: morinsoft-pool
-      namespace: metallb-system
-    spec:
-      addresses:
-      - 10.0.0.200-10.0.0.210
-    ---
+    # 1. Patch the existing pool to the full range
+    kubectl patch ipaddresspool first-pool -n metallb-system --type merge \
+      -p '{"spec":{"addresses":["10.0.0.200-10.0.0.210"]}}'
+    
+    # 2. Ensure the L2 Advertisement exists for this pool
+    cat <<EOF | kubectl apply -f -
     apiVersion: metallb.io/v1beta1
     kind: L2Advertisement
     metadata:
@@ -62,8 +58,12 @@
       namespace: metallb-system
     spec:
       ipAddressPools:
-      - morinsoft-pool
+      - first-pool
     EOF
+  register: metallb_fix
+  failed_when: 
+    - metallb_fix.rc != 0 
+    - "'not found' not in metallb_fix.stderr" # Don't fail if we need to create it instead
 
 - name: 6.1.3 - Clean up conflicting services (Squatters)
   run_once: true
