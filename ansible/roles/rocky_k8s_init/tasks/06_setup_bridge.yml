@@ -74,13 +74,13 @@
     # Remove the conflicting nginx-lb service if it exists
     kubectl delete svc nginx-lb -n default --ignore-not-found
     
-    # Enable Proxy Protocol
+    # Enable Proxy Protocol (Fixed quotes and brackets)
     kubectl patch configmap ingress-nginx-controller -n ingress-nginx --type merge \
-      -p '{"data":{"use-proxy-protocol":"true","real-ip-header":"proxy_protocol","set-real-ip-from":"{{ (ingress_vip.split('.')[:3] | join('.')) }}.0/24"  
+      -p "{\"data\":{\"use-proxy-protocol\":\"true\",\"real-ip-header\":\"proxy_protocol\",\"set-real-ip-from\":\"{{ (ingress_vip.split('.')[:3] | join('.')) }}.0/24\"}}"
+    
     # Bind Controller to VIP
     kubectl patch svc ingress-nginx-controller -n ingress-nginx \
       -p '{"spec":{"type":"LoadBalancer","loadBalancerIP":"10.0.0.200","externalTrafficPolicy":"Local"}}'
-
 
 - name: 6.1.4 - Restart Controller and Deploy Test Application
   run_once: true
