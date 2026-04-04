@@ -11,6 +11,7 @@ core_ssh_key: >-
     ) 
   }}
 
+ingress_ip: "{{ lookup('env', 'ingress_ip') | default('192.168.100.30', true) }}"
 # Existing defaults
 cloud_helper_user: "{{ lookup('env', 'CLOUD_HELPER_USER') | default('cloud_helper', true) }}"
 vm_host: "{{ lookup('env', 'golden_image_name') | default('golden-base', true) }}"

@@ -75,7 +75,7 @@
     
     # Enable Proxy Protocol (Fixed quotes and brackets)
     kubectl patch configmap ingress-nginx-controller -n ingress-nginx --type merge \
-      -p "{\"data\":{\"use-proxy-protocol\":\"true\",\"real-ip-header\":\"proxy_protocol\",\"set-real-ip-from\":\"{{ (ingress_vip.split('.')[:3] | join('.')) }}.0/24\"}}"
+      -p "{\"data\":{\"use-proxy-protocol\":\"true\",\"real-ip-header\":\"proxy_protocol\",\"set-real-ip-from\":\"{{ (ingress_ip.split('.')[:3] | join('.')) }}.0/24\"}}"
     
     # Bind Controller to VIP
     kubectl patch svc ingress-nginx-controller -n ingress-nginx \
