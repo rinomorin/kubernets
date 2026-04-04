@@ -29,41 +29,101 @@
 - name: 6.1.1 - Deploy NGINX Ingress Controller
   shell: |
     kubectl apply --validate=false -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/baremetal/deploy.yaml
-  # Run this only once from the master node that has the config
   run_once: true
   delegate_to: msrlv9mast01
-  become: false
   environment:
-    # Use the absolute path to the config on that node
     KUBECONFIG: "/home/core/.kube/config" 
   register: ingress_result
   until: ingress_result.rc == 0
   retries: 5
   delay: 15
 
-- name: 6.1.2 - Ingress Deployment Summary & Next Steps
+- name: 6.1.2 - Configure MetalLB Pool and L2 Advertisement
+  run_once: true
+  delegate_to: msrlv9mast01
+  environment:
+    KUBECONFIG: "/home/core/.kube/config"
+  shell: |
+    # Patch or create the pool
+    kubectl apply -f - <<EOF
+    apiVersion: metallb.io/v1beta1
+    kind: IPAddressPool
+    metadata:
+      name: morinsoft-pool
+      namespace: metallb-system
+    spec:
+      addresses:
+      - 10.0.0.200-10.0.0.210
+    ---
+    apiVersion: metallb.io/v1beta1
+    kind: L2Advertisement
+    metadata:
+      name: morinsoft-l2-ad
+      namespace: metallb-system
+    spec:
+      ipAddressPools:
+      - morinsoft-pool
+    EOF
+
+- name: 6.1.3 - Clean up conflicting services (Squatters)
+  run_once: true
+  delegate_to: msrlv9mast01
+  environment:
+    KUBECONFIG: "/home/core/.kube/config"
+  shell: "kubectl delete svc nginx-lb -n default --ignore-not-found"
+
+- name: 6.1.4 - Patch NGINX ConfigMap for Proxy Protocol
+  run_once: true
+  delegate_to: msrlv9mast01
+  environment:
+    KUBECONFIG: "/home/core/.kube/config"
+  shell: |
+    kubectl patch configmap ingress-nginx-controller -n ingress-nginx --type merge \
+    -p '{"data":{"use-proxy-protocol":"true","real-ip-header":"proxy_protocol","set-real-ip-from":"192.168.100.0/24"}}'
+
+- name: 6.1.5 - Bind Ingress Controller to VIP 10.0.0.200
+  run_once: true
+  delegate_to: msrlv9mast01
+  environment:
+    KUBECONFIG: "/home/core/.kube/config"
+  shell: |
+    kubectl patch svc ingress-nginx-controller -n ingress-nginx \
+    -p '{"spec":{"type":"LoadBalancer","loadBalancerIP":"10.0.0.200","externalTrafficPolicy":"Local"}}'
+
+- name: 6.1.6 - Restart NGINX to apply Proxy Protocol settings
+  run_once: true
+  delegate_to: msrlv9mast01
+  environment:
+    KUBECONFIG: "/home/core/.kube/config"
+  shell: |
+    kubectl rollout restart deployment ingress-nginx-controller -n ingress-nginx
+    kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx
+
+- name: 6.1.7 - Ingress Deployment Summary
   run_once: true
   delegate_to: localhost
   ansible.builtin.debug:
     msg: 
       - "---------------------------------------------------------------"
-      - "STAGE 1 COMPLETE: INGRESS CONTROLLER & METALLB ONLINE"
+      - "STAGE 1 COMPLETE: HTTPS INGRESS & PROXY PROTOCOL ACTIVE"
       - "---------------------------------------------------------------"
-      - "Web Access: http://nginx.{{ cloud_zone }}"
-      - "(Note: HTTPS is not yet implemented)"
+      - "VIP Address: 10.0.0.200"
+      - "External URL: https://nginx.{{ cloud_zone }}"
+      - "HAProxy Config: Must use 'send-proxy-v2' on port 443"
       - ""
-      - "VERIFICATION STEPS:"
-      - "1. Ensure MetalLB IPAddressPool is set to: 10.0.0.200-10.0.0.210"
-      - "2. Deploy applications using the following Ingress spec:"
-      - ""
+      - "DEPLOYMENT TEMPLATE (HTTPS):"
       - "apiVersion: networking.k8s.io/v1"
       - "kind: Ingress"
       - "metadata:"
       - "  name: [app-name]-ingress"
       - "spec:"
       - "  ingressClassName: nginx"
+      - "  tls:"
+      - "  - hosts: ['nginx.{{ cloud_zone }}']"
+      - "    secretName: morinsoft-tls-cert"
       - "  rules:"
-      - "  - http:"
+      - "  - host: 'nginx.{{ cloud_zone }}'"
+      - "    http:"
       - "      paths:"
       - "      - path: /"
       - "        pathType: Prefix"
