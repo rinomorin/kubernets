@@ -1,9 +1,0 @@
-- hosts: localhost
-  connection: ssh
-  gather_facts: false
-  vars:
-    # ansible_remote_tmp: "{{ iso_repo }}/ansible/.ansible/tmp"
-    ansible_user: "{{ lookup('env', 'secops_id') }}"
-    ansible_password: "{{ lookup('env', 'secops_pwd') }}"
-  roles:
-    - rocky-repo

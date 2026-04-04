@@ -1,2 +1,0 @@
-- debug:
-    msg: "Skipping prereq installation — handled by Flatcar Ignition"
